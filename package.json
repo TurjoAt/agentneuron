@@ -1,25 +1,71 @@
 {
   "name": "agentneuron",
   "version": "0.2.0",
-  "description": "Live monitor for AI-context markdown (CLAUDE.md, AGENTS.md, Cursor rules, skills, docs) with git, history, link graph and health checks.",
+  "description": "AI context control center: monitor, understand and act on CLAUDE.md, AGENTS.md, Cursor/Copilot rules, skills and agent configs — live web UI, MCP server, git & project intelligence.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "codex",
+    "agents-md",
+    "cursor",
+    "cursor-rules",
+    "copilot",
+    "windsurf",
+    "gemini",
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "llm",
+    "context-engineering",
+    "prompt-engineering",
+    "markdown",
+    "devtools",
+    "cli",
+    "monitoring",
+    "dashboard"
+  ],
+  "author": {
+    "name": "Rezaul Hoque Turjo",
+    "email": "hi@turjo.me",
+    "url": "https://turjo.me"
+  },
+  "homepage": "https://github.com/__GH_OWNER__/agentneuron#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/__GH_OWNER__/agentneuron.git"
+  },
+  "bugs": {
+    "url": "https://github.com/__GH_OWNER__/agentneuron/issues",
+    "email": "hi@turjo.me"
+  },
+  "license": "MIT",
   "type": "module",
   "bin": {
     "agentneuron": "dist/agentneuron.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "dev": "node src/cli.js start",
     "ui:dev": "vite --config ui/vite.config.js",
     "ui:build": "vite build --config ui/vite.config.js",
     "build": "node scripts/build.mjs",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "node scripts/build.mjs --strict && npm test",
+    "pack:check": "npm pack --dry-run"
   },
-  "license": "MIT",
   "devDependencies": {
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-markdown": "^6.5.2",

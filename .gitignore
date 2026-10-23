@@ -2,3 +2,17 @@ node_modules/
 dist/
 ui/dist/
 .agentneuron/
+.mdctl/
+*.tgz
+coverage/
+.nyc_output/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+.vscode/*
+!.vscode/extensions.json
+.idea/

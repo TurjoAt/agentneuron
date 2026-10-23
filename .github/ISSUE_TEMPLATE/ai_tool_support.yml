@@ -1,0 +1,37 @@
+name: AI tool support request
+description: Request detection of a new AI tool's config / rules files
+labels: [ai-tool-support, enhancement, triage]
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool name and link
+      placeholder: "Windsurf - https://windsurf.com"
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Config file paths / globs
+      description: Which files does the tool read? (e.g. `.windsurf/rules/*.md`, `GEMINI.md`)
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: kinds
+    attributes:
+      label: What kind of files are they?
+      description: Context/instructions, rules, skills, agents, commands, settings, MCP config...
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: Official documentation link
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample file (optional, no secrets)
+      render: markdown

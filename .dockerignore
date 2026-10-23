@@ -1,0 +1,12 @@
+node_modules
+ui/dist
+dist
+.git
+.github
+test
+docs
+*.tgz
+.agentneuron
+.mdctl
+.env*
+coverage
