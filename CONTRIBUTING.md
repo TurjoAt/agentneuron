@@ -4,7 +4,7 @@ Thanks for helping! AgentNeuron is a local-first tool, so changes are reviewed w
 
 ## Development setup
 
-Requirements: Node.js >= 18 (22 recommended) and npm.
+Requirements: Node.js 20.19+ or 22.12+ (22 recommended) and npm for development — the UI build tools need it. The published bundle itself runs on Node 18+.
 
 ```bash
 git clone https://github.com/TurjoAt/agentneuron.git
