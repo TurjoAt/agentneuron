@@ -35,7 +35,7 @@ export function list() {
 }
 export function runningUrl(p) { return children.get(path.resolve(p))?.url || null; }
 
-/** Spawn `mdctl start <dir> --port 0` and resolve with its URL. Re-uses a live child. */
+/** Spawn `agentneuron start <dir> --port 0` and resolve with its URL. Re-uses a live child. */
 export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutMs = 15000 } = {}) {
   hook();
   const abs = path.resolve(dir);
@@ -52,7 +52,7 @@ export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutM
       if (done) return; done = true; clearTimeout(timer);
       if (err) { try { child.kill('SIGTERM'); } catch { /* gone */ } children.delete(abs); reject(err); } else resolve(val);
     };
-    const timer = setTimeout(() => finish(new Error('timed out waiting for mdctl to print its URL')), timeoutMs);
+    const timer = setTimeout(() => finish(new Error('timed out waiting for agentneuron to print its URL')), timeoutMs);
     timer.unref?.();
     const onData = (d) => {
       buf += d.toString();
@@ -68,7 +68,7 @@ export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutM
     child.on('error', (e) => finish(e));
     child.on('exit', (code) => {
       if (children.get(abs)?.child === child) children.delete(abs);
-      finish(new Error(`mdctl exited with code ${code} before printing a URL`));
+      finish(new Error(`agentneuron exited with code ${code} before printing a URL`));
     });
   });
 }

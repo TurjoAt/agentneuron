@@ -8,7 +8,7 @@ const KNOWN = {
   '.claude': ['Claude Code settings, agents, skills, commands', 'claude'], '.cursor': ['Cursor rules and MCP', 'cursor'], '.codex': ['Codex CLI config', 'codex'],
   '.gemini': ['Gemini CLI config', 'gemini'], '.windsurf': ['Windsurf rules', 'windsurf'], '.continue': ['Continue config', 'continue'], '.roo': ['Roo Code rules', 'roo'],
   '.clinerules': ['Cline rules', 'cline'], '.zed': ['Zed settings', 'zed'], '.junie': ['JetBrains Junie guidelines', 'junie'], '.amazonq': ['Amazon Q rules', 'amazonq'],
-  '.mdctl': ['mdctl state, history and cache', 'mdctl'], '.gitlab': ['GitLab templates', 'gitlab'], '.circleci': ['CircleCI config', 'circleci'], '.config': ['Tool config', null],
+  '.agentneuron': ['agentneuron state, history and cache', 'agentneuron'], '.gitlab': ['GitLab templates', 'gitlab'], '.circleci': ['CircleCI config', 'circleci'], '.config': ['Tool config', null],
   '.storybook': ['Storybook config', 'storybook'], '.turbo': ['Turborepo cache', 'turbo'], '.cache': ['Tool cache', null], '.venv': ['Python virtualenv', 'python'], '.yarn': ['Yarn releases/cache', 'yarn'],
   '.changeset': ['Changesets', 'changesets'], '.aider.tags.cache.v3': ['Aider cache', 'aider'],
 };

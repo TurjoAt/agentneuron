@@ -1,4 +1,4 @@
-# mdctl — Module & API Contract (source of truth for all agents)
+# agentneuron — Module & API Contract (source of truth for all agents)
 
 Read `docs/VISION.md` for the why. This file is the **how**. Do not change a
 signature here without telling the lead (it breaks other agents' work).
@@ -7,8 +7,8 @@ signature here without telling the lead (it breaks other agents' work).
 - Plain **JavaScript ESM** (`.js`, `import`/`export`), Node >= 18. JSDoc types welcome. No TypeScript.
 - Server code may only import Node built-ins + `chokidar` (v4). Everything gets bundled by esbuild into one file.
 - All paths exchanged between modules and over the API are **project-relative POSIX** (`docs/plan.md`, never absolute, never `\`).
-- Never write inside the target project except under `<root>/.mdctl/`. Read-only on everything else (except explicit restore).
-- Always ignore: `.git`, `node_modules`, `vendor`, `.mdctl`, `dist`, `build`, `.next`, `storage`, `__MACOSX`, plus `config.ignore`. Skip files > `config.maxFileSize` (default 1 MB).
+- Never write inside the target project except under `<root>/.agentneuron/`. Read-only on everything else (except explicit restore).
+- Always ignore: `.git`, `node_modules`, `vendor`, `.agentneuron`, `dist`, `build`, `.next`, `storage`, `__MACOSX`, plus `config.ignore`. Skip files > `config.maxFileSize` (default 1 MB).
 - Tests: `node --test`, in `test/<module>.test.js`, use temp dirs (`fs.mkdtempSync(os.tmpdir()+...)`) — never touch real projects.
 - Each agent ONLY edits the files it owns (listed below). Need something from another module? Code against this contract.
 
@@ -52,12 +52,12 @@ signature here without telling the lead (it breaks other agents' work).
 
 ### Agent A (Sonnet) — core: `src/core/*`, `src/patterns/catalogue.json`
 - `src/patterns/catalogue.json` — `{ patterns: [{ glob, tool, kind, description }] , docKinds: [{ regex, kind }] }`. Cover Claude (CLAUDE.md, CLAUDE.local.md, .claude/agents/*.md, .claude/skills/**/SKILL.md, .claude/commands/**/*.md, .claude/settings*.json, .mcp.json), Codex (AGENTS.md, AGENTS.override.md, .codex/**), Cursor (.cursorrules, .cursor/rules/**/*.mdc, .cursor/mcp.json), Copilot (.github/copilot-instructions.md, .github/instructions/**/*.instructions.md, .github/prompts/*.prompt.md), Windsurf (.windsurfrules, .windsurf/rules/**), Gemini (GEMINI.md, .gemini/**), generic (README, TODO, ROADMAP, DECISIONS, adr/**, PLAN*, CHANGELOG, docs/**, memory/**).
-- `src/core/config.js` — `export function loadConfig(root, overrides={})` → `{ root, port:4747, host:"127.0.0.1", token:null, ignore:[], extraPatterns:[], includeAllMarkdown:true, maxFileSize:1048576, historyLimitPerFile:200, openBrowser:false }`. Reads `<root>/.mdctl/config.json` if present. `export function ensureMdctlDir(root)` creates `.mdctl/` (+ `.mdctl/.gitignore` containing `history/\ncache/\n`).
+- `src/core/config.js` — `export function loadConfig(root, overrides={})` → `{ root, port:4747, host:"127.0.0.1", token:null, ignore:[], extraPatterns:[], includeAllMarkdown:true, maxFileSize:1048576, historyLimitPerFile:200, openBrowser:false }`. Reads `<root>/.agentneuron/config.json` if present. `export function ensureAgentneuronDir(root)` creates `.agentneuron/` (+ `.agentneuron/.gitignore` containing `history/\ncache/\n`).
 - `src/core/classify.js` — `export function classify(relPath)` → `{ tool, kind, tracked: boolean }` (tracked=true if it matches a catalogue pattern or is `.md/.mdc`). `export function isCandidate(relPath, config)`.
 - `src/core/tokens.js` — `export function estimateTokens(text)` (≈ chars/4 with word-aware tweak; deterministic).
 - `src/core/scanner.js` — `export async function scan(root, config)` → `FileEntry[]`; `export async function readEntry(root, relPath)` → `{ entry: FileEntry, content: string } | null`.
 - `src/core/watcher.js` — `export function createWatcher(root, config, onEvent)` → `{ close(): Promise<void> }`. onEvent(`{type, path}`) debounced ~150ms per path, via chokidar with ignore rules.
-- `src/core/history.js` — `export function createHistory(root, config)` → `{ record(path, content) => HistoryEntry|null (null if hash unchanged), list(path) => HistoryEntry[] (newest first), get(path, id) => string|null, latest(path) => HistoryEntry|null, restore(path, id) => HistoryEntry (writes file + records) }`. Storage under `.mdctl/history/`. Enforce historyLimitPerFile.
+- `src/core/history.js` — `export function createHistory(root, config)` → `{ record(path, content) => HistoryEntry|null (null if hash unchanged), list(path) => HistoryEntry[] (newest first), get(path, id) => string|null, latest(path) => HistoryEntry|null, restore(path, id) => HistoryEntry (writes file + records) }`. Storage under `.agentneuron/history/`. Enforce historyLimitPerFile.
 - `src/core/diff.js` — `export function lineDiff(oldText, newText)` → `{ added, removed, hunks: [{ type:"add"|"del"|"ctx", line, text }] }` (Myers or LCS; fine for files < 1MB; cap work for huge inputs).
 - `src/core/store.js` — `export function createStore(root, config)` → EventEmitter-based state: `{ files: Map<path, FileEntry>, contents: Map<path,string>, events: Event[] (ring, 500), init(): Promise<void> (scan+read+history.record baseline), handleFsEvent({type,path}): Promise<Event|null>, history, on('event', fn), on('changed', fn) }`. On each change: read, compute stats via lineDiff against previous content, record history, push Event, emit `'event'`.
 
@@ -78,7 +78,7 @@ signature here without telling the lead (it breaks other agents' work).
 - `src/agents/conflicts.js` — `export function createConflictRadar({ windowMs = 120000 })` → `{ note(event /*with agent*/), active(): [{ path, agents:[AgentRef], lastTs }] }` — flags a path touched by ≥2 distinct sessions within window.
 
 ### Agent D (Sonnet) — server, CLI, build: `src/server/*`, `src/cli.js`, `scripts/build.mjs`, `test/server.test.js`, `README.md`
-- `src/server/app.js` — `export async function startServer(config)` → `{ url, close() }`. Wires store, git, analysis, health, agents. Plain `node:http`. Serves UI from an injected HTML string (`globalThis.__MDCTL_UI__` when bundled; in dev read `ui/dist/index.html`; if missing serve a tiny fallback page). Auth: if `config.token` set, require `?token=` or `Authorization: Bearer` (UI keeps token from the URL and sends it on API calls & SSE via `?token=`). If host isn't loopback and no token → auto-generate token and print it.
+- `src/server/app.js` — `export async function startServer(config)` → `{ url, close() }`. Wires store, git, analysis, health, agents. Plain `node:http`. Serves UI from an injected HTML string (`globalThis.__AGENTNEURON_UI__` when bundled; in dev read `ui/dist/index.html`; if missing serve a tiny fallback page). Auth: if `config.token` set, require `?token=` or `Authorization: Bearer` (UI keeps token from the URL and sends it on API calls & SSE via `?token=`). If host isn't loopback and no token → auto-generate token and print it.
 - Caches analysis results; recompute graph/lint lazily after changes (debounce 300ms).
 - REST (all JSON, GET unless noted):
   - `/api/state` → `{ project:{root, name}, version, startedAt, counts:{files, tokens, byTool:{}, byKind:{}}, health:{score,grade,counts}, git:{available, branch, dirty} }`
@@ -97,9 +97,9 @@ signature here without telling the lead (it breaks other agents' work).
   - `/api/sessions` → sessions list; `/api/conflicts` → active conflicts
   - `/api/search?q=` → `[{ path, line, text }]` (case-insensitive, max 200)
 - SSE `/api/stream` (`text/event-stream`): events named `event` (Event), `health` ({score,grade,counts}), `graph` ({changed:true}), `conflict` (conflict list), `ping` every 20s.
-- `src/cli.js` — commands: `start` (default) `[--port n] [--host h] [--token t] [--open] [--write] [dir]`, `lint [--json] [dir]` (exit 1 if errors), `status [dir]` (short text summary), `init [dir]` (creates `.mdctl/` with `config.json` + copies the running bundle to `.mdctl/mdctl.mjs` when running bundled), `--version`, `--help`. Root = dir arg or cwd.
-- `scripts/build.mjs` — 1) `vite build --config ui/vite.config.js` (UI owned by Agent E, outputs single inlined `ui/dist/index.html`); 2) esbuild bundle `src/cli.js` → `dist/mdctl.mjs` (platform node, format esm, target node18, bundle chokidar, banner `#!/usr/bin/env node` + `createRequire` shim), defining `globalThis.__MDCTL_UI__` to the HTML string; chmod +x.
-- Result must work as: `node dist/mdctl.mjs /some/project` and `cp dist/mdctl.mjs project/.mdctl/ && node project/.mdctl/mdctl.mjs` (root = parent of `.mdctl` when the script lives inside a `.mdctl` folder and no dir is given).
+- `src/cli.js` — commands: `start` (default) `[--port n] [--host h] [--token t] [--open] [--write] [dir]`, `lint [--json] [dir]` (exit 1 if errors), `status [dir]` (short text summary), `init [dir]` (creates `.agentneuron/` with `config.json` + copies the running bundle to `.agentneuron/agentneuron.mjs` when running bundled), `--version`, `--help`. Root = dir arg or cwd.
+- `scripts/build.mjs` — 1) `vite build --config ui/vite.config.js` (UI owned by Agent E, outputs single inlined `ui/dist/index.html`); 2) esbuild bundle `src/cli.js` → `dist/agentneuron.mjs` (platform node, format esm, target node18, bundle chokidar, banner `#!/usr/bin/env node` + `createRequire` shim), defining `globalThis.__AGENTNEURON_UI__` to the HTML string; chmod +x.
+- Result must work as: `node dist/agentneuron.mjs /some/project` and `cp dist/agentneuron.mjs project/.agentneuron/ && node project/.agentneuron/agentneuron.mjs` (root = parent of `.agentneuron` when the script lives inside a `.agentneuron` folder and no dir is given).
 
 ### Agent E (Opus) — UI: `ui/**` only
 - Svelte 5 + Vite, `ui/vite.config.js` with root `ui/`, output `ui/dist/index.html` as ONE file (inline all JS/CSS — write a tiny vite plugin or use build options; no external network at runtime, no CDN fonts → system font stack).

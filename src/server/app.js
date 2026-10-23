@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { createStore } from '../core/store.js';
 import { createWatcher } from '../core/watcher.js';
 import { lineDiff } from '../core/diff.js';
-import { ensureMdctlDir } from '../core/config.js';
+import { ensureAgentneuronDir } from '../core/config.js';
 import { createGit } from '../analysis/git.js';
 import { buildGraph } from '../analysis/graph.js';
 import { effectiveContext, contextDirs } from '../analysis/context.js';
@@ -25,12 +25,12 @@ import { createPersist } from '../persist/index.js';
 import { createNotifier } from '../notify/index.js';
 
 export { VERSION };
-const SESSION_COOKIE = 'mdctl_session';
+const SESSION_COOKIE = 'agentneuron_session';
 const SESSION_TTL = 7 * 24 * 3600 * 1000;
 
-const FALLBACK_HTML = `<!doctype html><meta charset="utf-8"><title>mdctl</title>
+const FALLBACK_HTML = `<!doctype html><meta charset="utf-8"><title>agentneuron</title>
 <body style="font:15px system-ui;background:#0b0d12;color:#dde;padding:2rem">
-<h1>mdctl</h1><p>The UI bundle is not built. Run <code>npm run build</code>.</p>
+<h1>agentneuron</h1><p>The UI bundle is not built. Run <code>npm run build</code>.</p>
 <p>The JSON API is live: <a style="color:#8cf" href="api/state">/api/state</a></p></body>`;
 
 function isLoopback(h) {
@@ -38,7 +38,7 @@ function isLoopback(h) {
 }
 
 function loadUi() {
-  if (typeof globalThis.__MDCTL_UI__ === 'string' && globalThis.__MDCTL_UI__.length) return globalThis.__MDCTL_UI__;
+  if (typeof globalThis.__AGENTNEURON_UI__ === 'string' && globalThis.__AGENTNEURON_UI__.length) return globalThis.__AGENTNEURON_UI__;
   try {
     const here = path.dirname(new URL(import.meta.url).pathname);
     return fs.readFileSync(path.resolve(here, '../../ui/dist/index.html'), 'utf8');
@@ -59,7 +59,7 @@ export async function startServer(config) {
     config.token = crypto.randomBytes(12).toString('hex');
     config.tokenGenerated = true;
   }
-  try { ensureMdctlDir(root); } catch { /* read-only project is fine */ }
+  try { ensureAgentneuronDir(root); } catch { /* read-only project is fine */ }
 
   const startedAt = Date.now();
   const store = createStore(root, config);
@@ -124,7 +124,7 @@ export async function startServer(config) {
   git.available().then((ok) => ok && refreshRepo()).catch(() => {});
   analysis().catch(() => {});
 
-  function warn(what, e) { if (process.env.MDCTL_DEBUG) console.error(`[mdctl] ${what}:`, e); }
+  function warn(what, e) { if (process.env.AGENTNEURON_DEBUG) console.error(`[agentneuron] ${what}:`, e); }
 
   function broadcast(name, data) {
     const msg = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -382,7 +382,7 @@ export async function startServer(config) {
     const audited = route.level !== 'read';
     const ip = req.socket?.remoteAddress || null;
     if (!ctx.can(route.level, role)) {
-      const why = route.level === 'state' ? 'requires the admin role' : `action level "${route.level}" is disabled - enable it in .mdctl/config.json (actions.${route.level}: true) or start with --enable ${route.level}`;
+      const why = route.level === 'state' ? 'requires the admin role' : `action level "${route.level}" is disabled - enable it in .agentneuron/config.json (actions.${route.level}: true) or start with --enable ${route.level}`;
       if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, status: 403 });
       bad(res, 403, why);
       return true;

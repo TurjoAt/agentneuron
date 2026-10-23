@@ -46,12 +46,12 @@ class AppState {
   /** bumped when annotations change (SSE files {changed:'annotations'}) */
   annotTick = $state(0);
   /** global find & replace panel / sidebar sections */
-  sideRecentOpen = $state(loadLocal('mdctl.side.recent', true));
-  sidePinnedOpen = $state(loadLocal('mdctl.side.pinned', true));
+  sideRecentOpen = $state(loadLocal('agentneuron.side.recent', true));
+  sidePinnedOpen = $state(loadLocal('agentneuron.side.pinned', true));
   /** pinned files (bookmarks) [{ path, label? }] */
   bookmarks = $state.raw([]);
   /** recently opened files (newest first) */
-  recent = $state.raw(loadLocal('mdctl.recent', []));
+  recent = $state.raw(loadLocal('agentneuron.recent', []));
   /** in-app navigation stack (hashes) for back/forward */
   navStack = $state.raw([location.hash || '#/overview']);
   navPos = $state(0);
@@ -160,7 +160,7 @@ function trackRecent() {
   if (r.view !== 'files' || !r.params.path) return;
   const p = r.params.path;
   app.recent = [p, ...app.recent.filter((x) => x !== p)].slice(0, 15);
-  saveLocal('mdctl.recent', app.recent);
+  saveLocal('agentneuron.recent', app.recent);
 }
 trackRecent();
 
@@ -174,7 +174,7 @@ export async function loadBookmarks() {
     bookmarksLocal = false;
   } catch {
     bookmarksLocal = true;
-    app.bookmarks = loadLocal('mdctl.bookmarks', []);
+    app.bookmarks = loadLocal('agentneuron.bookmarks', []);
   }
 }
 export async function toggleBookmark(path, label) {
@@ -182,7 +182,7 @@ export async function toggleBookmark(path, label) {
   const canState = !!app.me?.levels?.state;
   if (bookmarksLocal || !canState) {
     app.bookmarks = on ? app.bookmarks.filter((b) => b.path !== path) : [...app.bookmarks, { path, label, local: true }];
-    saveLocal('mdctl.bookmarks', app.bookmarks.filter((b) => b.local));
+    saveLocal('agentneuron.bookmarks', app.bookmarks.filter((b) => b.local));
     toast(on ? 'Unpinned' : 'Pinned (this browser only — sign in as admin to share pins)', 'info');
     return;
   }
@@ -204,9 +204,9 @@ export function pushNotification(n) {
   const kind = item.level === 'error' ? 'error' : item.level === 'warn' ? 'warn' : item.level === 'ok' || item.level === 'success' ? 'ok' : 'info';
   toast(item.title + (item.body ? ` — ${item.body}` : ''), kind, kind === 'error' ? 7000 : 4500);
   try {
-    const want = loadLocal('mdctl.browserNotify', false);
+    const want = loadLocal('agentneuron.browserNotify', false);
     if (want && typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
-      new Notification(item.title, { body: item.body || '', tag: item.type || 'mdctl' });
+      new Notification(item.title, { body: item.body || '', tag: item.type || 'agentneuron' });
     }
   } catch {
     /* notifications unavailable */
@@ -227,7 +227,7 @@ export function setTheme(t) {
   app.theme = t;
   document.documentElement.dataset.theme = t;
   try {
-    localStorage.setItem('mdctl.theme', t);
+    localStorage.setItem('agentneuron.theme', t);
   } catch {
     /* storage unavailable */
   }
@@ -257,7 +257,7 @@ export async function loadState() {
   const s = await api('/api/state');
   app.state = s;
   if (s?.health) app.health = { ...(app.health || {}), ...s.health };
-  if (s?.project?.name) document.title = `${s.project.name} · mdctl`;
+  if (s?.project?.name) document.title = `${s.project.name} · AgentNeuron`;
 }
 
 export async function loadFiles() {

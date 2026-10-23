@@ -11,7 +11,7 @@ let root, srv, base;
 const TOKEN = 'secret123';
 
 before(async () => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-srv-'));
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-srv-'));
   fs.mkdirSync(path.join(root, 'docs'));
   fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Project\n\nSee @docs/plan.md and [missing](nope.md)\n\n- [ ] first task\n');
   fs.writeFileSync(path.join(root, 'docs/plan.md'), '# Plan\n\nhello needle world\n');

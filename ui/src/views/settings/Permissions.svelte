@@ -42,16 +42,16 @@
   <div class="card-h">How to enable <span class="sub">read-only — change this on the server, not here</span></div>
   <div class="card-b col" style="gap:12px">
     <div>
-      <div class="eyebrow">.mdctl/config.json</div>
+      <div class="eyebrow">.agentneuron/config.json</div>
       <pre>{`{ "actions": { "edit": true, "exec": true, "danger": false, "terminal": false } }`}</pre>
     </div>
     <div>
       <div class="eyebrow">CLI flags</div>
-      <pre>mdctl start --enable edit,exec            # add danger,terminal only if you need them
-mdctl start --admin-token SECRET           # separate admin from read-only viewers</pre>
+      <pre>agentneuron start --enable edit,exec            # add danger,terminal only if you need them
+agentneuron start --admin-token SECRET           # separate admin from read-only viewers</pre>
     </div>
     {#if settings?.howToEnable}<p class="muted small" style="margin:0">{settings.howToEnable}</p>{/if}
-    {#if flags.length}<p class="faint small" style="margin:0">Currently off: {flags.join(', ')}. Restart mdctl after editing the config file.</p>{/if}
+    {#if flags.length}<p class="faint small" style="margin:0">Currently off: {flags.join(', ')}. Restart agentneuron after editing the config file.</p>{/if}
   </div>
 </section>
 

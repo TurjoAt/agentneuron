@@ -8,7 +8,7 @@ import { createGit2, parseHunks, parseTrack } from '../src/git2/index.js';
 import { groupCommits, parseConventional, buildChangelog, prependChangelog } from '../src/git2/changelog.js';
 
 export const sh = (cwd, ...a) => execFileSync('git', a, { cwd, stdio: 'pipe', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } }).toString();
-const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-g2-')));
+const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-g2-')));
 const w = (d, f, c) => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), c); };
 
 function mkRepo() {

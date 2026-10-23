@@ -142,7 +142,7 @@
       <ActionBtn id="agents.create" params={{ template: 'agents-md' }} label="AGENTS.md" icon="plus" cls="sm" />
       <button class="btn sm" onclick={() => newFile()}><Icon name="file" size={14} /> New file</button>
       <a class="btn sm" href="#/agents?tab=sync"><Icon name="merge" size={14} /> Sync tools</a>
-      <ActionBtn id="mdctl.rescan" label="Rescan" icon="refresh" cls="sm" opts={{ silent: false }} />
+      <ActionBtn id="agentneuron.rescan" label="Rescan" icon="refresh" cls="sm" opts={{ silent: false }} />
     </div>
   </div>
 

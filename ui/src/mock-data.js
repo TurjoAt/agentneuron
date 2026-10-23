@@ -531,13 +531,13 @@ const MANAGER = { type: 'enum', enum: ['pnpm', 'npm', 'composer'], required: tru
 
 /** Mock action registry (mirrors the server registry shapes). */
 export const MOCK_ACTIONS = [
-  { id: 'mdctl.rescan', title: 'Rescan project', category: 'mdctl', level: 'state', description: 'Re-index every tracked file and recompute the graph and health.', params: {} },
-  { id: 'mdctl.snapshot', title: 'Record metrics snapshot', category: 'mdctl', level: 'state', description: 'Append a metrics snapshot to .mdctl/metrics.jsonl.', params: {} },
-  { id: 'mdctl.history.clear', title: 'Clear file history', category: 'mdctl', level: 'danger', description: 'Delete all local version snapshots in .mdctl/history.', params: {} },
-  { id: 'mdctl.terminal', title: 'Run command', category: 'mdctl', level: 'danger', flag: 'terminal', description: 'Run a command line (split into argv, no shell).', params: { command: S('Command line', { required: true }) } },
+  { id: 'agentneuron.rescan', title: 'Rescan project', category: 'agentneuron', level: 'state', description: 'Re-index every tracked file and recompute the graph and health.', params: {} },
+  { id: 'agentneuron.snapshot', title: 'Record metrics snapshot', category: 'agentneuron', level: 'state', description: 'Append a metrics snapshot to .agentneuron/metrics.jsonl.', params: {} },
+  { id: 'agentneuron.history.clear', title: 'Clear file history', category: 'agentneuron', level: 'danger', description: 'Delete all local version snapshots in .agentneuron/history.', params: {} },
+  { id: 'agentneuron.terminal', title: 'Run command', category: 'agentneuron', level: 'danger', flag: 'terminal', description: 'Run a command line (split into argv, no shell).', params: { command: S('Command line', { required: true }) } },
   { id: 'files.create', title: 'Create file', category: 'files', level: 'edit', description: 'Create a new file (refuses to overwrite).', params: { path: { type: 'path', required: true, label: 'Path' }, content: { type: 'text', label: 'Content' } } },
   { id: 'files.rename', title: 'Rename / move file', category: 'files', level: 'edit', description: 'Rename a file and rewrite every link to it.', params: { from: { type: 'path', required: true, label: 'From' }, to: { type: 'path', required: true, label: 'To' }, rewriteLinks: { type: 'boolean', default: true, label: 'Rewrite links' } } },
-  { id: 'files.delete', title: 'Delete file (to trash)', category: 'files', level: 'edit', description: 'Move a file to .mdctl/trash (restorable).', params: { path: { type: 'path', required: true, label: 'Path' } } },
+  { id: 'files.delete', title: 'Delete file (to trash)', category: 'files', level: 'edit', description: 'Move a file to .agentneuron/trash (restorable).', params: { path: { type: 'path', required: true, label: 'Path' } } },
   { id: 'files.replace', title: 'Find and replace', category: 'files', level: 'edit', description: 'Replace text across tracked files.', params: { q: S('Find', { required: true }), replace: S('Replace with'), regex: { type: 'boolean', default: false } } },
   { id: 'git.stage', title: 'Stage files', category: 'git', level: 'edit', description: 'git add the given paths', params: { paths: PATHS } },
   { id: 'git.unstage', title: 'Unstage files', category: 'git', level: 'edit', description: 'Remove paths from the index', params: { paths: PATHS } },
@@ -564,5 +564,5 @@ export const MOCK_ACTIONS = [
   { id: 'agents.create', title: 'Create agent file from template', category: 'agents', level: 'edit', description: 'Render a template into a new file.', params: { template: S('Template', { required: true }), vars: { type: 'text', label: 'Variables (JSON)' }, path: { type: 'path', label: 'Path' } } },
   { id: 'agents.mcp.test', title: 'Test MCP server', category: 'agents', level: 'exec', description: 'Spawn the server, initialize and list tools (15 s timeout).', params: { name: S('Server', { required: true }) } },
   { id: 'tasks.export', title: 'Export native tasks to markdown', category: 'tasks', level: 'edit', description: 'Write native board tasks into TASKS.md.', params: { path: { type: 'path', default: 'TASKS.md', label: 'Path' } } },
-  { id: 'workspace.open', title: 'Open project in mdctl', category: 'workspace', level: 'exec', description: 'Start another mdctl instance for a sibling project.', params: { path: { type: 'string', required: true, label: 'Project path' } } },
+  { id: 'workspace.open', title: 'Open project in agentneuron', category: 'workspace', level: 'exec', description: 'Start another agentneuron instance for a sibling project.', params: { path: { type: 'string', required: true, label: 'Project path' } } },
 ];

@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 function mkCtx(actions = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-reg-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-reg-'));
   const config = loadConfig(root, { actions });
   const sse = [];
   const ctx = {
@@ -24,13 +24,13 @@ function mkCtx(actions = {}) {
 }
 
 test('config: all action levels are off by default; --enable parsing', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-cfg-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-cfg-'));
   const c = loadConfig(root);
   assert.deepEqual(c.actions, { edit: false, exec: false, danger: false, terminal: false });
   assert.equal(loadConfig(root, { actions: { exec: true } }).actions.exec, true);
   assert.equal(loadConfig(root, { allowWrite: true }).actions.edit, true);
-  fs.mkdirSync(path.join(root, '.mdctl'));
-  fs.writeFileSync(path.join(root, '.mdctl/config.json'), JSON.stringify({ actions: { edit: 'yes', exec: true } }));
+  fs.mkdirSync(path.join(root, '.agentneuron'));
+  fs.writeFileSync(path.join(root, '.agentneuron/config.json'), JSON.stringify({ actions: { edit: 'yes', exec: true } }));
   const c2 = loadConfig(root);
   assert.equal(c2.actions.edit, false); // only strict true enables
   assert.equal(c2.actions.exec, true);
@@ -78,7 +78,7 @@ test('level gating: disabled by default with how-to-enable reason; roles', async
   assert.deepEqual(list.map((a) => a.id), ['t.edit', 't.exec', 't.state']);
   const byId = Object.fromEntries(list.map((a) => [a.id, a]));
   assert.equal(byId['t.exec'].enabled, false);
-  assert.match(byId['t.exec'].reason, /enable actions\.exec in \.mdctl\/config\.json/);
+  assert.match(byId['t.exec'].reason, /enable actions\.exec in \.agentneuron\/config\.json/);
   assert.equal(byId['t.state'].enabled, true);
   assert.equal((await reg.list('viewer')).find((a) => a.id === 't.state').enabled, false);
   await assert.rejects(reg.run('t.exec', {}, { role: 'admin' }), (e) => e.status === 403 && /actions\.exec/.test(e.message));

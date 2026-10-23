@@ -25,7 +25,7 @@ if (fs.existsSync(uiOut)) html = fs.readFileSync(uiOut, 'utf8');
 else console.warn('[build] ui/dist/index.html missing - server will serve fallback page');
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
-const out = path.join(root, 'dist/mdctl.mjs');
+const out = path.join(root, 'dist/agentneuron.mjs');
 await build({
   entryPoints: [path.join(root, 'src/cli.js')],
   outfile: out,
@@ -35,8 +35,8 @@ await build({
   target: 'node18',
   legalComments: 'none',
   define: {
-    'globalThis.__MDCTL_UI__': JSON.stringify(html),
-    'globalThis.__MDCTL_VERSION__': JSON.stringify(pkg.version),
+    'globalThis.__AGENTNEURON_UI__': JSON.stringify(html),
+    'globalThis.__AGENTNEURON_VERSION__': JSON.stringify(pkg.version),
   },
   banner: {
     js: '#!/usr/bin/env node\nimport { createRequire as __cr } from "node:module";\nconst require = __cr(import.meta.url);',

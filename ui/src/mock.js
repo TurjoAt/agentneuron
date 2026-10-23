@@ -177,7 +177,7 @@ export function createMock() {
   };
   const levels = () => ({ read: true, state: can('state'), edit: can('edit'), exec: can('exec'), danger: can('danger'), terminal: can('terminal') });
   const howTo = (level) =>
-    level === 'state' ? 'requires the admin role' : role !== 'admin' ? `requires the admin role (you are ${role})` : `enable actions.${level} in .mdctl/config.json (or start with --enable ${level})`;
+    level === 'state' ? 'requires the admin role' : role !== 'admin' ? `requires the admin role (you are ${role})` : `enable actions.${level} in .agentneuron/config.json (or start with --enable ${level})`;
   const need = (level) => {
     if (!can(level)) throw httpErr(403, howTo(level));
   };
@@ -644,7 +644,7 @@ export function createMock() {
   const boardChanged = () => setTimeout(() => broadcast('board', { changed: true }), 30);
 
   function mdWrite(task, patch) {
-    if (!can('edit')) return { ok: false, reason: 'markdown write-back is disabled: enable actions.edit in .mdctl/config.json' };
+    if (!can('edit')) return { ok: false, reason: 'markdown write-back is disabled: enable actions.edit in .agentneuron/config.json' };
     const f = db.get(task.path);
     const lines = f.content.split('\n');
     const t = parseMdTasks(task.path, f.content).find((x) => x.id === task.id);
@@ -861,10 +861,10 @@ export function createMock() {
   function preview(id, p = {}) {
     const m = p.manager || 'pnpm';
     const map = {
-      'mdctl.rescan': [null, 'Re-index all tracked files'],
-      'mdctl.snapshot': [null, 'Append a metrics snapshot'],
-      'mdctl.history.clear': [null, 'Delete every local history snapshot'],
-      'mdctl.terminal': [String(p.command || '').split(/\s+/).filter(Boolean), 'Runs without a shell'],
+      'agentneuron.rescan': [null, 'Re-index all tracked files'],
+      'agentneuron.snapshot': [null, 'Append a metrics snapshot'],
+      'agentneuron.history.clear': [null, 'Delete every local history snapshot'],
+      'agentneuron.terminal': [String(p.command || '').split(/\s+/).filter(Boolean), 'Runs without a shell'],
       'git.stage': [['git', 'add', '--', ...(p.paths || [])], `Stage ${(p.paths || []).length} path(s)`],
       'git.unstage': [['git', 'restore', '--staged', '--', ...(p.paths || [])], `Unstage ${(p.paths || []).length} path(s)`],
       'git.commit': [['git', 'commit', ...(p.amend ? ['--amend'] : []), ...(p.message ? ['-m', p.message] : ['--no-edit'])], p.amend ? 'Amend last commit' : `Commit ${staged.size} staged file(s)`],
@@ -888,7 +888,7 @@ export function createMock() {
       'packages.audit': [[m, 'audit', '--json'], 'Audit'],
       'scripts.run': [[m, 'run', p.name || '<script>'], `Run script ${p.name || ''}`],
       'agents.mcp.test': [['npx', '-y', `@modelcontextprotocol/server-${p.name || 'x'}`], 'initialize + tools/list'],
-      'workspace.open': [['node', 'mdctl', 'start', p.path || '<path>', '--port', '0'], 'Start another instance'],
+      'workspace.open': [['node', 'agentneuron', 'start', p.path || '<path>', '--port', '0'], 'Start another instance'],
     };
     const [command, summary] = map[id] || [null, MOCK_ACTIONS.find((a) => a.id === id)?.description || ''];
     return { command, summary };
@@ -926,7 +926,7 @@ export function createMock() {
         return [L('stderr', `Enumerating objects: 9, done.`, 400), L('stderr', `Writing objects: 100% (5/5), 1.21 KiB | 1.21 MiB/s, done.`, 500), L('stderr', `To github.com:acme/commerce.git\n   9a0f44b..${commits[0].short}  ${currentBranch} -> ${currentBranch}`, 400)];
       case 'agents.mcp.test':
         return [L('info', `spawn npx -y @modelcontextprotocol/server-${p.name}`, 300), L('stdout', `→ initialize (protocol 2025-06-18)`, 600), L('stdout', `← serverInfo: ${p.name}-mcp 0.6.2`, 300), L('stdout', `→ tools/list`, 300), L('stdout', `← 14 tools: search_repositories, get_file_contents, create_issue, …`, 400)];
-      case 'mdctl.terminal':
+      case 'agentneuron.terminal':
         return [L('stdout', `$ ${p.command}`, 200), L('stdout', `ok`, 300)];
       default:
         return [L('info', `${preview(id, p).summary || id}`, 250), L('stdout', 'done', 350)];
@@ -960,8 +960,8 @@ export function createMock() {
       case 'git.tag.create': commits[0].refs.push(`tag: ${p.name}`); return {};
       case 'files.create': writeFile(p.path, p.content || '', { create: true }); return { path: p.path };
       case 'files.delete': return fileDelete(p.path);
-      case 'mdctl.rescan': broadcast('graph', { changed: true }); return { files: db.size };
-      case 'tasks.export': { const lines = ['# Tasks', '', '<!-- mdctl:export -->', ...board.native.map((t) => `- [${charOf(t.status)}] ${t.title}${metaSuffix(t)}`), '']; if (db.has(p.path || 'TASKS.md')) writeFile(p.path || 'TASKS.md', lines.join('\n')); else writeFile(p.path || 'TASKS.md', lines.join('\n')); return { path: p.path || 'TASKS.md', tasks: board.native.length }; }
+      case 'agentneuron.rescan': broadcast('graph', { changed: true }); return { files: db.size };
+      case 'tasks.export': { const lines = ['# Tasks', '', '<!-- agentneuron:export -->', ...board.native.map((t) => `- [${charOf(t.status)}] ${t.title}${metaSuffix(t)}`), '']; if (db.has(p.path || 'TASKS.md')) writeFile(p.path || 'TASKS.md', lines.join('\n')); else writeFile(p.path || 'TASKS.md', lines.join('\n')); return { path: p.path || 'TASKS.md', tasks: board.native.length }; }
       case 'workspace.open': return { url: location.href };
       default: return { ok: true };
     }
@@ -1114,9 +1114,9 @@ export function createMock() {
       actions: clone(config.actions),
       roles: { you: role, tokenRequired, adminToken: tokenRequired, viewerToken: tokenRequired },
       notifications: { browser: true, webhooks: [{ url: 'https://hooks.slack.com/services/T0***/B0***/***', events: ['secret', 'conflict', 'job-failed'] }, { url: 'https://discord.com/api/webhooks/12***/***', events: ['health-drop'] }] },
-      paths: { root: PROJECT.root, data: '.mdctl', config: '.mdctl/config.json', audit: '.mdctl/audit.jsonl', events: '.mdctl/events.jsonl', metrics: '.mdctl/metrics.jsonl' },
+      paths: { root: PROJECT.root, data: '.agentneuron', config: '.agentneuron/config.json', audit: '.agentneuron/audit.jsonl', events: '.agentneuron/events.jsonl', metrics: '.agentneuron/metrics.jsonl' },
       version: '0.2.0-mock',
-      howToEnable: 'Actions beyond read are OFF by default. Enable them in .mdctl/config.json, e.g. {"actions":{"edit":true,"exec":true}}, or start mdctl with --enable edit,exec[,danger,terminal]. Use --admin-token to separate admin from read-only viewers.',
+      howToEnable: 'Actions beyond read are OFF by default. Enable them in .agentneuron/config.json, e.g. {"actions":{"edit":true,"exec":true}}, or start agentneuron with --enable edit,exec[,danger,terminal]. Use --admin-token to separate admin from read-only viewers.',
     }),
 
     // files
@@ -1419,7 +1419,7 @@ export function createMock() {
 
   // test hooks for headless demos: simulate an agent editing a file on disk
   try {
-    window.__mdctlMock = {
+    window.__agentneuronMock = {
       touch(path, line = '\nEdited on disk by an agent.\n') {
         const f = db.get(path);
         if (!f) return false;

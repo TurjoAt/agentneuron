@@ -63,7 +63,7 @@
       await post('/api/restore', { path, id });
       toast('Version restored', 'ok');
     } catch (e) {
-      toast(e.status === 403 ? 'Restore disabled — start mdctl with --write to allow it' : `Restore failed: ${e.message}`, 'error', 6000);
+      toast(e.status === 403 ? 'Restore disabled — start agentneuron with --write to allow it' : `Restore failed: ${e.message}`, 'error', 6000);
     }
   }
 
@@ -73,7 +73,7 @@
 </script>
 
 {#if !ordered.length}
-  <Empty icon="history" title="No local history yet">mdctl snapshots every change into <code>.mdctl/history</code>.</Empty>
+  <Empty icon="history" title="No local history yet">agentneuron snapshots every change into <code>.agentneuron/history</code>.</Empty>
 {:else}
   <div class="hist">
     <div class="scrub card">

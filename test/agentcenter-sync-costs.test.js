@@ -6,7 +6,7 @@ import path from 'node:path';
 import { syncStatus, syncPlan, similarity } from '../src/agentcenter/sync.js';
 import { estimateCosts, modelFamily, priceFor, usdOf } from '../src/agentcenter/costs.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-sync-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-sync-'));
 
 test('similarity', () => {
   assert.equal(similarity('- aaa\n- bbb\n', '- aaa\n- bbb\n'), 100);

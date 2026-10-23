@@ -40,7 +40,7 @@ export async function deleteFile(path) {
     title: 'Move to trash?',
     icon: 'trash',
     tone: 'danger',
-    body: `${path} will be moved to .mdctl/trash. You can restore it from Settings → Trash.`,
+    body: `${path} will be moved to .agentneuron/trash. You can restore it from Settings → Trash.`,
     cta: 'Move to trash',
     run: async () => {
       try {

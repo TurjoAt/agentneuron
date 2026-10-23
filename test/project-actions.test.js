@@ -17,7 +17,7 @@ function fakeJob(results = {}) {
   return { calls, logs: [], log(s, t) { this.logs.push([s, t]); }, async exec(cmd, args, opts) { calls.push([cmd, args, opts]); return results[cmd] || { code: 0, stdout: '', stderr: '' }; } };
 }
 function proj() {
-  const r = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-act-'));
+  const r = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-act-'));
   fs.writeFileSync(path.join(r, 'package.json'), JSON.stringify({ name: 'p', scripts: { build: 'x', 'test:unit': 'y' } }));
   fs.writeFileSync(path.join(r, 'composer.json'), JSON.stringify({ name: 'a/b', scripts: { test: 'phpunit' } }));
   fs.writeFileSync(path.join(r, 'artisan'), '');
@@ -94,10 +94,10 @@ test('outdated/audit parsers and cache + routes', async () => {
     const job = fakeJob({ npm: { code: 1, stdout: npm, stderr: '' } });
     const res = await reg.defs.get('packages.outdated').run({ manager: 'npm' }, {}, job);
     assert.equal(res.count, 1);
-    assert.ok(fs.existsSync(path.join(root, '.mdctl/cache/outdated-npm.json')));
+    assert.ok(fs.existsSync(path.join(root, '.agentneuron/cache/outdated-npm.json')));
   } else {
-    fs.mkdirSync(path.join(root, '.mdctl/cache'), { recursive: true });
-    fs.writeFileSync(path.join(root, '.mdctl/cache/outdated-npm.json'), JSON.stringify({ manager: 'npm', ts: 1, items: parseOutdated('npm', npm) }));
+    fs.mkdirSync(path.join(root, '.agentneuron/cache'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.agentneuron/cache/outdated-npm.json'), JSON.stringify({ manager: 'npm', ts: 1, items: parseOutdated('npm', npm) }));
   }
   const router = createRouter();
   await projectRoutes(router, { root, allFiles: () => [], git: null });

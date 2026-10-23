@@ -132,7 +132,7 @@ export async function computeFixes(ctx, issueId) {
       }
     }
   } else if (issue.rule === 'empty-file') {
-    fixes.push({ id: 'trash', title: 'Delete empty file', description: `Move ${p} to .mdctl/trash (restorable).`, edits: [], files: [], trash: p });
+    fixes.push({ id: 'trash', title: 'Delete empty file', description: `Move ${p} to .agentneuron/trash (restorable).`, edits: [], files: [], trash: p });
   } else if (issue.rule === 'duplicate-rule') {
     const others = [...(issue.message.match(/[^\s,]+:\d+/g) || [])];
     const targets = [{ path: p, line: issue.line }, ...others.map((o) => { const i = o.lastIndexOf(':'); return { path: o.slice(0, i), line: Number(o.slice(i + 1)) }; })];

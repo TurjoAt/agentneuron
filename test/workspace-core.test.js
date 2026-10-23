@@ -9,14 +9,14 @@ import registerRoutes from '../src/server/routes/workspace.js';
 import registerGit from '../src/actions/git.js';
 import { createRouter } from '../src/server/router.js';
 
-const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-ws-')));
+const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-ws-')));
 const w = (d, f, c = '') => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), c); };
 
 function mkWs() {
   const r = tmp();
   w(r, 'proj-a/package.json', '{}'); w(r, 'proj-a/CLAUDE.md', '# a'); w(r, 'proj-a/docs/x.md', 'x'); w(r, 'proj-a/node_modules/dep/package.json', '{}');
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: path.join(r, 'proj-a') });
-  w(r, 'proj-b/composer.json', '{}'); w(r, 'proj-b/artisan', ''); w(r, 'proj-b/AGENTS.md', '#'); w(r, 'proj-b/.mdctl/config.json', '{}');
+  w(r, 'proj-b/composer.json', '{}'); w(r, 'proj-b/artisan', ''); w(r, 'proj-b/AGENTS.md', '#'); w(r, 'proj-b/.agentneuron/config.json', '{}');
   w(r, 'group/nested/go.mod', 'module x'); w(r, 'group/nested/.cursor/rules/a.mdc', 'r');
   w(r, 'plain/readme.txt', 'nothing'); w(r, 'group/deep/er/est/package.json', '{}');
   return r;
@@ -28,7 +28,7 @@ test('findProjects: depth <= 2, skips ignores and non-projects', () => {
   assert.deepEqual(names, ['group/nested', 'proj-a', 'proj-b']);
 });
 
-test('scan: stacks, ai tools, md count, git, mdctl', async () => {
+test('scan: stacks, ai tools, md count, git, agentneuron', async () => {
   const r = mkWs();
   clearCache();
   const list = await scanWorkspace(r, { force: true });
@@ -37,10 +37,10 @@ test('scan: stacks, ai tools, md count, git, mdctl', async () => {
   assert.deepEqual(a.aiTools, ['claude']);
   assert.equal(a.mdFiles, 2);
   assert.equal(a.git.branch, 'main'); assert.equal(typeof a.git.dirty, 'number');
-  assert.equal(a.hasMdctl, false);
+  assert.equal(a.hasAgentneuron, false);
   const b = list.find((p) => p.name === 'proj-b');
   assert.deepEqual(b.stacks.sort(), ['laravel', 'php']);
-  assert.equal(b.hasMdctl, true);
+  assert.equal(b.hasAgentneuron, true);
   assert.equal(b.git.branch, null);
   const n = list.find((p) => p.name === 'nested');
   assert.deepEqual(n.aiTools, ['cursor']); assert.equal(n.mdFiles, 1);

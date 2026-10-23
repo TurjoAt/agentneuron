@@ -7,7 +7,7 @@ import { scanAgentSetup, rulesForFile, splitGlobs } from '../src/agentcenter/set
 import { parseFrontmatter } from '../src/agentcenter/frontmatter.js';
 
 function mk(files) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-ac-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-ac-'));
   for (const [p, c] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, p)), { recursive: true });
     fs.writeFileSync(path.join(root, p), c);

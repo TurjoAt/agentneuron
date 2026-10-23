@@ -5,7 +5,7 @@ import { isIgnored } from '../core/classify.js';
 
 const DAY = 86400000;
 const CONTEXT_KINDS = new Set(['context', 'rules']);
-const GENERATED_DIRS = /(^|\/)(node_modules|vendor|dist|build|\.next|storage|\.git|\.mdctl|coverage|tmp|temp|cache|\.cache|logs?|out|target)(\/|$)/;
+const GENERATED_DIRS = /(^|\/)(node_modules|vendor|dist|build|\.next|storage|\.git|\.agentneuron|coverage|tmp|temp|cache|\.cache|logs?|out|target)(\/|$)/;
 const PATH_EXTS = 'md|mdc|js|mjs|cjs|ts|tsx|jsx|json|yml|yaml|toml|py|php|rb|go|rs|java|sh|css|scss|html|vue|svelte|sql|txt|env|lock|xml|conf';
 const PATH_RE = /^(?:\.{1,2}\/)*[A-Za-z0-9_@.\-\[\]()]+(?:\/[A-Za-z0-9_@.\-\[\]()]+)*\/?$/;
 const EXT_RE = new RegExp(`\\.(?:${PATH_EXTS})$`, 'i');

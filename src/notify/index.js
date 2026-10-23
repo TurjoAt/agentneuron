@@ -18,7 +18,7 @@ export function createNotifier(ctx, { timeoutMs = 5000 } = {}) {
       for (const h of hooks) {
         if (!h || typeof h.url !== 'string' || !/^https?:\/\//i.test(h.url)) continue;
         if (Array.isArray(h.events) && h.events.length && !h.events.includes(type)) continue;
-        const text = `[mdctl] ${n.title}${n.body ? ' - ' + n.body : ''}`;
+        const text = `[agentneuron] ${n.title}${n.body ? ' - ' + n.body : ''}`;
         const ac = new AbortController();
         const t = setTimeout(() => ac.abort(), timeoutMs);
         t.unref?.();

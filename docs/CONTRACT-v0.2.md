@@ -1,4 +1,4 @@
-# mdctl v0.2 — Contract (binding for all agents)
+# agentneuron v0.2 — Contract (binding for all agents)
 
 Read first: `docs/PLAN-v0.2.md` (what & why), `docs/CONTRACT.md` (v0.1 types, rules —
 still valid), `README.md`. v0.1 code is committed (`git log`). Do not break v0.1
@@ -13,18 +13,18 @@ endpoints the UI uses today.
 - **Never spawn a shell**: use `spawn/execFile(cmd, argsArray)`; validate every arg
   (package names `^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$` (+ optional `@version`
   `^[\w.^~<>=*|-]+$`), composer `vendor/name`, script names must exist in manifest).
-- mdctl internal state goes to `<root>/.mdctl/` only.
+- agentneuron internal state goes to `<root>/.agentneuron/` only.
 - **Only edit files you own** (listed per agent). Tests: `test/<area>-*.test.js`
   with temp dirs; never touch real projects. `npm test` must stay green.
 - Secrets: never return env values, tokens, passwords. Use
   `maskSecretsInText` from `src/health/secrets.js` on any free text from transcripts.
 
 ## Permission model (user rule: **everything that changes things is OFF by default**)
-Levels: `read` (always) · `state` (mdctl's own data in `.mdctl/`: board, bookmarks,
+Levels: `read` (always) · `state` (agentneuron's own data in `.agentneuron/`: board, bookmarks,
 annotations — needs role admin) · `edit` (write project files, git stage/commit) ·
 `exec` (run commands: packages, scripts, artisan, fetch/pull/push, MCP test) ·
 `danger` (discard, delete branch, migrate, delete files permanently, terminal).
-- Config `.mdctl/config.json`:
+- Config `.agentneuron/config.json`:
   ```json
   { "actions": { "edit": false, "exec": false, "danger": false, "terminal": false },
     "token": null, "adminToken": null,
@@ -54,7 +54,7 @@ annotations — needs role admin) · `edit` (write project files, git stage/comm
 ```js
 registry.register({
   id: 'packages.add',            // dotted, unique
-  title: 'Add package', category: 'packages', // files|git|packages|scripts|framework|agents|tasks|mdctl|workspace
+  title: 'Add package', category: 'packages', // files|git|packages|scripts|framework|agents|tasks|agentneuron|workspace
   level: 'exec', description: '…',
   params: { manager: { type: 'enum', enum: ['npm','composer'], required: true },
             name: { type: 'string', required: true, pattern: '…', label: 'Package' },
@@ -65,7 +65,7 @@ registry.register({
 });
 ```
 - `registry.list(role)` → `[{ id, title, category, level, description, params, enabled, reason? }]`
-  (`enabled:false` + reason like `"enable actions.exec in .mdctl/config.json"`).
+  (`enabled:false` + reason like `"enable actions.exec in .agentneuron/config.json"`).
 - `registry.preview(id, params)`; `registry.run(id, params, { role, by })` → Job
   (validates params by schema first; checks `ctx.can(def.level, role)`).
 - Job: `{ id, actionId, title, params, level, status: 'queued'|'running'|'ok'|'error'|'cancelled',
@@ -77,12 +77,12 @@ registry.register({
 
 ## Agent S1 (Sonnet) — platform: security, actions, jobs, persistence, notifications, CLI
 Owns: `src/server/app.js`, `src/server/router.js`, `src/cli.js`, `src/core/config.js`,
-`src/actions/registry.js` (new), `src/actions/index.js`, `src/actions/mdctl.js`,
+`src/actions/registry.js` (new), `src/actions/index.js`, `src/actions/agentneuron.js`,
 `src/persist/*`, `src/notify/*`, `src/server/routes/system.js`, `scripts/build.mjs`,
 `test/platform-*.test.js`, `test/server.test.js`, `test/cli.test.js`, `README.md`.
 - Config defaults + `--enable`, `--admin-token`; `state` level in `ctx.can`; roles
   as above; convert v0.1 `/api/restore` to `edit` level (keep `--write` as alias for `--enable edit`).
-- **Auth**: `POST /api/auth/login {token}` → sets cookie `mdctl_session` (HttpOnly,
+- **Auth**: `POST /api/auth/login {token}` → sets cookie `agentneuron_session` (HttpOnly,
   SameSite=Strict, random session id ↔ role, in-memory) ; `POST /api/auth/logout`;
   `GET /api/auth/me` → `{ role, levels: { read, state, edit, exec, danger, terminal }, tokenRequired }`.
   Requests authenticate by cookie OR `?token=` OR Bearer (keep v0.1 behaviour).
@@ -94,10 +94,10 @@ Owns: `src/server/app.js`, `src/server/router.js`, `src/cli.js`, `src/core/confi
   `POST /api/jobs/cancel {id}`, `GET /api/audit?limit=` (admin only),
   `GET /api/settings` → `{ actions, roles, notifications (urls masked), paths, version, howToEnable: "…" }`.
   SSE `job` (job summary on every status change), `joblog` (`{ id, stream, text }`).
-- **Audit** `.mdctl/audit.jsonl`: every action run + every state/edit route call
+- **Audit** `.agentneuron/audit.jsonl`: every action run + every state/edit route call
   (`{ ts, role, ip, action|route, params (secrets masked), status }`).
-- **Persistence** (`ctx.persist`): `.mdctl/events.jsonl` (append every store event),
-  `.mdctl/metrics.jsonl` (snapshot on start + hourly + on health change, debounced 5 min):
+- **Persistence** (`ctx.persist`): `.agentneuron/events.jsonl` (append every store event),
+  `.agentneuron/metrics.jsonl` (snapshot on start + hourly + on health change, debounced 5 min):
   `{ ts, files, tokens, health, grade, errors, warns, infos, tasksOpen, tasksDone, gitDirty, byTool, byKind }`.
   API: `ctx.persist.events.query({ from, to, limit })`, `ctx.persist.metrics.query({ from, to })`,
   `ctx.persist.metrics.snapshot()`. Rotate files > 20 MB (keep 3).
@@ -105,11 +105,11 @@ Owns: `src/server/app.js`, `src/server/router.js`, `src/cli.js`, `src/core/confi
   + POST JSON to configured webhooks (Slack/Discord-compatible `text` field), with
   5 s timeout, never throws. Triggers: new secret issue, conflict, health drop ≥ 10
   points, job failed/done.
-- mdctl actions (`src/actions/mdctl.js`): `mdctl.rescan` (state), `mdctl.history.clear` (danger),
-  `mdctl.snapshot` (state; metrics snapshot), `mdctl.terminal` (danger + `actions.terminal`;
+- agentneuron actions (`src/actions/agentneuron.js`): `agentneuron.rescan` (state), `agentneuron.history.clear` (danger),
+  `agentneuron.snapshot` (state; metrics snapshot), `agentneuron.terminal` (danger + `actions.terminal`;
   runs a command line via `spawn(cmd, args)` after simple shell-words split, no shell).
-- CLI: `mdctl mcp [dir]` → `import { runMcpServer } from './mcp/server.js'` (S3 writes it);
-  `mdctl workspace [dir]` → start in workspace mode (sets `config.workspaceRoot`).
+- CLI: `agentneuron mcp [dir]` → `import { runMcpServer } from './mcp/server.js'` (S3 writes it);
+  `agentneuron workspace [dir]` → start in workspace mode (sets `config.workspaceRoot`).
 - Wire `ctx.actions`, `ctx.persist`, `ctx.notify` **before** `registerAll`; call
   `registerActions(registry, ctx)` from `src/actions/index.js`.
 
@@ -143,7 +143,7 @@ Owns: `src/project/**`, `src/server/routes/project.js`, `src/actions/packages.js
   (docs mentioning code files that changed after the doc did, via `git log -1 --format=%ct -- path`).
 - Routes: `GET /api/project`, `GET /api/project/deps?manager=`, `GET /api/project/routes`,
   `GET /api/project/migrations`, `GET /api/project/drift`, `GET /api/project/stats`,
-  `GET /api/project/outdated` (last result of the outdated action, cached in `.mdctl/cache/`).
+  `GET /api/project/outdated` (last result of the outdated action, cached in `.agentneuron/cache/`).
 - Actions (`exec` unless noted): `packages.install {manager}`, `packages.add {manager, name, version?, dev?}`,
   `packages.remove {manager, name}`, `packages.update {manager, name?}`,
   `packages.outdated {manager}` (parses JSON output → stores cache), `packages.audit {manager}`,
@@ -207,7 +207,7 @@ Owns: `src/files/**`, `src/board/**`, `src/server/routes/files.js`, `src/server/
   - `POST /api/file/rename {from, to, rewriteLinks = true, dryRun = false}` →
     `{ from, to, rewritten: [{ path, count }] }` — rewrites md links / wiki / `@imports` /
     backticked & plain mentions in all tracked files [edit].
-  - `POST /api/file/delete {path}` → moves to `.mdctl/trash/<id>/` [edit];
+  - `POST /api/file/delete {path}` → moves to `.agentneuron/trash/<id>/` [edit];
     `GET /api/trash`, `POST /api/trash/restore {id}` [edit], `POST /api/trash/purge {id}` [danger].
   - `GET /api/links/resolve?from=&target=` → `{ path | null, exists, candidates }`;
     `GET /api/backlinks?path=` → `Link[]` [read].
@@ -218,9 +218,9 @@ Owns: `src/files/**`, `src/board/**`, `src/server/routes/files.js`, `src/server/
     existing files (fuzzy by basename + path distance); orphan → add link to nearest README/CLAUDE.md/AGENTS.md
     index section; secret → replace value with `${ENV_NAME}`; empty-file → delete (to trash);
     duplicate-rule → remove from one file.
-  - Bookmarks `.mdctl/bookmarks.json`: `GET /api/bookmarks`, `POST /api/bookmarks {path, label?}`,
+  - Bookmarks `.agentneuron/bookmarks.json`: `GET /api/bookmarks`, `POST /api/bookmarks {path, label?}`,
     `POST /api/bookmarks/remove {path}` [state].
-  - Annotations `.mdctl/annotations.json`: `GET /api/annotations?path=`,
+  - Annotations `.agentneuron/annotations.json`: `GET /api/annotations?path=`,
     `POST /api/annotations {path, line, text}` (stores anchor = line text, re-anchors on change),
     `POST /api/annotations/remove {id}`, `POST /api/annotations/resolve {id}` [state].
     `{ id, path, line, anchor, text, author /*role*/, ts, resolved }`.
@@ -231,7 +231,7 @@ Owns: `src/files/**`, `src/board/**`, `src/server/routes/files.js`, `src/server/
   - md parsing: `- [ ]` todo, `- [/]` doing, `- [x]` done; inline meta `@due(2026-11-01)`, `#label`,
     `!low|!med|!high|!urgent`, `@name` assignee; nested checkboxes under a task → checklist.
     Stable id = sha1(path + normalized title) (survives line moves). Extra fields for md tasks
-    (backlog/review status, order, comments…) stored as an overlay in `.mdctl/board.json`.
+    (backlog/review status, order, comments…) stored as an overlay in `.agentneuron/board.json`.
   - `GET /api/board` → `{ columns: [{ id, title, wip }], tasks, labels, assignees }` [read];
     `POST /api/board/task {task, path?}` create (native → state; with `path` → appends to md → edit-checked inside);
     `POST /api/board/update {id, patch}`, `POST /api/board/move {id, status, order}`,
@@ -273,7 +273,7 @@ Owns: `src/git2/**`, `src/reports/**`, `src/workspace/**`, `src/server/routes/gi
   (conventional commits grouping, fallback "Other"); action `git.changelog.write {from?, to?}` (edit, prepends CHANGELOG.md).
 - Workspace (`src/workspace/*`, route `workspace.js`): root = `config.workspaceRoot` ||
   parent of project root. `GET /api/workspace` → `{ root, current, projects: [{ name, path, stacks, aiTools, mdFiles,
-  lastModified, hasMdctl, git: { branch, dirty }, running: { url } | null }] }` (scan depth ≤ 2, skip ignores,
+  lastModified, hasAgentneuron, git: { branch, dirty }, running: { url } | null }] }` (scan depth ≤ 2, skip ignores,
   cached 60 s, quick stack sniff by manifest names only). Action `workspace.open {path}` (exec): spawns
   `process.execPath <bundle or src/cli.js> start <path> --port 0 --host <same> [--token same]` detached-ish (child
   tracked, killed on close), parses printed URL, returns `{ url }`. `GET /api/workspace/instances`.

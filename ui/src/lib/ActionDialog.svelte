@@ -188,7 +188,7 @@
           <span>Command preview</span>
           {#if preview.loading}<span class="spin"></span>{/if}
         </div>
-        <pre class="pv-b mono">{#if cmdText}<span class="ps">$</span> {cmdText}{:else if preview.error}<span class="err">{preview.error}</span>{:else}<span class="faint">{preview.loading ? 'Resolving…' : 'No external command — runs inside mdctl'}</span>{/if}</pre>
+        <pre class="pv-b mono">{#if cmdText}<span class="ps">$</span> {cmdText}{:else if preview.error}<span class="err">{preview.error}</span>{:else}<span class="faint">{preview.loading ? 'Resolving…' : 'No external command — runs inside agentneuron'}</span>{/if}</pre>
         {#if preview.summary}<div class="pv-s">{preview.summary}</div>{/if}
       </div>
 

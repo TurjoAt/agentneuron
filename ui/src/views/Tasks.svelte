@@ -30,11 +30,11 @@
   const decisions = resource(() => api('/api/decisions'), { enabled: () => tab === 'decisions' });
   $effect(() => onStream('board', () => board.reload()));
 
-  let swimlane = $state(load('mdctl.tasks.swimlane', 'none'));
+  let swimlane = $state(load('agentneuron.tasks.swimlane', 'none'));
   function load(k, d) {
     try { return localStorage.getItem(k) || d; } catch { return d; }
   }
-  $effect(() => { try { localStorage.setItem('mdctl.tasks.swimlane', swimlane); } catch {} });
+  $effect(() => { try { localStorage.setItem('agentneuron.tasks.swimlane', swimlane); } catch {} });
 
   let f = $state({ q: '', label: '', priority: '', assignee: '', source: '', due: '' });
   const columns = $derived(board.data?.columns || []);

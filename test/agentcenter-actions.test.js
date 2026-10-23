@@ -10,7 +10,7 @@ import { createStore } from '../src/core/store.js';
 import { loadConfig } from '../src/core/config.js';
 import { testMcpServer } from '../src/agentcenter/mcptest.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-act-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-act-'));
 
 function fakeRegistry() {
   const defs = new Map();

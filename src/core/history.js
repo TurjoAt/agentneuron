@@ -10,9 +10,9 @@ function safeName(relPath) {
   return enc.length > 150 ? `${enc.slice(0, 60)}-${sha1(relPath).slice(0, 16)}` : enc;
 }
 
-/** Local time-travel history stored under <root>/.mdctl/history/<encoded path>/. */
+/** Local time-travel history stored under <root>/.agentneuron/history/<encoded path>/. */
 export function createHistory(root, config = {}) {
-  const base = path.join(root, '.mdctl', 'history');
+  const base = path.join(root, '.agentneuron', 'history');
   const limit = Math.max(1, config.historyLimitPerFile ?? 200);
   let lastTs = 0;
 

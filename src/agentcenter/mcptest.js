@@ -67,7 +67,7 @@ function testStdio(def, { cwd, signal, timeoutMs }) {
         }
       }
     });
-    send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'mdctl', version: '0.2.0' } } });
+    send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'agentneuron', version: '0.2.0' } } });
   });
 }
 
@@ -102,7 +102,7 @@ async function testHttp(def, { signal, timeoutMs }) {
     return { status: r.status, json: parseBody(text, r.headers.get('content-type')) };
   };
   try {
-    const init = await post({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'mdctl', version: '0.2.0' } } });
+    const init = await post({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'agentneuron', version: '0.2.0' } } });
     if (!init.json?.result) return finish(base, { ok: false, error: mask(init.json?.error?.message || `HTTP ${init.status}`) });
     headers['mcp-protocol-version'] = init.json.result.protocolVersion || PROTOCOL;
     await post({ jsonrpc: '2.0', method: 'notifications/initialized' }).catch(() => {});

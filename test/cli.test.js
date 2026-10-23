@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/cli.js');
 const run = (args, opts = {}) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', timeout: 30000, ...opts });
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-cli-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-cli-'));
 
 test('--help and --version', () => {
   const h = run(['--help']);
@@ -35,7 +35,7 @@ test('lint --json exits 0 on clean project, 1 on errors', () => {
   assert.equal(r1.status, 1);
 });
 
-test('status prints summary; init creates .mdctl/config.json', () => {
+test('status prints summary; init creates .agentneuron/config.json', () => {
   const d = tmp();
   fs.writeFileSync(path.join(d, 'AGENTS.md'), '# Agents\n\nhi\n');
   const s = run(['status', d]);
@@ -43,7 +43,7 @@ test('status prints summary; init creates .mdctl/config.json', () => {
   assert.match(s.stdout, /files:/);
   const i = run(['init', d]);
   assert.equal(i.status, 0, i.stderr);
-  assert.ok(fs.existsSync(path.join(d, '.mdctl/config.json')));
+  assert.ok(fs.existsSync(path.join(d, '.agentneuron/config.json')));
 });
 
 test('start prints URL banner and stops on SIGINT', async () => {

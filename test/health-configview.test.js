@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readAgentConfig, parseSimpleToml } from '../src/health/configview.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-cfg-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-cfg-'));
 const w = (root, rel, c) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), typeof c === 'string' ? c : JSON.stringify(c)); };
 
 test('empty project', () => {

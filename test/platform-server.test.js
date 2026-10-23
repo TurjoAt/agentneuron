@@ -10,7 +10,7 @@ let root, srv, base;
 const ADMIN = 'adm-secret', VIEW = 'view-secret';
 
 before(async () => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-plat-'));
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-plat-'));
   fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# P\n\n- [ ] one\n');
   srv = await startServer(loadConfig(root, { port: 0, token: VIEW, adminToken: ADMIN }));
   base = `http://127.0.0.1:${srv.port}`;
@@ -35,7 +35,7 @@ test('cookie login: admin vs viewer roles, logout', async () => {
   const a = await login(ADMIN);
   assert.equal(a.r.status, 200);
   const sc = a.r.headers.get('set-cookie');
-  assert.match(sc, /HttpOnly/); assert.match(sc, /SameSite=Strict/); assert.match(sc, /mdctl_session=/);
+  assert.match(sc, /HttpOnly/); assert.match(sc, /SameSite=Strict/); assert.match(sc, /agentneuron_session=/);
   const me = await (await fetch(base + '/api/auth/me', { headers: { cookie: a.cookie } })).json();
   assert.equal(me.role, 'admin'); assert.equal(me.levels.state, true); assert.equal(me.levels.exec, false);
   assert.equal((await fetch(base + '/api/state', { headers: { cookie: a.cookie } })).status, 200);
@@ -50,7 +50,7 @@ test('cookie login: admin vs viewer roles, logout', async () => {
   assert.equal(bm.role, 'viewer');
   assert.equal((await fetch(`${base}/api/state?token=${ADMIN}`)).status, 200);
   // cross-origin write with cookie refused
-  const x = await jpost('/api/actions/run', { id: 'mdctl.snapshot' }, { cookie: a.cookie, origin: 'http://evil.example' });
+  const x = await jpost('/api/actions/run', { id: 'agentneuron.snapshot' }, { cookie: a.cookie, origin: 'http://evil.example' });
   assert.equal(x.status, 403);
   await jpost('/api/auth/logout', {}, { cookie: a.cookie });
   assert.equal((await fetch(base + '/api/state', { headers: { cookie: a.cookie } })).status, 401);
@@ -61,12 +61,12 @@ test('actions list, state action runs, exec/danger disabled with reason, audit w
   const H = { cookie };
   const list = await (await fetch(base + '/api/actions', { headers: H })).json();
   const byId = Object.fromEntries(list.map((a) => [a.id, a]));
-  assert.equal(byId['mdctl.snapshot'].enabled, true);
-  assert.equal(byId['mdctl.history.clear'].enabled, false);
-  assert.match(byId['mdctl.history.clear'].reason, /actions\.danger/);
-  assert.equal(byId['mdctl.terminal'].enabled, false);
+  assert.equal(byId['agentneuron.snapshot'].enabled, true);
+  assert.equal(byId['agentneuron.history.clear'].enabled, false);
+  assert.match(byId['agentneuron.history.clear'].reason, /actions\.danger/);
+  assert.equal(byId['agentneuron.terminal'].enabled, false);
 
-  const run = await jpost('/api/actions/run', { id: 'mdctl.snapshot' }, H);
+  const run = await jpost('/api/actions/run', { id: 'agentneuron.snapshot' }, H);
   assert.equal(run.status, 200);
   const job = await run.json();
   let j;
@@ -78,21 +78,21 @@ test('actions list, state action runs, exec/danger disabled with reason, audit w
   assert.equal(j.status, 'ok'); assert.ok(Array.isArray(j.log));
   assert.ok((await (await fetch(base + '/api/jobs', { headers: H })).json()).some((x) => x.id === job.id));
 
-  const dis = await jpost('/api/actions/run', { id: 'mdctl.terminal', params: { command: 'echo hi' } }, H);
+  const dis = await jpost('/api/actions/run', { id: 'agentneuron.terminal', params: { command: 'echo hi' } }, H);
   assert.equal(dis.status, 403);
   assert.match((await dis.json()).error, /disabled.*actions\./);
-  const prev = await jpost('/api/actions/preview', { id: 'mdctl.terminal', params: { command: 'ls "a b"' } }, H);
+  const prev = await jpost('/api/actions/preview', { id: 'agentneuron.terminal', params: { command: 'ls "a b"' } }, H);
   assert.deepEqual((await prev.json()).command, ['ls', 'a b']);
-  assert.equal((await jpost('/api/actions/run', { id: 'mdctl.snapshot', params: { bogus: 1 } }, { cookie })).status, 200);
+  assert.equal((await jpost('/api/actions/run', { id: 'agentneuron.snapshot', params: { bogus: 1 } }, { cookie })).status, 200);
 
   const audit = await (await fetch(base + '/api/audit?limit=20', { headers: H })).json();
-  assert.ok(audit.some((a) => a.action === 'mdctl.snapshot' && a.status === 'ok'));
-  assert.ok(audit.some((a) => a.action === 'mdctl.terminal' && a.status === 403));
+  assert.ok(audit.some((a) => a.action === 'agentneuron.snapshot' && a.status === 'ok'));
+  assert.ok(audit.some((a) => a.action === 'agentneuron.terminal' && a.status === 403));
 
   const st = await (await fetch(base + '/api/settings', { headers: H })).json();
   assert.equal(st.actions.exec, false); assert.match(st.howToEnable, /--enable/);
-  assert.ok(fs.existsSync(path.join(root, '.mdctl/audit.jsonl')));
-  assert.ok(fs.existsSync(path.join(root, '.mdctl/metrics.jsonl')));
+  assert.ok(fs.existsSync(path.join(root, '.agentneuron/audit.jsonl')));
+  assert.ok(fs.existsSync(path.join(root, '.agentneuron/metrics.jsonl')));
 });
 
 test('enabled terminal action executes without a shell and streams', async () => {
@@ -100,12 +100,12 @@ test('enabled terminal action executes without a shell and streams', async () =>
   const s2 = await startServer(c);
   try {
     const b = `http://127.0.0.1:${s2.port}`;
-    const job = await s2.ctx.actions.run('mdctl.terminal', { command: `${process.execPath} -e "console.log(1+1); console.log(process.argv[1])" "a;b"` }, { role: 'admin' });
+    const job = await s2.ctx.actions.run('agentneuron.terminal', { command: `${process.execPath} -e "console.log(1+1); console.log(process.argv[1])" "a;b"` }, { role: 'admin' });
     await job.done;
     assert.equal(job.status, 'ok');
     assert.ok(job.logBuf.some((l) => l.stream === 'stdout' && /^2/.test(l.text)));
     assert.ok(job.logBuf.some((l) => /a;b/.test(l.text)));
-    const bad = await s2.ctx.actions.run('mdctl.terminal', { command: `${process.execPath} -e "process.exit(3)"` }, { role: 'admin' });
+    const bad = await s2.ctx.actions.run('agentneuron.terminal', { command: `${process.execPath} -e "process.exit(3)"` }, { role: 'admin' });
     await bad.done;
     assert.equal(bad.status, 'error');
     assert.equal((await fetch(b + '/api/auth/me')).status, 200);

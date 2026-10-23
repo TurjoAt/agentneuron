@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { isCandidate } from '../core/classify.js';
 import { readEntry } from '../core/scanner.js';
 import {
-  FileError, resolveSafe, cleanRel, atomicWrite, writeNew, readTextIfExists, mdctlPath, readJson, atomicJson, sha1,
+  FileError, resolveSafe, cleanRel, atomicWrite, writeNew, readTextIfExists, agentneuronPath, readJson, atomicJson, sha1,
 } from './paths.js';
 import { rewriteContent, makeIndex, resolveWiki, resolveRel } from './rewrite.js';
 import { closestFiles } from './fuzzy.js';
@@ -198,7 +198,7 @@ export function createFileOps(ctx) {
   }
 
   // ---- trash ---------------------------------------------------------------
-  const trashDir = () => mdctlPath(root, 'trash');
+  const trashDir = () => agentneuronPath(root, 'trash');
   const validId = (id) => typeof id === 'string' && /^[\w-]{3,64}$/.test(id);
 
   async function remove({ path: input }) {

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const server = fileURLToPath(new URL('../src/mcp/server.js', import.meta.url));
 
 test('MCP stdio server: initialize, tools/list, tools/call', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-mcp-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-mcp-'));
   fs.mkdirSync(path.join(root, 'docs'));
   fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Proj\nSee @docs/plan.md\n- [ ] ship it\napi_key = "sk-ant-api03-' + 'Zq9Xw8Vu7Ts6Rp5On4Ml3'.repeat(2) + '"\n');
   fs.writeFileSync(path.join(root, 'docs/plan.md'), '# Plan\n- [x] done thing\nneedle here\n');
@@ -42,7 +42,7 @@ test('MCP stdio server: initialize, tools/list, tools/call', async () => {
   try {
     const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } });
     assert.equal(init.result.protocolVersion, '2025-06-18');
-    assert.equal(init.result.serverInfo.name, 'mdctl');
+    assert.equal(init.result.serverInfo.name, 'agentneuron');
     assert.ok(init.result.capabilities.tools);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const list = await rpc('tools/list', {});

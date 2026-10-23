@@ -36,7 +36,7 @@
     <!-- svelte-ignore a11y_autofocus -->
     <textarea class="input" rows="2" bind:value={text} placeholder="Add a note on line {compose.line}… (⌘↵ to save)" onkeydown={onkey} autofocus></textarea>
     <div class="row">
-      <span class="faint small grow">Stored in .mdctl/annotations.json · re-anchors when the line moves</span>
+      <span class="faint small grow">Stored in .agentneuron/annotations.json · re-anchors when the line moves</span>
       <button type="button" class="btn sm ghost" onclick={onclose}>Cancel</button>
       <button type="submit" class="btn sm primary" disabled={!text.trim() || busy || !canRun('state')}>Add note</button>
     </div>

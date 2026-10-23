@@ -8,7 +8,7 @@
 </script>
 
 <section class="card">
-  <div class="card-h">About mdctl</div>
+  <div class="card-h">About agentneuron</div>
   <div class="card-b col" style="gap:14px">
     <div class="row" style="gap:12px;flex-wrap:wrap">
       <div class="col" style="gap:2px"><div class="eyebrow">Version</div><div class="v mono">{settings?.version || '—'}</div></div>
@@ -24,7 +24,7 @@
         {:else}<span class="faint small">No path information.</span>{/each}
       </div>
     </div>
-    <div class="faint small">Press <kbd class="kbd">⌘K</kbd> / <kbd class="kbd">Ctrl K</kbd> for the command palette. Markdown is the source of truth; mdctl keeps its own state in <code>.mdctl/</code>.</div>
+    <div class="faint small">Press <kbd class="kbd">⌘K</kbd> / <kbd class="kbd">Ctrl K</kbd> for the command palette. Markdown is the source of truth; agentneuron keeps its own state in <code>.agentneuron/</code>.</div>
   </div>
 </section>
 

@@ -42,8 +42,8 @@ export function levelReason(level) {
   if (!app.me) return 'Not signed in';
   if (level === 'state') return 'Requires the admin role (sign in with the admin token)';
   if (app.me.role !== 'admin') return `Requires the admin role — you are signed in as ${app.me.role}`;
-  if (level === 'terminal') return 'enable actions.terminal in .mdctl/config.json (or start with --enable terminal)';
-  return `enable actions.${level} in .mdctl/config.json (or start with --enable ${level})`;
+  if (level === 'terminal') return 'enable actions.terminal in .agentneuron/config.json (or start with --enable terminal)';
+  return `enable actions.${level} in .agentneuron/config.json (or start with --enable ${level})`;
 }
 
 export function actionDef(id) {
@@ -63,7 +63,7 @@ export function actionEnabled(id) {
 function guessLevel(id) {
   if (/discard|delete|drop|purge|migrate|terminal|clear/.test(id)) return 'danger';
   if (/^(packages|scripts|framework)\.|fetch|pull|push|mcp\.test|workspace\.open/.test(id)) return 'exec';
-  if (/^mdctl\.(rescan|snapshot)/.test(id)) return 'state';
+  if (/^agentneuron\.(rescan|snapshot)/.test(id)) return 'state';
   return 'edit';
 }
 

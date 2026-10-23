@@ -147,9 +147,9 @@ const anyAvailable = (types, bins) => async (ctx) => {
   } catch { return false; }
 };
 
-export function cachePath(root, m) { return path.join(root, '.mdctl', 'cache', `outdated-${m}.json`); }
+export function cachePath(root, m) { return path.join(root, '.agentneuron', 'cache', `outdated-${m}.json`); }
 export async function readOutdatedCache(root) {
-  const dir = path.join(root, '.mdctl', 'cache');
+  const dir = path.join(root, '.agentneuron', 'cache');
   const out = {};
   let names = []; try { names = await fsp.readdir(dir); } catch { return out; }
   for (const n of names) {
@@ -193,9 +193,9 @@ export default function register(registry, ctx) {
       const items = parseOutdated(m, r.stdout);
       const doc = { manager: m, ts: Date.now(), items, ...(items.length === 0 && r.stdout && m === 'bun' ? { raw: String(r.stdout).slice(0, 20000) } : {}) };
       try {
-        await fsp.mkdir(path.join(ctx.root, '.mdctl', 'cache'), { recursive: true });
+        await fsp.mkdir(path.join(ctx.root, '.agentneuron', 'cache'), { recursive: true });
         await fsp.writeFile(cachePath(ctx.root, m), JSON.stringify(doc));
-      } catch { job.log?.('stderr', 'could not write .mdctl/cache'); }
+      } catch { job.log?.('stderr', 'could not write .agentneuron/cache'); }
       return { manager: m, count: items.length };
     },
   });

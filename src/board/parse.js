@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { scanLines, blankInlineCode } from '../analysis/links.js';
 
 export const PRIORITIES = ['none', 'low', 'med', 'high', 'urgent'];
-export const EXPORT_MARKER = '<!-- mdctl:export -->';
+export const EXPORT_MARKER = '<!-- agentneuron:export -->';
 
 const ITEM = /^(\s*)((?:[-*+]|\d+[.)])\s+\[)([ xX/])(\]\s+)(.*)$/;
 const LIST = /^(\s*)(?:[-*+]|\d+[.)])\s+/;

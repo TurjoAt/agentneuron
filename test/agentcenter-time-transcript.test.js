@@ -12,7 +12,7 @@ import { projectDirName } from '../src/agents/sessions.js';
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 
 test('contextAt / contextDiff use history versions', async () => {
-  const root = tmp('mdctl-tt-');
+  const root = tmp('agentneuron-tt-');
   fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# V1\n- alpha\n');
   const store = createStore(root, loadConfig(root));
   await store.init();
@@ -36,8 +36,8 @@ test('contextAt / contextDiff use history versions', async () => {
 });
 
 test('sessionTimeline reads claude transcript, masks secrets, truncates', async () => {
-  const home = tmp('mdctl-home-');
-  const root = tmp('mdctl-proj-');
+  const home = tmp('agentneuron-home-');
+  const root = tmp('agentneuron-proj-');
   const dir = path.join(home, '.claude', 'projects', projectDirName(root));
   fs.mkdirSync(dir, { recursive: true });
   const L = (o) => JSON.stringify(o);

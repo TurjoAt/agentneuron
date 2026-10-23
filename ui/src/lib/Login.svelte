@@ -31,8 +31,8 @@
       </svg>
     </div>
     <div class="col" style="gap:4px;text-align:center">
-      <h1>Sign in to mdctl</h1>
-      <p class="muted">This server is protected. Paste the token printed in the terminal where <span class="mono">mdctl</span> was started.</p>
+      <h1>Sign in to agentneuron</h1>
+      <p class="muted">This server is protected. Paste the token printed in the terminal where <span class="mono">agentneuron</span> was started.</p>
     </div>
     <label class="fld">
       <span class="fl">Access token</span>

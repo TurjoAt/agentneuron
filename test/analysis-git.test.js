@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { createGit } from '../src/analysis/git.js';
 
 const sh = (cwd, ...a) => execFileSync('git', a, { cwd, stdio: 'pipe' }).toString();
-const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-git-')));
+const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-git-')));
 
 test('not a repo: never throws', async () => {
   const d = tmp();

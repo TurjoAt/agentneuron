@@ -40,12 +40,30 @@ export function parseEnable(list) {
   return out;
 }
 
-/** Resolve config: defaults < <root>/.mdctl/config.json < overrides. */
+/**
+ * Projects initialised before the rename keep their data in <root>/.mdctl/.
+ * Move it to <root>/.agentneuron/ once, so history and config carry over.
+ */
+export function migrateLegacyDir(root) {
+  const absRoot = path.resolve(root);
+  const legacy = path.join(absRoot, '.mdctl');
+  const dir = path.join(absRoot, '.agentneuron');
+  try {
+    if (!fs.existsSync(dir) && fs.statSync(legacy).isDirectory()) {
+      fs.renameSync(legacy, dir);
+      return true;
+    }
+  } catch { /* no legacy dir, or not movable: start fresh */ }
+  return false;
+}
+
+/** Resolve config: defaults < <root>/.agentneuron/config.json < overrides. */
 export function loadConfig(root, overrides = {}) {
   const absRoot = path.resolve(root);
+  migrateLegacyDir(absRoot);
   let fileCfg = {};
   try {
-    const raw = fs.readFileSync(path.join(absRoot, '.mdctl', 'config.json'), 'utf8');
+    const raw = fs.readFileSync(path.join(absRoot, '.agentneuron', 'config.json'), 'utf8');
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) fileCfg = parsed;
   } catch { /* missing or invalid config: use defaults */ }
@@ -62,9 +80,10 @@ export function loadConfig(root, overrides = {}) {
   return cfg;
 }
 
-/** Create <root>/.mdctl/ with a .gitignore for generated data. Returns the dir. */
-export function ensureMdctlDir(root) {
-  const dir = path.join(path.resolve(root), '.mdctl');
+/** Create <root>/.agentneuron/ with a .gitignore for generated data. Returns the dir. */
+export function ensureAgentneuronDir(root) {
+  migrateLegacyDir(root);
+  const dir = path.join(path.resolve(root), '.agentneuron');
   fs.mkdirSync(dir, { recursive: true });
   const gi = path.join(dir, '.gitignore');
   if (!fs.existsSync(gi)) fs.writeFileSync(gi, 'history/\ncache/\n');

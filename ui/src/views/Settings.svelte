@@ -38,7 +38,7 @@
   <div class="page-h">
     <div>
       <h1>Settings</h1>
-      <p>Permissions, access, audit trail and housekeeping. Changes to what mdctl may do are made on the server.</p>
+      <p>Permissions, access, audit trail and housekeeping. Changes to what agentneuron may do are made on the server.</p>
     </div>
   </div>
   <div class="tabs"><Tabs tabs={TABS} bind:active={tab} onchange={go} /></div>

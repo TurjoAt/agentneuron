@@ -131,7 +131,7 @@ export default function register(registry, ctx) {
       let ex = '';
       try { ex = fs.readFileSync(file, 'utf8'); } catch { /* new file */ }
       const next = prependChangelog(ex, r.markdown);
-      const tmp = file + '.mdctl-tmp';
+      const tmp = file + '.agentneuron-tmp';
       fs.writeFileSync(tmp, next);
       fs.renameSync(tmp, file);
       job.log?.('info', `CHANGELOG.md updated (${r.count} commits)`);
@@ -142,16 +142,16 @@ export default function register(registry, ctx) {
 
   // ---- workspace -------------------------------------------------------
   registry.register({
-    id: 'workspace.open', title: 'Open project in mdctl', category: 'workspace', level: 'exec',
-    description: 'Start another mdctl instance for a sibling project',
+    id: 'workspace.open', title: 'Open project in agentneuron', category: 'workspace', level: 'exec',
+    description: 'Start another agentneuron instance for a sibling project',
     params: { path: { type: 'string', required: true, label: 'Project directory' } },
-    preview: (p) => ({ command: ['mdctl', 'start', String(p.path), '--port', '0'], summary: 'Start a new mdctl instance' }),
+    preview: (p) => ({ command: ['agentneuron', 'start', String(p.path), '--port', '0'], summary: 'Start a new agentneuron instance' }),
     run: async (p, c, job) => {
       const dir = resolveProjectDir(ctx, p.path);
       if (!dir) throw new Error('path must be a directory inside the workspace root');
       const r = await instances.open(dir, { host: ctx.config?.host || '127.0.0.1', token: ctx.config?.token || undefined });
       clearCache();
-      job.log?.('info', `mdctl running at ${r.url}`);
+      job.log?.('info', `agentneuron running at ${r.url}`);
       return { url: r.url };
     },
   });

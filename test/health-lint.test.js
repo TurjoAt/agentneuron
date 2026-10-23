@@ -10,7 +10,7 @@ const f = (p, o = {}) => ({
   path: p, name: p.split('/').pop(), dir: p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '',
   tool: 'generic', kind: 'doc', ext: '.md', size: 100, mtime: NOW, hash: 'h', tokens: 50, lines: 5, title: null, ...o,
 });
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-lint-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-lint-'));
 const rules = (is, r) => is.filter((i) => i.rule === r);
 
 test('broken-link from links', () => {

@@ -4,7 +4,7 @@
   import Icon from '../../lib/Icon.svelte';
 
   let { settings = null } = $props();
-  const KEY = 'mdctl.browserNotify';
+  const KEY = 'agentneuron.browserNotify';
   const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'false') === true; } catch { return false; } };
   let want = $state(read());
   let perm = $state(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
@@ -52,7 +52,7 @@
       {:else}
         <div class="faint small">No webhooks configured.</div>
       {/each}
-      <div class="eyebrow" style="margin-top:6px">Add one in .mdctl/config.json</div>
+      <div class="eyebrow" style="margin-top:6px">Add one in .agentneuron/config.json</div>
       <pre>{`{ "notifications": { "webhooks": [ { "url": "https://hooks.slack.com/…", "events": ["secret","conflict","health-drop","job-failed","job-done"] } ] } }`}</pre>
       <span class="faint small">URLs are masked here; secrets never leave the server.</span>
     </div>

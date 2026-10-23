@@ -8,7 +8,7 @@ function unavailable(reason) { return { available: false, reason }; }
 
 function explain(err) {
   const s = String(err || '');
-  if (/dubious ownership/i.test(s)) return 'git refuses this repository ("dubious ownership"); run mdctl as the repository owner. mdctl does not change safe.directory.';
+  if (/dubious ownership/i.test(s)) return 'git refuses this repository ("dubious ownership"); run agentneuron as the repository owner. agentneuron does not change safe.directory.';
   if (/not a git repository/i.test(s)) return 'not a git repository';
   if (/ENOENT/.test(s)) return 'git not found or directory missing';
   return s.trim().split('\n')[0] || 'git unavailable';

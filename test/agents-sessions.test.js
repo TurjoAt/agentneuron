@@ -9,7 +9,7 @@ const T0 = Date.UTC(2026, 9, 23, 10, 0, 0);
 const iso = (ms) => new Date(ms).toISOString();
 
 function setup() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-sess-'));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-sess-'));
   const root = path.join(base, 'my.proj_x');
   const home = path.join(base, 'home');
   fs.mkdirSync(root, { recursive: true });

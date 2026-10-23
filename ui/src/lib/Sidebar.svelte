@@ -19,13 +19,13 @@
   const toolOfPath = (p) => fileIndex().byPath.get(p)?.tool;
 
   function toggle(which) {
-    if (which === 'pinned') saveLocal('mdctl.side.pinned', (app.sidePinnedOpen = !app.sidePinnedOpen));
-    else saveLocal('mdctl.side.recent', (app.sideRecentOpen = !app.sideRecentOpen));
+    if (which === 'pinned') saveLocal('agentneuron.side.pinned', (app.sidePinnedOpen = !app.sidePinnedOpen));
+    else saveLocal('agentneuron.side.recent', (app.sideRecentOpen = !app.sideRecentOpen));
   }
 </script>
 
 <nav class="side" aria-label="Main">
-  <a class="brand" href="#/overview" aria-label="mdctl overview">
+  <a class="brand" href="#/overview" aria-label="AgentNeuron overview">
     <span class="mark">
       <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
         <defs>
@@ -39,7 +39,7 @@
         <path d="M8 22V10l4 5 4-5v12M20 10v8m0 0-3-3m3 3 3-3M19 22h6" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </span>
-    <span class="name">mdctl<span class="sub">{app.state?.project?.name || 'context control'}</span></span>
+    <span class="name">AgentNeuron<span class="sub">{app.state?.project?.name || 'context control'}</span></span>
   </a>
 
   <div class="scroll">

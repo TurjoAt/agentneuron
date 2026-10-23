@@ -9,7 +9,7 @@ import { createRouter } from '../src/server/router.js';
 import filesRoutes from '../src/server/routes/files.js';
 import taskRoutes from '../src/server/routes/tasks.js';
 
-export const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-f-'));
+export const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-f-'));
 export const put = (root, rel, c) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), c); };
 export const read = (root, rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 

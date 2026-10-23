@@ -1,7 +1,7 @@
 import { globMatch, globToRegex } from './glob.js';
 import catalogue from '../patterns/catalogue.json' with { type: 'json' };
 
-export const ALWAYS_IGNORED = ['.git', 'node_modules', 'vendor', '.mdctl', 'dist', 'build', '.next', 'storage', '__MACOSX'];
+export const ALWAYS_IGNORED = ['.git', 'node_modules', 'vendor', '.agentneuron', '.mdctl', 'dist', 'build', '.next', 'storage', '__MACOSX'];
 
 const docKinds = catalogue.docKinds.map((d) => ({ re: new RegExp(d.regex, 'i'), kind: d.kind }));
 const MD_RE = /\.(md|mdc|mdx|markdown)$/i;
@@ -48,7 +48,7 @@ export function isIgnored(relPath, config = {}) {
   return false;
 }
 
-/** Should this file be tracked by mdctl at all (ignore rules + catalogue / markdown)? */
+/** Should this file be tracked by agentneuron at all (ignore rules + catalogue / markdown)? */
 export function isCandidate(relPath, config = {}) {
   if (!relPath || isIgnored(relPath, config)) return false;
   const extra = config.extraPatterns || [];

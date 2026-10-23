@@ -39,7 +39,7 @@ test('path safety and permission gating', async () => {
   fs.symlinkSync(outside, path.join(r, 'link'));
   fs.symlinkSync(path.join(outside, 'secret.md'), path.join(r, 'evil.md'));
   const { api } = await makeApi(r);
-  for (const p of ['/etc/passwd', '../x.md', 'a/../../x.md', 'a\0.md', 'link/secret.md', 'evil.md', '.mdctl/board.json', '.git/config']) {
+  for (const p of ['/etc/passwd', '../x.md', 'a/../../x.md', 'a\0.md', 'link/secret.md', 'evil.md', '.agentneuron/board.json', '.git/config']) {
     const res = await api('GET', `/api/file/raw?path=${encodeURIComponent(p)}`);
     assert.ok(res.status >= 400, p);
     const s = await api('POST', '/api/file/save', { path: p, content: 'x', baseHash: 'h' });

@@ -438,7 +438,7 @@ Phases, flags, communication, rollback plan.
 
 add({
   id: 'todo', name: 'TODO list', category: 'tasks', tool: 'generic', defaultPath: 'TODO.md',
-  description: 'Task list in the checkbox syntax mdctl understands (- [ ], - [/], - [x], !priority, @due, #label).',
+  description: 'Task list in the checkbox syntax agentneuron understands (- [ ], - [/], - [x], !priority, @due, #label).',
   vars: [PROJECT],
   body: `# TODO - {{project}}
 

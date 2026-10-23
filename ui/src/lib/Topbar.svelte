@@ -22,7 +22,7 @@
   </div>
 
   <nav class="crumbs" aria-label="Breadcrumbs">
-    <span class="proj ellipsis">{app.state?.project?.name || 'mdctl'}</span>
+    <span class="proj ellipsis">{app.state?.project?.name || 'agentneuron'}</span>
     <span class="slash">/</span>
     <a class="view" href={href(app.route.view)} onclick={(e) => { if (segs.length) { e.preventDefault(); navigate('files', {}); } }}>{view?.label}</a>
     {#each segs as s, i (i)}

@@ -1,5 +1,5 @@
-// mdctl MCP server: read-only tools over stdio (JSON-RPC 2.0, newline-delimited).
-// stdout carries ONLY protocol messages; diagnostics go to stderr when MDCTL_DEBUG is set.
+// agentneuron MCP server: read-only tools over stdio (JSON-RPC 2.0, newline-delimited).
+// stdout carries ONLY protocol messages; diagnostics go to stderr when AGENTNEURON_DEBUG is set.
 import path from 'node:path';
 import readline from 'node:readline';
 import { loadConfig } from '../core/config.js';
@@ -165,8 +165,8 @@ export async function runMcpServer(root, config = {}, io = {}) {
         return rpcResult(msg.id, {
           protocolVersion: SUPPORTED.has(want) ? want : PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'mdctl', version: globalThis.__MDCTL_VERSION__ || '0.2.0' },
-          instructions: 'mdctl exposes the AI-context markdown of this project (CLAUDE.md, AGENTS.md, rules, skills, docs). Read-only.',
+          serverInfo: { name: 'agentneuron', version: globalThis.__AGENTNEURON_VERSION__ || '0.2.0' },
+          instructions: 'agentneuron exposes the AI-context markdown of this project (CLAUDE.md, AGENTS.md, rules, skills, docs). Read-only.',
         });
       }
       case 'ping': return isNote ? null : rpcResult(msg.id, {});

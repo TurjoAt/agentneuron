@@ -1,4 +1,4 @@
-// mdctl's own actions: rescan, history clear, metrics snapshot, terminal.
+// agentneuron's own actions: rescan, history clear, metrics snapshot, terminal.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -23,7 +23,7 @@ export function splitWords(line) {
 
 export default function register(registry, ctx) {
   registry.register({
-    id: 'mdctl.rescan', title: 'Rescan project', category: 'mdctl', level: 'state',
+    id: 'agentneuron.rescan', title: 'Rescan project', category: 'agentneuron', level: 'state',
     description: 'Re-read all tracked markdown files and recompute analysis.',
     preview: () => ({ command: null, summary: 'Rescans the project directory' }),
     async run(_p, c, job) {
@@ -36,11 +36,11 @@ export default function register(registry, ctx) {
   });
 
   registry.register({
-    id: 'mdctl.history.clear', title: 'Clear file history', category: 'mdctl', level: 'danger',
-    description: 'Deletes all stored file versions in .mdctl/history (cannot be undone).',
-    preview: () => ({ command: null, summary: 'Removes .mdctl/history/' }),
+    id: 'agentneuron.history.clear', title: 'Clear file history', category: 'agentneuron', level: 'danger',
+    description: 'Deletes all stored file versions in .agentneuron/history (cannot be undone).',
+    preview: () => ({ command: null, summary: 'Removes .agentneuron/history/' }),
     async run(_p, c, job) {
-      fs.rmSync(path.join(c.root, '.mdctl', 'history'), { recursive: true, force: true });
+      fs.rmSync(path.join(c.root, '.agentneuron', 'history'), { recursive: true, force: true });
       job.log('info', 'history cleared');
       try { await c.store.init(); } catch { /* best effort re-seed */ }
       return { cleared: true };
@@ -48,14 +48,14 @@ export default function register(registry, ctx) {
   });
 
   registry.register({
-    id: 'mdctl.snapshot', title: 'Record metrics snapshot', category: 'mdctl', level: 'state',
-    description: 'Appends a metrics snapshot to .mdctl/metrics.jsonl.',
+    id: 'agentneuron.snapshot', title: 'Record metrics snapshot', category: 'agentneuron', level: 'state',
+    description: 'Appends a metrics snapshot to .agentneuron/metrics.jsonl.',
     preview: () => ({ command: null, summary: 'Writes a metrics row' }),
     async run(_p, c) { return c.persist.metrics.snapshot(); },
   });
 
   registry.register({
-    id: 'mdctl.terminal', title: 'Run command', category: 'mdctl', level: 'danger', flag: 'terminal',
+    id: 'agentneuron.terminal', title: 'Run command', category: 'agentneuron', level: 'danger', flag: 'terminal',
     description: 'Runs a command line in the project (no shell: words are split and spawned directly).',
     params: {
       command: { type: 'text', required: true, label: 'Command', maxLength: 4000 },

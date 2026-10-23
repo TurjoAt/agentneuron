@@ -1,4 +1,4 @@
-# mdctl v0.2 — from monitor to control center (plan, 2026-10-23)
+# agentneuron v0.2 — from monitor to control center (plan, 2026-10-23)
 
 v0.1 *watches*. v0.2 lets you *act*: edit, navigate, manage tasks, run git and
 package operations, understand the whole project stack, and manage every AI-tool
@@ -19,7 +19,7 @@ config — from one UI.
   panel ("who links here"), open-in-graph.
 - **File actions**: new (from templates: CLAUDE.md, AGENTS.md, ADR, plan, skill,
   agent, command, rule), rename/move **with automatic link rewriting** across all
-  files, duplicate, delete (to `.mdctl/trash`, undoable), restore version, copy path,
+  files, duplicate, delete (to `.agentneuron/trash`, undoable), restore version, copy path,
   "create task from selection", "explain/summarize" (later via agent).
 
 ## 2. Graph 2.0 — "neural network" view
@@ -41,7 +41,7 @@ editor, right-click → actions.
 ## 3. Reports page (new)
 - **Time range**: 24h / 7d / 30d / 90d / custom + compare to previous period.
 - Needs persistence (v0.1 keeps only 500 events in memory):
-  `.mdctl/events.jsonl` (every change), `.mdctl/metrics.jsonl` (hourly snapshot:
+  `.agentneuron/events.jsonl` (every change), `.agentneuron/metrics.jsonl` (hourly snapshot:
   files, tokens, health, tasks, git dirty).
 - Charts: changes over time (line/area, by tool/kind stacked), token growth,
   health score trend, tasks created vs closed (burndown/burnup), agent activity per
@@ -56,7 +56,7 @@ editor, right-click → actions.
 - Sources:
   - **Markdown tasks** (two-way sync): `- [ ]` todo, `- [/]` in progress, `- [x]` done;
     inline meta `@due(2026-11-01) #label !high @owner`. Moving a card edits the md line.
-  - **Native tasks** stored in `.mdctl/board.json` (optionally exported to `TASKS.md`).
+  - **Native tasks** stored in `.agentneuron/board.json` (optionally exported to `TASKS.md`).
 - Card: title, description (md), status, priority, labels, due date, assignee
   (person or agent session), linked files, subtasks/checklist, comments, activity.
 - Filters, search, swimlanes (by file / label / priority / assignee), WIP limits.
@@ -124,21 +124,21 @@ Features:
     Makefile targets.
   - Framework: Laravel cache:clear / migrate:status / route:list; Next build…
   - Agents: create skill/agent/command, add MCP server, edit permissions/hooks.
-  - mdctl: rescan, clear history, export report.
+  - agentneuron: rescan, clear history, export report.
 - **Job runner**: queue + live terminal panel (stdout/stderr streamed over SSE),
-  cancel, exit code, duration, job history in `.mdctl/jobs/`.
+  cancel, exit code, duration, job history in `.agentneuron/jobs/`.
 - **Safety**:
   - No free-form shell by default — only registered actions with argument validation.
     Optional "terminal" mode must be explicitly enabled.
   - Every action shows the exact command before running; confirmation dialogs.
-  - **Audit log** `.mdctl/audit.jsonl` (when, who/token, action, params, result).
+  - **Audit log** `.agentneuron/audit.jsonl` (when, who/token, action, params, result).
   - **Two tokens**: viewer token (read-only) and admin token (actions). Cookie session
     instead of token in URL.
   - Mode flags: `--mode read|edit|exec` (default read). Recommend HTTPS when exec is
     enabled on a public address.
 
 ## 9. Cross-cutting
-- Persistence layer (`.mdctl/*.jsonl`, `board.json`) with rotation.
+- Persistence layer (`.agentneuron/*.jsonl`, `board.json`) with rotation.
 - UI shell: global action bar, right-click context menus, toasts with undo,
   keyboard shortcuts, job panel docked at bottom.
 - Multi-project dashboard, notifications, MCP server mode (from v0.1 backlog).

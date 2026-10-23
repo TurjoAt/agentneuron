@@ -47,9 +47,9 @@ export default async function register(router, ctx) {
         browser: c.notifications?.browser !== false,
         webhooks: (c.notifications?.webhooks || []).map((w) => ({ url: maskUrl(w.url), events: w.events || [] })),
       },
-      paths: { root: ctx.root, data: '.mdctl', config: '.mdctl/config.json', audit: '.mdctl/audit.jsonl', events: '.mdctl/events.jsonl', metrics: '.mdctl/metrics.jsonl' },
+      paths: { root: ctx.root, data: '.agentneuron', config: '.agentneuron/config.json', audit: '.agentneuron/audit.jsonl', events: '.agentneuron/events.jsonl', metrics: '.agentneuron/metrics.jsonl' },
       version: VERSION,
-      howToEnable: 'Actions beyond read are OFF by default. Enable them in .mdctl/config.json, e.g. {"actions":{"edit":true,"exec":true}}, or start mdctl with --enable edit,exec[,danger,terminal]. Use --admin-token to separate admin from read-only viewers.',
+      howToEnable: 'Actions beyond read are OFF by default. Enable them in .agentneuron/config.json, e.g. {"actions":{"edit":true,"exec":true}}, or start agentneuron with --enable edit,exec[,danger,terminal]. Use --admin-token to separate admin from read-only viewers.',
     };
   });
 

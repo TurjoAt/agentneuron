@@ -3,28 +3,28 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig, ensureMdctlDir } from '../src/core/config.js';
+import { loadConfig, ensureAgentneuronDir } from '../src/core/config.js';
 import { classify, isCandidate } from '../src/core/classify.js';
 import { globMatch } from '../src/core/glob.js';
 import { estimateTokens } from '../src/core/tokens.js';
 import { scan, readEntry } from '../src/core/scanner.js';
 import { lineDiff } from '../src/core/diff.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-core-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-core-'));
 const put = (root, rel, c) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), c); };
 
 test('config defaults, file and overrides', () => {
   const r = tmp();
   assert.equal(loadConfig(r).port, 4747);
-  ensureMdctlDir(r);
-  assert.equal(fs.readFileSync(path.join(r, '.mdctl/.gitignore'), 'utf8'), 'history/\ncache/\n');
-  fs.writeFileSync(path.join(r, '.mdctl/config.json'), JSON.stringify({ port: 5000, ignore: ['tmp'] }));
+  ensureAgentneuronDir(r);
+  assert.equal(fs.readFileSync(path.join(r, '.agentneuron/.gitignore'), 'utf8'), 'history/\ncache/\n');
+  fs.writeFileSync(path.join(r, '.agentneuron/config.json'), JSON.stringify({ port: 5000, ignore: ['tmp'] }));
   const c = loadConfig(r, { host: '0.0.0.0', port: undefined });
   assert.equal(c.port, 5000);
   assert.equal(c.host, '0.0.0.0');
   assert.deepEqual(c.ignore, ['tmp']);
   assert.equal(c.root, path.resolve(r));
-  fs.writeFileSync(path.join(r, '.mdctl/config.json'), '{bad');
+  fs.writeFileSync(path.join(r, '.agentneuron/config.json'), '{bad');
   assert.equal(loadConfig(r).port, 4747);
 });
 
@@ -79,7 +79,7 @@ test('isCandidate honours ignore rules, extra patterns, includeAllMarkdown', () 
   const cfg = loadConfig(tmp(), { ignore: ['legacy', 'docs/private/**'] });
   assert.ok(isCandidate('README.md', cfg));
   assert.ok(!isCandidate('node_modules/x/README.md', cfg));
-  assert.ok(!isCandidate('.mdctl/history/a.md', cfg));
+  assert.ok(!isCandidate('.agentneuron/history/a.md', cfg));
   assert.ok(!isCandidate('a/vendor/b.md', cfg));
   assert.ok(!isCandidate('legacy/a.md', cfg));
   assert.ok(!isCandidate('docs/private/a.md', cfg));

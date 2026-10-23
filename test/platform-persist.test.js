@@ -9,7 +9,7 @@ import { createAudit, maskParams } from '../src/persist/audit.js';
 import { createJsonl } from '../src/persist/jsonl.js';
 import { createNotifier } from '../src/notify/index.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-persist-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-persist-'));
 
 test('events + metrics persistence, query by range and limit', async () => {
   const root = tmp();
@@ -30,7 +30,7 @@ test('events + metrics persistence, query by range and limit', async () => {
   assert.equal(snap.byTool.cursor, 1); assert.equal(snap.warns, 2); assert.equal(snap.grade, 'A');
   const rows = p.metrics.query({ from: Date.now() - 5000 });
   assert.equal(rows.length, 1);
-  assert.ok(fs.existsSync(path.join(root, '.mdctl/metrics.jsonl')));
+  assert.ok(fs.existsSync(path.join(root, '.agentneuron/metrics.jsonl')));
 });
 
 test('jsonl rotation keeps 3 rotated files', () => {

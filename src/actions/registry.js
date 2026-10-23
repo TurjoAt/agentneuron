@@ -22,7 +22,7 @@ export function safeRelPath(p) {
 
 export function howToEnable(level) {
   if (level === 'state') return 'requires the admin role (log in with the admin token)';
-  return `enable actions.${level} in .mdctl/config.json (or start mdctl with --enable ${level})`;
+  return `enable actions.${level} in .agentneuron/config.json (or start agentneuron with --enable ${level})`;
 }
 
 function validateDef(def) {

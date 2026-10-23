@@ -34,9 +34,9 @@ export default function register(registry, ctx) {
   });
   registry.register({
     id: 'files.delete', title: 'Delete file (to trash)', category: 'files', level: 'edit',
-    description: 'Move a file to .mdctl/trash. Restorable.',
+    description: 'Move a file to .agentneuron/trash. Restorable.',
     params: { path: { type: 'path', required: true, label: 'Path' } },
-    preview: (p) => ({ summary: `Move ${p.path} to .mdctl/trash` }),
+    preview: (p) => ({ summary: `Move ${p.path} to .agentneuron/trash` }),
     run: async (p) => ops().remove({ path: p.path }),
   });
   registry.register({

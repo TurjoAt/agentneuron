@@ -1,10 +1,10 @@
 {
-  "name": "mdctl",
+  "name": "agentneuron",
   "version": "0.2.0",
   "description": "Live monitor for AI-context markdown (CLAUDE.md, AGENTS.md, Cursor rules, skills, docs) with git, history, link graph and health checks.",
   "type": "module",
   "bin": {
-    "mdctl": "dist/mdctl.mjs"
+    "agentneuron": "dist/agentneuron.mjs"
   },
   "files": [
     "dist"

@@ -8,7 +8,7 @@ import { createHistory } from '../src/core/history.js';
 import { createStore } from '../src/core/store.js';
 import { createWatcher } from '../src/core/watcher.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-core-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-core-'));
 const put = (root, rel, c) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), c); };
 
 test('history: record, dedupe, list, get, latest, limit', () => {
@@ -32,7 +32,7 @@ test('history: record, dedupe, list, get, latest, limit', () => {
   assert.equal(h.get('docs/a.md', e1.id), null);
   assert.deepEqual(h.list('missing.md'), []);
   assert.equal(h.latest('missing.md'), null);
-  assert.ok(fs.existsSync(path.join(r, '.mdctl/history')));
+  assert.ok(fs.existsSync(path.join(r, '.agentneuron/history')));
 });
 
 test('history: restore writes file and records', () => {

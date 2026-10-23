@@ -225,7 +225,7 @@ const PROJECT_INFO = {
     { name: '.devcontainer', purpose: 'Dev container definition', tool: null, files: 2, bytes: 1_890 },
     { name: '.turbo', purpose: 'Turborepo cache (generated)', tool: null, files: 412, bytes: 48_200_000 },
     { name: '.next', purpose: 'Next.js build output (generated)', tool: null, files: 1_860, bytes: 212_000_000 },
-    { name: '.mdctl', purpose: 'mdctl state: history, metrics, board', tool: null, files: 9, bytes: 1_420_000 },
+    { name: '.agentneuron', purpose: 'agentneuron state: history, metrics, board', tool: null, files: 9, bytes: 1_420_000 },
   ],
   framework: {
     laravel: { version: '11.31.0', routes: 48, migrations: 23, models: 14, providers: 6, root: 'apps/admin' },
@@ -355,7 +355,7 @@ const TEMPLATES = [
   ['adr', 'ADR', 'docs', 'generic', 'docs/adr/{{number}}-{{slug}}.md', 'Architecture decision record (context, decision, consequences).'],
   ['plan', 'Plan', 'docs', 'generic', 'docs/plans/{{slug}}.md', 'Implementation plan with phases and checkboxes.'],
   ['prd', 'PRD', 'docs', 'generic', 'docs/prd/{{slug}}.md', 'Product requirements: problem, goals, non-goals, metrics.'],
-  ['todo', 'TODO list', 'tasks', 'generic', 'TODO.md', 'Checkbox task list mdctl can sync to the board.'],
+  ['todo', 'TODO list', 'tasks', 'generic', 'TODO.md', 'Checkbox task list agentneuron can sync to the board.'],
   ['decision-log', 'Decision log', 'docs', 'generic', 'DECISIONS.md', 'Running log of small decisions with status.'],
   ['handoff', 'Session handoff', 'agents', 'generic', 'docs/handoff/{{date}}.md', 'What was done, what is next, open questions — for the next agent.'],
   ['readme', 'README', 'docs', 'generic', 'README.md', 'Project README with setup, scripts and structure.'],
@@ -471,12 +471,12 @@ function contextVersion(tool, ts) {
 const WORKSPACE = (now) => ({
   root: '/home/dev', current: PROJECT.root,
   projects: [
-    { name: 'acme-commerce', path: PROJECT.root, stacks: ['Next.js', 'Fastify', 'Laravel', 'pnpm'], aiTools: ['claude', 'codex', 'cursor', 'copilot', 'windsurf', 'gemini'], mdFiles: 38, lastModified: now - 3 * 60_000, hasMdctl: true, git: { branch: 'feat/checkout-v2', dirty: 4 }, running: { url: location.origin + location.pathname + location.search } },
-    { name: 'acme-mobile', path: '/home/dev/acme-mobile', stacks: ['Expo', 'React Native'], aiTools: ['claude', 'cursor'], mdFiles: 14, lastModified: now - 5 * H, hasMdctl: true, git: { branch: 'main', dirty: 0 }, running: null },
-    { name: 'billing-service', path: '/home/dev/billing-service', stacks: ['Go'], aiTools: ['codex'], mdFiles: 9, lastModified: now - 2 * DAY, hasMdctl: false, git: { branch: 'main', dirty: 1 }, running: null },
-    { name: 'design-system', path: '/home/dev/design-system', stacks: ['Vite', 'React', 'Storybook'], aiTools: ['claude', 'copilot'], mdFiles: 22, lastModified: now - 4 * DAY, hasMdctl: false, git: { branch: 'next', dirty: 0 }, running: null },
-    { name: 'infra', path: '/home/dev/infra', stacks: ['Terraform', 'Docker'], aiTools: ['claude'], mdFiles: 6, lastModified: now - 11 * DAY, hasMdctl: false, git: { branch: 'main', dirty: 0 }, running: null },
-    { name: 'shop-admin-legacy', path: '/home/dev/shop-admin-legacy', stacks: ['Laravel', 'PHP'], aiTools: [], mdFiles: 3, lastModified: now - 140 * DAY, hasMdctl: false, git: { branch: 'master', dirty: 0 }, running: null },
+    { name: 'acme-commerce', path: PROJECT.root, stacks: ['Next.js', 'Fastify', 'Laravel', 'pnpm'], aiTools: ['claude', 'codex', 'cursor', 'copilot', 'windsurf', 'gemini'], mdFiles: 38, lastModified: now - 3 * 60_000, hasAgentneuron: true, git: { branch: 'feat/checkout-v2', dirty: 4 }, running: { url: location.origin + location.pathname + location.search } },
+    { name: 'acme-mobile', path: '/home/dev/acme-mobile', stacks: ['Expo', 'React Native'], aiTools: ['claude', 'cursor'], mdFiles: 14, lastModified: now - 5 * H, hasAgentneuron: true, git: { branch: 'main', dirty: 0 }, running: null },
+    { name: 'billing-service', path: '/home/dev/billing-service', stacks: ['Go'], aiTools: ['codex'], mdFiles: 9, lastModified: now - 2 * DAY, hasAgentneuron: false, git: { branch: 'main', dirty: 1 }, running: null },
+    { name: 'design-system', path: '/home/dev/design-system', stacks: ['Vite', 'React', 'Storybook'], aiTools: ['claude', 'copilot'], mdFiles: 22, lastModified: now - 4 * DAY, hasAgentneuron: false, git: { branch: 'next', dirty: 0 }, running: null },
+    { name: 'infra', path: '/home/dev/infra', stacks: ['Terraform', 'Docker'], aiTools: ['claude'], mdFiles: 6, lastModified: now - 11 * DAY, hasAgentneuron: false, git: { branch: 'main', dirty: 0 }, running: null },
+    { name: 'shop-admin-legacy', path: '/home/dev/shop-admin-legacy', stacks: ['Laravel', 'PHP'], aiTools: [], mdFiles: 3, lastModified: now - 140 * DAY, hasAgentneuron: false, git: { branch: 'master', dirty: 0 }, running: null },
   ],
 });
 
@@ -557,9 +557,9 @@ export function insightRoutes(ctx = {}) {
       const fmt = q.format || 'md';
       const rows = Object.entries(k);
       const stamp = new Date(to).toISOString().slice(0, 10);
-      if (fmt === 'csv') return { filename: `mdctl-report-${stamp}.csv`, mime: 'text/csv', content: 'metric,value\n' + rows.map(([a, b]) => `${a},${b}`).join('\n') + '\n' };
-      if (fmt === 'html') return { filename: `mdctl-report-${stamp}.html`, mime: 'text/html', content: `<!doctype html><meta charset="utf-8"><title>mdctl report</title><h1>${PROJECT.name}</h1><table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>` };
-      return { filename: `mdctl-report-${stamp}.md`, mime: 'text/markdown', content: `# ${PROJECT.name} report\n\n| Metric | Value |\n|---|---|\n${rows.map(([a, b]) => `| ${a} | ${b} |`).join('\n')}\n` };
+      if (fmt === 'csv') return { filename: `agentneuron-report-${stamp}.csv`, mime: 'text/csv', content: 'metric,value\n' + rows.map(([a, b]) => `${a},${b}`).join('\n') + '\n' };
+      if (fmt === 'html') return { filename: `agentneuron-report-${stamp}.html`, mime: 'text/html', content: `<!doctype html><meta charset="utf-8"><title>agentneuron report</title><h1>${PROJECT.name}</h1><table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>` };
+      return { filename: `agentneuron-report-${stamp}.md`, mime: 'text/markdown', content: `# ${PROJECT.name} report\n\n| Metric | Value |\n|---|---|\n${rows.map(([a, b]) => `| ${a} | ${b} |`).join('\n')}\n` };
     },
 
     // ------------------------------------------------ git stats (reports + overview)
@@ -597,7 +597,7 @@ export function insightRoutes(ctx = {}) {
       const src = SEED.find((s) => s[0] === (b.source || 'CLAUDE.md'))?.[4] || '';
       return (b.targets || []).map((target) => {
         const cur = SEED.find((s) => s[0] === target)?.[4];
-        const content = `<!-- synced from ${b.source} by mdctl -->\n` + src.replace(/^@.*\n/gm, '');
+        const content = `<!-- synced from ${b.source} by agentneuron -->\n` + src.replace(/^@.*\n/gm, '');
         return { target, exists: cur != null, content, diff: lineDiff(cur || '', content) };
       });
     },

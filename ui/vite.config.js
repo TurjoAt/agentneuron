@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 function inlineSingleFile() {
   const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return {
-    name: 'mdctl:inline-single-file',
+    name: 'agentneuron:inline-single-file',
     apply: 'build',
     enforce: 'post',
     generateBundle(_options, bundle) {
@@ -58,7 +58,7 @@ export default defineConfig({
   base: './',
   plugins: [svelte(), inlineSingleFile()],
   server: {
-    // during `vite dev` proxy the API to a locally running mdctl server;
+    // during `vite dev` proxy the API to a locally running agentneuron server;
     // if it isn't running, /api/state fails and the UI falls back to the mock.
     proxy: { '/api': { target: 'http://127.0.0.1:4747', changeOrigin: true } },
   },

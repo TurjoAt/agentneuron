@@ -134,7 +134,7 @@ test('top: churn, tokens, stale, links', async () => {
 });
 
 test('heatmap counts per day incl. commits', async () => {
-  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-rp-')));
+  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-rp-')));
   const g = (...a) => execFileSync('git', a, { cwd: repo, stdio: 'pipe' });
   g('init', '-q', '-b', 'main'); g('config', 'user.name', 't'); g('config', 'user.email', 't@t');
   fs.writeFileSync(path.join(repo, 'a'), '1'); g('add', '-A'); g('commit', '-q', '-m', 'x');
@@ -166,6 +166,6 @@ test('export csv/md/html', async () => {
   assert.ok(!html.includes('<script>x'));
   assert.match(html, /&lt;script&gt;/);
   const e = await exportReport(c, range, 'md');
-  assert.match(e.filename, /^mdctl-report-.*\.md$/);
+  assert.match(e.filename, /^agentneuron-report-.*\.md$/);
   assert.equal((await exportReport(c, range, 'csv')).type.startsWith('text/csv'), true);
 });

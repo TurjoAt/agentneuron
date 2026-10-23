@@ -50,7 +50,7 @@
   {:else if !ready && !unavailable}
     <div class="skel" style="height:200px"></div>
   {:else if unavailable}
-    <div class="card"><Empty icon="git" title="Git not available">{unavailable.reason || 'This project is not a git repository, or git is not installed.'} mdctl's local history still tracks every change.</Empty></div>
+    <div class="card"><Empty icon="git" title="Git not available">{unavailable.reason || 'This project is not a git repository, or git is not installed.'} agentneuron's local history still tracks every change.</Empty></div>
   {:else}
     <div class="tabbar"><Tabs {tabs} bind:active onchange={(t) => navigate('git', { tab: t })} /></div>
     {#key active}

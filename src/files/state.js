@@ -1,10 +1,10 @@
-// Bookmarks and annotations (.mdctl only).
+// Bookmarks and annotations (.agentneuron only).
 import crypto from 'node:crypto';
-import { FileError, cleanRel, mdctlPath, readJson, atomicJson } from './paths.js';
+import { FileError, cleanRel, agentneuronPath, readJson, atomicJson } from './paths.js';
 
 export function createState(ctx) {
-  const bmFile = () => mdctlPath(ctx.root, 'bookmarks.json');
-  const anFile = () => mdctlPath(ctx.root, 'annotations.json');
+  const bmFile = () => agentneuronPath(ctx.root, 'bookmarks.json');
+  const anFile = () => agentneuronPath(ctx.root, 'annotations.json');
   const note = (what) => { try { ctx.broadcast?.('files', { changed: what }); } catch { /* ignore */ } };
   const arr = (f) => { const v = readJson(f, []); return Array.isArray(v) ? v : []; };
 

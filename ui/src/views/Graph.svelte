@@ -34,9 +34,9 @@
 
   // ------------------------------------------------------------ view state
   const p0 = untrack(() => ({ ...params }));
-  let layout = $state(LAYOUTS.some((l) => l.id === p0.layout) ? p0.layout : load('mdctl.graph.layout', 'neural'));
-  let groupBy = $state(load('mdctl.graph.groupBy', 'folder'));
-  let colorMode = $state(load('mdctl.graph.color', 'tool'));
+  let layout = $state(LAYOUTS.some((l) => l.id === p0.layout) ? p0.layout : load('agentneuron.graph.layout', 'neural'));
+  let groupBy = $state(load('agentneuron.graph.groupBy', 'folder'));
+  let colorMode = $state(load('agentneuron.graph.color', 'tool'));
   let labels = $state('auto');
   let root = $state(p0.root || null);
   let filters = $state({ tools: new Set(), kinds: new Set(), health: 'all', age: 'any', hideOrphans: false, broken: true });
@@ -51,9 +51,9 @@
   let hover = $state(null); // { node?, cell?, x, y }
   let panelOpen = $state(true);
 
-  $effect(() => saveLocal('mdctl.graph.layout', layout));
-  $effect(() => saveLocal('mdctl.graph.groupBy', groupBy));
-  $effect(() => saveLocal('mdctl.graph.color', colorMode));
+  $effect(() => saveLocal('agentneuron.graph.layout', layout));
+  $effect(() => saveLocal('agentneuron.graph.groupBy', groupBy));
+  $effect(() => saveLocal('agentneuron.graph.color', colorMode));
 
   // model: rebuilt on graph/health/files change; churn from the event ring
   const model = $derived.by(() => {

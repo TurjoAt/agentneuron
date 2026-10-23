@@ -1,6 +1,6 @@
-// Task board: markdown tasks (two-way sync) + native tasks + overlay in .mdctl/board.json.
+// Task board: markdown tasks (two-way sync) + native tasks + overlay in .agentneuron/board.json.
 import crypto from 'node:crypto';
-import { FileError, mdctlPath, readJson, atomicJson, cleanRel } from '../files/paths.js';
+import { FileError, agentneuronPath, readJson, atomicJson, cleanRel } from '../files/paths.js';
 import { getOps } from '../files/ops.js';
 import {
   parseMdTasks, editLine, statusToChar, charToStatus, buildTaskLines, metaSuffix, PRIORITIES, EXPORT_MARKER,
@@ -60,7 +60,7 @@ function validatePatch(p, columns) {
 
 export function createBoard(ctx) {
   const { root, store } = ctx;
-  const file = () => mdctlPath(root, 'board.json');
+  const file = () => agentneuronPath(root, 'board.json');
   let timer = null;
   let watched = false;
 
@@ -145,7 +145,7 @@ export function createBoard(ctx) {
 
   async function mdWrite(task, patch, role) {
     // returns {ok, reason?, newId?}
-    if (!ctx.can?.('edit', role)) return { ok: false, reason: 'markdown write-back is disabled: enable actions.edit in .mdctl/config.json' };
+    if (!ctx.can?.('edit', role)) return { ok: false, reason: 'markdown write-back is disabled: enable actions.edit in .agentneuron/config.json' };
     const fm = freshMd(task);
     if (!fm) return { ok: false, reason: 'task line not found in file (changed on disk?)' };
     const { lines, t } = fm;
@@ -244,7 +244,7 @@ export function createBoard(ctx) {
       changed();
       return { task: collect(s).find((t) => t.id === n.id) };
     }
-    if (!ctx.can?.('edit', role)) throw new FileError(403, 'creating markdown tasks needs the edit level (enable actions.edit in .mdctl/config.json)');
+    if (!ctx.can?.('edit', role)) throw new FileError(403, 'creating markdown tasks needs the edit level (enable actions.edit in .agentneuron/config.json)');
     const ops = getOps(ctx);
     const rel = cleanRel(mdPath);
     const content = ops.readFresh(rel);
@@ -295,7 +295,7 @@ export function createBoard(ctx) {
       save(s); changed();
       return { deleted: true };
     }
-    let res = { ok: false, reason: 'markdown write-back is disabled: enable actions.edit in .mdctl/config.json' };
+    let res = { ok: false, reason: 'markdown write-back is disabled: enable actions.edit in .agentneuron/config.json' };
     if (ctx.can?.('edit', role)) {
       const fm = freshMd(task);
       if (fm) {

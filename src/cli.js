@@ -2,23 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
-import { loadConfig, ensureMdctlDir, parseEnable } from './core/config.js';
+import { loadConfig, ensureAgentneuronDir, parseEnable } from './core/config.js';
 import { createStore } from './core/store.js';
 import { buildGraph } from './analysis/graph.js';
 import { lint } from './health/lint.js';
 import { healthScore } from './health/score.js';
 import { startServer, VERSION } from './server/app.js';
 
-const HELP = `mdctl ${VERSION} - live monitor for AI-context markdown
+const HELP = `agentneuron ${VERSION} - live monitor for AI-context markdown
 
 Usage:
-  mdctl [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--open]
-  mdctl workspace [dir]         start in workspace mode (dir = folder holding your projects)
-  mdctl mcp [dir]               run the MCP server on stdio (for AI tools)
-  mdctl lint [--json] [dir]     exit 1 if any error-level issue
-  mdctl status [dir]            short text summary
-  mdctl init [dir]              create .mdctl/ (config + copy of this bundle)
-  mdctl --version | --help
+  agentneuron [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--open]
+  agentneuron workspace [dir]         start in workspace mode (dir = folder holding your projects)
+  agentneuron mcp [dir]               run the MCP server on stdio (for AI tools)
+  agentneuron lint [--json] [dir]     exit 1 if any error-level issue
+  agentneuron status [dir]            short text summary
+  agentneuron init [dir]              create .agentneuron/ (config + copy of this bundle)
+  agentneuron --version | --help
 
 Options:
   --port, -p <n>   port (default 4747; 0 = random)
@@ -26,7 +26,7 @@ Options:
   --token <t>      require a token (login screen, ?token=<t> or Authorization: Bearer <t>)
   --admin-token <t>  admin token; then --token becomes the read-only viewer token
   --enable <list>  enable action levels (comma list of: edit, exec, danger, terminal).
-                   Everything beyond read/state is OFF by default; or set "actions" in .mdctl/config.json
+                   Everything beyond read/state is OFF by default; or set "actions" in .agentneuron/config.json
   --write          alias for --enable edit
   --open           open the browser
   --json           machine-readable output (lint)
@@ -56,7 +56,7 @@ function scriptDir() {
 function resolveRoot(dirArg) {
   if (dirArg) return path.resolve(dirArg);
   const sd = scriptDir();
-  if (sd && path.basename(sd) === '.mdctl') return path.dirname(sd);
+  if (sd && path.basename(sd) === '.agentneuron') return path.dirname(sd);
   return process.cwd();
 }
 
@@ -88,7 +88,7 @@ async function cmdStatus(root) {
   const tokens = files.reduce((s, f) => s + (f.tokens || 0), 0);
   const byTool = {};
   for (const f of files) byTool[f.tool] = (byTool[f.tool] || 0) + 1;
-  console.log(`mdctl status for ${root}`);
+  console.log(`agentneuron status for ${root}`);
   console.log(`  files:  ${files.length}  (${Object.entries(byTool).map(([k, v]) => `${k}:${v}`).join(' ') || 'none'})`);
   console.log(`  tokens: ${tokens}`);
   console.log(`  health: ${health.score}/100 (${health.grade})  errors ${health.counts.error}  warnings ${health.counts.warn}  info ${health.counts.info}`);
@@ -97,21 +97,21 @@ async function cmdStatus(root) {
 }
 
 function cmdInit(root) {
-  ensureMdctlDir(root);
-  const dir = path.join(root, '.mdctl');
+  ensureAgentneuronDir(root);
+  const dir = path.join(root, '.agentneuron');
   const cfg = path.join(dir, 'config.json');
   if (!fs.existsSync(cfg)) {
     fs.writeFileSync(cfg, JSON.stringify({ port: 4747, ignore: [], extraPatterns: [], includeAllMarkdown: true }, null, 2) + '\n');
     console.log(`created ${path.relative(process.cwd(), cfg) || cfg}`);
   } else console.log('config.json already exists');
   const self = fileURLToPath(import.meta.url);
-  if (globalThis.__MDCTL_UI__ !== undefined && self.endsWith('.mjs')) {
-    const dest = path.join(dir, 'mdctl.mjs');
+  if (globalThis.__AGENTNEURON_UI__ !== undefined && self.endsWith('.mjs')) {
+    const dest = path.join(dir, 'agentneuron.mjs');
     if (path.resolve(self) !== path.resolve(dest)) {
       fs.copyFileSync(self, dest); fs.chmodSync(dest, 0o755);
       console.log(`copied bundle to ${dest}`);
     }
-    console.log(`run: node ${path.join('.mdctl', 'mdctl.mjs')}`);
+    console.log(`run: node ${path.join('.agentneuron', 'agentneuron.mjs')}`);
   } else console.log('(not running as a bundle; bundle copy skipped. Build with npm run build)');
   return 0;
 }
@@ -132,14 +132,14 @@ async function cmdStart(root, flags, workspace = false) {
   if (flags['admin-token']) overrides.adminToken = String(flags['admin-token']);
   if (flags.open) overrides.openBrowser = true;
   let enable;
-  try { enable = parseEnable(flags.enable); } catch (e) { console.error(`mdctl: --enable: ${e.message}`); return 2; }
+  try { enable = parseEnable(flags.enable); } catch (e) { console.error(`agentneuron: --enable: ${e.message}`); return 2; }
   if (flags.write) enable.push('edit');
   if (enable.length) overrides.actions = Object.fromEntries(enable.map((l) => [l, true]));
   if (workspace) overrides.workspaceRoot = root;
   const config = loadConfig(root, overrides);
   const srv = await startServer(config);
   console.log('');
-  console.log(`  mdctl ${VERSION}  -  AI-context monitor`);
+  console.log(`  AgentNeuron ${VERSION}  -  AI context control center`);
   console.log(`  project : ${root}`);
   console.log(`  files   : ${srv.store.files.size}`);
   console.log(`  open    : ${srv.url}`);
@@ -175,7 +175,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === 'help') { console.log(HELP); return 0; }
   const root = resolveRoot(_[0]);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
-    console.error(`mdctl: not a directory: ${root}`); return 2;
+    console.error(`agentneuron: not a directory: ${root}`); return 2;
   }
   switch (cmd) {
     case 'lint': return cmdLint(root, flags);
@@ -190,7 +190,7 @@ export async function main(argv = process.argv.slice(2)) {
 const isMain = (() => {
   try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
 })();
-if (isMain || globalThis.__MDCTL_UI__ !== undefined) {
+if (isMain || globalThis.__AGENTNEURON_UI__ !== undefined) {
   main().then((code) => { if (code) process.exitCode = code; })
-    .catch((e) => { console.error('mdctl:', e.message || e); process.exit(1); });
+    .catch((e) => { console.error('agentneuron:', e.message || e); process.exit(1); });
 }

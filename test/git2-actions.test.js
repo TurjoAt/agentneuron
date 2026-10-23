@@ -8,7 +8,7 @@ import registerGit from '../src/actions/git.js';
 import { createGit2 } from '../src/git2/index.js';
 
 const sh = (cwd, ...a) => execFileSync('git', a, { cwd, stdio: 'pipe' }).toString();
-const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-ga-')));
+const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-ga-')));
 const w = (d, f, c) => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), c); };
 
 function setup() {

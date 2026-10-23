@@ -8,7 +8,7 @@ export class FileError extends Error {
 }
 
 export const sha1 = (s) => crypto.createHash('sha1').update(s).digest('hex');
-const FORBIDDEN = new Set(['.git', '.mdctl', 'node_modules']);
+const FORBIDDEN = new Set(['.git', '.agentneuron', '.mdctl', 'node_modules']);
 
 /** Validate and normalise a project-relative POSIX path. Throws FileError(400). */
 export function cleanRel(input) {
@@ -51,7 +51,7 @@ export function resolveSafe(root, input) {
 export function atomicWrite(abs, content) {
   const dir = path.dirname(abs);
   fs.mkdirSync(dir, { recursive: true });
-  const tmp = path.join(dir, `.${path.basename(abs)}.mdctl-${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`);
+  const tmp = path.join(dir, `.${path.basename(abs)}.agentneuron-${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`);
   let mode;
   try { mode = fs.statSync(abs).mode & 0o777; } catch { /* new file */ }
   try {
@@ -67,7 +67,7 @@ export function atomicWrite(abs, content) {
 export function writeNew(abs, content) {
   const dir = path.dirname(abs);
   fs.mkdirSync(dir, { recursive: true });
-  const tmp = path.join(dir, `.${path.basename(abs)}.mdctl-${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`);
+  const tmp = path.join(dir, `.${path.basename(abs)}.agentneuron-${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`);
   fs.writeFileSync(tmp, content);
   try {
     fs.linkSync(tmp, abs);
@@ -99,4 +99,4 @@ export function readJson(abs, fallback) {
   try { return JSON.parse(fs.readFileSync(abs, 'utf8')); } catch { return fallback; }
 }
 
-export function mdctlPath(root, ...parts) { return path.join(realRoot(root), '.mdctl', ...parts); }
+export function agentneuronPath(root, ...parts) { return path.join(realRoot(root), '.agentneuron', ...parts); }

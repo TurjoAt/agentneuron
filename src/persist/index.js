@@ -8,7 +8,7 @@ const DEBOUNCE_MS = 5 * 60 * 1000;
 const HOURLY = 60 * 60 * 1000;
 
 export function createPersist(ctx, opts = {}) {
-  const dir = path.join(ctx.root, '.mdctl');
+  const dir = path.join(ctx.root, '.agentneuron');
   const evLog = createJsonl(path.join(dir, 'events.jsonl'), opts);
   const mLog = createJsonl(path.join(dir, 'metrics.jsonl'), opts);
   const audit = createAudit(ctx.root, opts);

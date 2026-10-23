@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { detectProject, laravelRoutes, laravelMigrations, laravelModels, parseRoutesSource, docDrift, clearProjectCache } from '../src/project/index.js';
 import { parseToml } from '../src/project/util.js';
 
-function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'mdctl-proj-')); }
+function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-proj-')); }
 function put(root, files) {
   for (const [p, c] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, p)), { recursive: true });

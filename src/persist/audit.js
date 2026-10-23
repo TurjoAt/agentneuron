@@ -1,4 +1,4 @@
-// Audit log: .mdctl/audit.jsonl. Params are masked before they hit disk.
+// Audit log: .agentneuron/audit.jsonl. Params are masked before they hit disk.
 import path from 'node:path';
 import { createJsonl } from './jsonl.js';
 import { maskSecretsInText } from '../health/secrets.js';
@@ -22,7 +22,7 @@ export function maskParams(v, depth = 0) {
 }
 
 export function createAudit(root, opts) {
-  const log = createJsonl(path.join(root, '.mdctl', 'audit.jsonl'), opts);
+  const log = createJsonl(path.join(root, '.agentneuron', 'audit.jsonl'), opts);
   return {
     log(entry) {
       const e = { ts: Date.now(), ...entry };

@@ -1,4 +1,4 @@
-// Annotations API helpers (.mdctl/annotations.json via /api/annotations).
+// Annotations API helpers (.agentneuron/annotations.json via /api/annotations).
 import { api, post } from './api.js';
 import { toast, app } from './store.svelte.js';
 import { canRun, levelReason } from './actions.svelte.js';

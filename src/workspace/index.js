@@ -18,7 +18,7 @@ const AI_FILES = [
   ['.github/copilot-instructions.md', 'copilot'], ['GEMINI.md', 'gemini'], ['.gemini', 'gemini'], ['.windsurf', 'windsurf'], ['.windsurfrules', 'windsurf'],
   ['.clinerules', 'cline'], ['.roo', 'roo'], ['CONVENTIONS.md', 'aider'], ['.aider.conf.yml', 'aider'], ['.junie', 'junie'],
 ];
-const PROJECT_MARKERS = new Set(['.git', '.mdctl', 'package.json', 'composer.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'Gemfile', 'pom.xml', 'CLAUDE.md', 'AGENTS.md', '.claude', '.cursor']);
+const PROJECT_MARKERS = new Set(['.git', '.agentneuron', 'package.json', 'composer.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'Gemfile', 'pom.xml', 'CLAUDE.md', 'AGENTS.md', '.claude', '.cursor']);
 
 function exists(p) { try { fs.accessSync(p); return true; } catch { return false; } }
 
@@ -80,7 +80,7 @@ export async function describeProject(dir) {
   try { lm = Math.max(lm, fs.statSync(dir).mtimeMs); } catch { /* ignore */ }
   return {
     name: path.basename(dir), path: dir, stacks: [...stacks], aiTools: [...ai], mdFiles: md.n,
-    lastModified: Math.floor(lm), hasMdctl: exists(path.join(dir, '.mdctl')),
+    lastModified: Math.floor(lm), hasAgentneuron: exists(path.join(dir, '.agentneuron')),
     git: { branch: branchOf(dir), dirty: await dirtyOf(dir) },
     running: null,
   };

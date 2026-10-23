@@ -79,7 +79,7 @@ const S = [
   ['amazonq', 'mcp', '.amazonq/mcp.json'],
 ].map(([tool, kind, glob, extra]) => ({ tool, kind, glob, re: globToRegex(glob), ...(extra || {}) }));
 
-const SKIP = new Set(['.git', 'node_modules', 'vendor', '.mdctl', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', 'storage', '__MACOSX',
+const SKIP = new Set(['.git', 'node_modules', 'vendor', '.agentneuron', '.mdctl', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', 'storage', '__MACOSX',
   '__pycache__', 'venv', '.venv', 'target', '.cache', 'coverage', '.turbo', '.idea', '.gradle']);
 const GLOBAL_SKIP = new Set(['projects', 'sessions', 'todos', 'shell-snapshots', 'statsig', 'ide', 'file-history', 'plugins', 'cache', 'history', 'log', 'logs', 'telemetry', 'archived_sessions', 'tmp']);
 const MAX_FILE = 1024 * 1024;

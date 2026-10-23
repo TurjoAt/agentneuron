@@ -61,7 +61,7 @@ export async function api(path, params, init = {}) {
       headers: { Accept: 'application/json', ...(init.headers || {}) },
     });
   } catch (e) {
-    throw new ApiError(0, 'Network error — is mdctl running?');
+    throw new ApiError(0, 'Network error — is agentneuron running?');
   }
   if (!res.ok) {
     let msg = res.statusText;

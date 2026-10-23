@@ -43,7 +43,7 @@
 
   function readMode() {
     try {
-      const m = localStorage.getItem('mdctl.editor.mode');
+      const m = localStorage.getItem('agentneuron.editor.mode');
       if (m === 'edit' || m === 'split' || m === 'preview') return innerWidth < 900 && m === 'split' ? 'edit' : m;
     } catch {
       /* ignore */
@@ -52,14 +52,14 @@
   }
   function readAuto() {
     try {
-      return localStorage.getItem('mdctl.editor.autosave') === '1';
+      return localStorage.getItem('agentneuron.editor.autosave') === '1';
     } catch {
       return false;
     }
   }
   function setMode(m) {
     mode = m;
-    saveLocal('mdctl.editor.mode', m);
+    saveLocal('agentneuron.editor.mode', m);
     if (m !== 'preview') tick().then(() => ed?.focus());
   }
 
@@ -270,7 +270,7 @@
     <span class="spacer"></span>
     {#if editable}
       <label class="auto" title="Save automatically 1.5 s after you stop typing">
-        <input type="checkbox" class="sw sm" checked={autosave} onchange={(e) => { autosave = e.currentTarget.checked; saveLocal('mdctl.editor.autosave', autosave ? 1 : 0); try { localStorage.setItem('mdctl.editor.autosave', autosave ? '1' : '0'); } catch {} }} />
+        <input type="checkbox" class="sw sm" checked={autosave} onchange={(e) => { autosave = e.currentTarget.checked; saveLocal('agentneuron.editor.autosave', autosave ? 1 : 0); try { localStorage.setItem('agentneuron.editor.autosave', autosave ? '1' : '0'); } catch {} }} />
         <span class="hide-sm">Autosave</span>
       </label>
     {/if}

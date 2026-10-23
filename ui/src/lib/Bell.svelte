@@ -11,7 +11,7 @@
 
   function readBrowser() {
     try {
-      return JSON.parse(localStorage.getItem('mdctl.browserNotify') || 'false');
+      return JSON.parse(localStorage.getItem('agentneuron.browserNotify') || 'false');
     } catch {
       return false;
     }
@@ -28,7 +28,7 @@
       if (p !== 'granted') on = false;
     }
     browser = on;
-    saveLocal('mdctl.browserNotify', on);
+    saveLocal('agentneuron.browserNotify', on);
   }
 
   const ICON = { secret: 'key', conflict: 'users', 'health-drop': 'health', 'job-failed': 'error', 'job-done': 'check' };
