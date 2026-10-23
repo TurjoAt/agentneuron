@@ -75,7 +75,7 @@
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "chokidar": "^4.0.3",
+    "chokidar": "^6.0.0",
     "d3-array": "^3.2.4",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
