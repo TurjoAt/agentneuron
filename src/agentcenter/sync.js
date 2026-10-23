@@ -80,16 +80,29 @@ function cleanRel(p) {
   return r;
 }
 
+const MAX_SYNC_BYTES = 2 * 1024 * 1024;
+
+/** realpath-confined read: refuses symlinks and anything that resolves outside the root. */
+function readInside(rootReal, abs) {
+  const st = fs.lstatSync(abs);
+  if (st.isSymbolicLink() || !st.isFile() || st.size > MAX_SYNC_BYTES) throw new Error('not a regular file');
+  const real = fs.realpathSync(abs); // also catches symlinked parent directories
+  if (!real.startsWith(rootReal + path.sep)) throw new Error('escapes project root');
+  return fs.readFileSync(real, 'utf8');
+}
+
 /**
  * Plan copying `source` into `targets` (paths or tool ids). Nothing is written.
  * `mode: 'import'` writes an `@source` import stub instead of a copy.
  */
 export function syncPlan(root, { source, targets, mode = 'copy' } = {}) {
   const src = cleanRel(BY_TOOL.get(source) || source);
+  let rootReal;
+  try { rootReal = fs.realpathSync(root); } catch { rootReal = path.resolve(root); }
   const abs = path.resolve(root, src);
   if (!abs.startsWith(path.resolve(root) + path.sep)) throw new Error('source escapes project root');
   let content;
-  try { content = fs.readFileSync(abs, 'utf8'); } catch { throw new Error(`source not readable: ${src}`); }
+  try { content = readInside(rootReal, abs); } catch { throw new Error(`source not readable: ${src}`); }
   const out = [];
   for (const t of Array.isArray(targets) ? targets : []) {
     const rel = cleanRel(BY_TOOL.get(t) || t);
@@ -97,7 +110,20 @@ export function syncPlan(root, { source, targets, mode = 'copy' } = {}) {
     const tabs = path.resolve(root, rel);
     if (!tabs.startsWith(path.resolve(root) + path.sep)) throw new Error('target escapes project root');
     let existing = null;
-    try { existing = fs.readFileSync(tabs, 'utf8'); } catch { /* new file */ }
+    try {
+      existing = readInside(rootReal, tabs);
+    } catch {
+      // a missing file is simply new; a symlink or out-of-root file must never be read or overwritten
+      let present = true;
+      try { fs.lstatSync(tabs); } catch { present = false; }
+      if (present) throw new Error(`target is not a regular file inside the project: ${rel}`);
+      // new file: its nearest existing ancestor directory must really live inside the root (no symlinked parents)
+      let anc = path.dirname(tabs);
+      while (!fs.existsSync(anc) && anc !== path.dirname(anc)) anc = path.dirname(anc);
+      let ancReal;
+      try { ancReal = fs.realpathSync(anc); } catch { ancReal = null; }
+      if (!ancReal || (ancReal !== rootReal && !ancReal.startsWith(rootReal + path.sep))) throw new Error(`target escapes project root: ${rel}`);
+    }
     const next = mode === 'import' ? `@${src}\n` : content;
     const d = lineDiff(existing ?? '', next);
     out.push({ target: rel, exists: existing !== null, content: next, diff: { added: d.added, removed: d.removed, hunks: d.hunks }, unchanged: existing === next });

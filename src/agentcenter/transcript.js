@@ -9,7 +9,11 @@ const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_TIMELINE = 3000;
 
-const toMs = (v) => (typeof v === 'number' ? v : Number.isNaN(Date.parse(v)) ? 0 : Date.parse(v));
+// always a finite, Date-representable epoch ms (or 0): hostile timestamps must not make toISOString() throw
+const toMs = (v) => {
+  const n = typeof v === 'number' ? v : Date.parse(v);
+  return Number.isFinite(n) && Math.abs(n) <= 8.64e15 ? n : 0;
+};
 const clip = (s, n = 500) => maskSecretsInText(String(s ?? '').replace(/\s+/g, ' ').trim()).slice(0, n);
 
 function textOf(content) {
@@ -50,7 +54,8 @@ export function locateTranscript(id, { root, home = os.homedir() } = {}) {
     }
   } catch { /* none */ }
   for (const f of walkJsonl(path.join(home, '.codex', 'sessions'))) {
-    if (f.endsWith(`${id}.jsonl`)) return { file: f, tool: 'codex' };
+    const b = path.basename(f);
+    if (b === `${id}.jsonl` || b.endsWith(`-${id}.jsonl`)) return { file: f, tool: 'codex' };
   }
   return null;
 }
@@ -162,11 +167,16 @@ const addU = (t, u) => { for (const k of ['input', 'output', 'cacheRead', 'cache
 /** Per-model token usage of one transcript: { models: {model: usage}, days: {day: {model: usage}}, tool } */
 export function readTranscriptUsage(file, tool = 'claude') {
   const lines = readLines(file);
+  // model names come from untrusted transcripts ("__proto__", "constructor"): only ever touch OWN properties
+  const slot = (o, k) => {
+    if (!Object.hasOwn(o, k)) Object.defineProperty(o, k, { value: {}, enumerable: true, writable: true, configurable: true });
+    return o[k];
+  };
   const models = {};
   const days = {};
   const bump = (model, ts, u) => {
-    addU((models[model] ||= {}), u);
-    if (ts) addU(((days[day(ts)] ||= {})[model] ||= {}), u);
+    addU(slot(models, model), u);
+    if (ts) addU(slot(slot(days, day(ts)), model), u);
   };
   if (tool === 'codex') {
     let model = 'gpt', last = null, lastTs = 0;

@@ -16,6 +16,9 @@ import { scanAgentSetup } from '../agentcenter/setup.js';
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
 const MAX_TEXT = 200 * 1024;
+const MAX_RESPONSE = 1024 * 1024; // hard cap on one tool result (serialized)
+const MAX_LINE = 4 * 1024 * 1024; // longest accepted JSON-RPC line
+const KNOWN_TOOLS = new Set(['claude', 'codex', 'cursor']);
 
 const obj = (properties = {}, required = []) => ({ type: 'object', properties, required, additionalProperties: false });
 const TOOLS = [
@@ -45,11 +48,21 @@ function parseSince(v) {
 }
 
 function safeRel(p) {
-  if (typeof p !== 'string' || !p || p.includes('\0')) return null;
+  if (typeof p !== 'string' || !p || p.length > 1024 || p.includes('\0')) return null;
   const n = p.replace(/\\/g, '/');
   if (n.startsWith('/') || /^[A-Za-z]:/.test(n)) return null;
   const r = n.replace(/^\.\//, '');
   return r.split('/').includes('..') ? null : r;
+}
+
+/** Defence in depth: mask secret-looking values in every string of a tool result. */
+function maskDeep(v, depth = 0) {
+  if (typeof v === 'string') return maskSecretsInText(v);
+  if (depth > 8 || v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map((x) => maskDeep(x, depth + 1));
+  const out = {};
+  for (const [k, x] of Object.entries(v)) out[k] = maskDeep(x, depth + 1);
+  return out;
 }
 
 const cap = (n, d = 50, max = 500) => Math.max(1, Math.min(max, Math.floor(Number(n)) || d));
@@ -82,8 +95,8 @@ export async function runMcpServer(root, config = {}, io = {}) {
 
   const tools = {
     list_files({ tool, kind } = {}) {
-      return [...store.files.values()].filter((f) => (!tool || f.tool === tool) && (!kind || f.kind === kind))
-        .map((f) => ({ path: f.path, tool: f.tool, kind: f.kind, size: f.size, tokens: f.tokens, lines: f.lines, mtime: f.mtime, title: f.title }));
+      return [...store.files.values()].filter((f) => (!tool || f.tool === tool) && (!kind || f.kind === kind)).slice(0, 5000)
+        .map((f) => ({ path: f.path, tool: f.tool, kind: f.kind, size: f.size, tokens: f.tokens, lines: f.lines, mtime: f.mtime, title: maskSecretsInText(f.title) }));
     },
     read_file({ path: p } = {}) {
       const rel = safeRel(p);
@@ -94,17 +107,19 @@ export async function runMcpServer(root, config = {}, io = {}) {
       return { path: rel, truncated, content: c };
     },
     search({ query, limit } = {}) {
-      const q = String(query || '').toLowerCase();
+      const q = String(query || '').toLowerCase().slice(0, 500);
       if (!q) throw new Error('query is required');
       const max = cap(limit, 50, 200);
       const hits = [];
       outer: for (const [p, c] of store.contents) {
         const lines = c.split('\n');
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i].toLowerCase().includes(q)) {
-            hits.push({ path: p, line: i + 1, text: maskSecretsInText(lines[i].trim().slice(0, 300)) });
-            if (hits.length >= max) break outer;
-          }
+          if (!lines[i].toLowerCase().includes(q)) continue;
+          // mask first, then match: a query must not be able to confirm/probe a secret's value
+          const masked = maskSecretsInText(lines[i].trim().slice(0, 2000));
+          if (!masked.toLowerCase().includes(q)) continue;
+          hits.push({ path: p, line: i + 1, text: masked.slice(0, 300) });
+          if (hits.length >= max) break outer;
         }
       }
       return hits;
@@ -112,14 +127,18 @@ export async function runMcpServer(root, config = {}, io = {}) {
     get_health({ limit } = {}) {
       const a = analysis();
       return { score: a.health.score, grade: a.health.grade, counts: a.health.counts, byRule: a.health.byRule,
-        issues: a.issues.slice(0, cap(limit, 25, 200)).map((i) => ({ rule: i.rule, severity: i.severity, path: i.path, line: i.line, message: maskSecretsInText(i.message), hint: i.hint })) };
+        issues: a.issues.slice(0, cap(limit, 25, 200)).map((i) => ({ rule: i.rule, severity: i.severity, path: i.path, line: i.line, message: maskSecretsInText(i.message), hint: maskSecretsInText(i.hint) })) };
     },
     get_context({ dir = '', tool = 'claude' } = {}) {
       const d = String(dir || '');
-      if (d.split(/[\\/]/).includes('..') || d.startsWith('/')) throw new Error('invalid dir');
+      if (d.includes('\0') || d.split(/[\\/]/).includes('..') || d.startsWith('/') || /^[A-Za-z]:/.test(d)) throw new Error('invalid dir');
+      if (!KNOWN_TOOLS.has(tool)) throw new Error('invalid tool');
       const files = [...store.files.values()];
       const r = effectiveContext(d, files, store.contents, tool);
-      return { dir: r.dir, tool: r.tool, tokens: r.tokens, chain: r.chain, text: maskSecretsInText(r.text), dirs: contextDirs(files) };
+      let text = maskSecretsInText(r.text);
+      let truncated = false;
+      if (text.length > MAX_TEXT) { text = text.slice(0, MAX_TEXT); truncated = true; }
+      return { dir: r.dir, tool: r.tool, tokens: r.tokens, chain: r.chain.slice(0, 500), truncated, text, dirs: contextDirs(files).slice(0, 2000) };
     },
     recent_changes({ since, limit } = {}) {
       const t = parseSince(since);
@@ -137,8 +156,8 @@ export async function runMcpServer(root, config = {}, io = {}) {
       const rel = safeRel(p);
       if (!rel || !store.files.has(rel)) throw new Error(`file not tracked: ${p}`);
       const a = analysis();
-      const slim = (e) => ({ from: e.from, to: e.to, type: e.type, line: e.line, broken: e.broken });
-      return { path: rel, out: a.graph.edges.filter((e) => e.from === rel).map(slim), in: a.graph.edges.filter((e) => e.to === rel).map(slim) };
+      const slim = (e) => ({ from: maskSecretsInText(e.from), to: maskSecretsInText(e.to), type: e.type, line: e.line, broken: e.broken });
+      return { path: rel, out: a.graph.edges.filter((e) => e.from === rel).slice(0, 1000).map(slim), in: a.graph.edges.filter((e) => e.to === rel).slice(0, 1000).map(slim) };
     },
     project_info() {
       const a = analysis();
@@ -154,8 +173,11 @@ export async function runMcpServer(root, config = {}, io = {}) {
   const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } });
 
   async function handle(msg) {
-    if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
-      return msg && msg.id !== undefined ? rpcError(msg.id, -32600, 'Invalid Request') : null;
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg) || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
+      // responses from the client (result/error) are ignored; everything else malformed is an error
+      if (msg && typeof msg === 'object' && !Array.isArray(msg) && msg.method === undefined && ('result' in msg || 'error' in msg)) return null;
+      const id = msg && typeof msg === 'object' && (typeof msg.id === 'string' || typeof msg.id === 'number') ? msg.id : null;
+      return rpcError(id, -32600, 'Invalid Request');
     }
     const isNote = msg.id === undefined || msg.id === null;
     const params = msg.params && typeof msg.params === 'object' ? msg.params : {};
@@ -172,13 +194,16 @@ export async function runMcpServer(root, config = {}, io = {}) {
       case 'ping': return isNote ? null : rpcResult(msg.id, {});
       case 'tools/list': return rpcResult(msg.id, { tools: TOOLS });
       case 'tools/call': {
-        const fn = tools[params.name];
-        if (!fn) return rpcError(msg.id, -32602, `Unknown tool: ${params.name}`);
+        const fn = typeof params.name === 'string' && Object.hasOwn(tools, params.name) ? tools[params.name] : null;
+        if (!fn) return rpcError(msg.id, -32602, `Unknown tool: ${String(params.name).slice(0, 100)}`);
         try {
-          const data = await fn(params.arguments && typeof params.arguments === 'object' ? params.arguments : {});
-          return rpcResult(msg.id, { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], isError: false });
+          const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments) ? params.arguments : {};
+          const data = await fn(args);
+          let text = JSON.stringify(maskDeep(data), null, 2);
+          if (text.length > MAX_RESPONSE) text = `${text.slice(0, MAX_RESPONSE)}\n… [output truncated at ${MAX_RESPONSE} bytes]`;
+          return rpcResult(msg.id, { content: [{ type: 'text', text }], isError: false });
         } catch (e) {
-          return rpcResult(msg.id, { content: [{ type: 'text', text: String(e?.message || e) }], isError: true });
+          return rpcResult(msg.id, { content: [{ type: 'text', text: maskSecretsInText(String(e?.message || e)).slice(0, 2000) }], isError: true });
         }
       }
       case 'resources/list': return rpcResult(msg.id, { resources: [] });
@@ -189,18 +214,23 @@ export async function runMcpServer(root, config = {}, io = {}) {
     }
   }
 
-  const send = (m) => { output.write(`${JSON.stringify(m)}\n`); };
+  const send = (m) => { try { output.write(`${JSON.stringify(m)}\n`); } catch { /* closed pipe */ } };
+  // a closed client pipe must not crash the process with an unhandled 'error' event
+  output.on?.('error', () => {});
+  input.on?.('error', () => {});
   const rl = readline.createInterface({ input, crlfDelay: Infinity });
   const pending = new Set();
   rl.on('line', (line) => {
     if (!line.trim()) return;
+    if (line.length > MAX_LINE) { send(rpcError(null, -32600, 'Request too large')); return; }
     let msg;
     try { msg = JSON.parse(line); } catch { send(rpcError(null, -32700, 'Parse error')); return; }
     const p = (async () => {
       const items = Array.isArray(msg) ? msg : [msg];
       const outs = [];
+      if (Array.isArray(msg) && !msg.length) { send(rpcError(null, -32600, 'Invalid Request')); return; }
       for (const m of items) {
-        try { const r = await handle(m); if (r) outs.push(r); } catch (e) { outs.push(rpcError(m?.id, -32603, String(e?.message || e))); }
+        try { const r = await handle(m); if (r) outs.push(r); } catch (e) { outs.push(rpcError(typeof m?.id === 'string' || typeof m?.id === 'number' ? m.id : null, -32603, 'Internal error')); }
       }
       if (Array.isArray(msg)) { if (outs.length) send(outs); } else if (outs[0]) send(outs[0]);
     })().finally(() => pending.delete(p));

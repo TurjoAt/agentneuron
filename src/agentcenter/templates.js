@@ -548,22 +548,28 @@ MIT (update as needed)
 const BY_ID = new Map(T.map((t) => [t.id, t]));
 
 function resolveVars(t, vars) {
-  const out = {};
+  const out = Object.create(null); // no prototype: {{constructor}} / {{__proto__}} resolve to ''
   for (const v of t.vars) out[v.name] = v.default;
   for (const [k, val] of Object.entries(vars && typeof vars === 'object' ? vars : {})) {
-    if (val == null) continue;
-    if (!/^[A-Za-z_][\w]*$/.test(k)) continue;
+    if (val == null || typeof val === 'object') continue;
+    if (!/^[A-Za-z_][\w]*$/.test(k) || k === '__proto__') continue;
     out[k] = String(val).slice(0, 4000);
   }
   return out;
 }
 
-function fill(tpl, vars) {
+/** A value used inside a file path: one safe segment, no separators, no dot-only/leading-dot names. */
+function pathSegment(v) {
+  const s = String(v ?? '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64);
+  return s || 'untitled';
+}
+
+function fill(tpl, vars, forPath = false) {
   return tpl.replace(/\{\{\s*([A-Za-z_]\w*)\s*(?:\|\s*(q|slug)\s*)?\}\}/g, (_, name, filter) => {
     const v = vars[name] ?? '';
     if (filter === 'q') return yamlScalar(v);
     if (filter === 'slug') return slugify(v);
-    return v;
+    return forPath ? pathSegment(v) : v;
   });
 }
 
@@ -578,5 +584,8 @@ export function renderTemplate(id, vars) {
   const t = BY_ID.get(id);
   if (!t) throw new Error(`Unknown template: ${id}`);
   const v = resolveVars(t, vars);
-  return { path: fill(t.defaultPath, v), content: fill(t.body, v) };
+  const p = fill(t.defaultPath, v, true);
+  // defence in depth: whatever the template produced must be a plain relative path inside the project
+  if (!p || p.startsWith('/') || p.includes('\\') || p.includes('\0') || p.split('/').some((seg) => seg === '..' || seg === '' || seg === '.')) throw new Error('template produced an invalid path');
+  return { path: p, content: fill(t.body, v) };
 }

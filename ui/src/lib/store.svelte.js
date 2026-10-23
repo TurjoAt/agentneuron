@@ -442,10 +442,11 @@ export async function boot(again = false) {
     try {
       await post('/api/auth/login', { token: urlToken });
       setToken('');
-      stripUrlToken();
     } catch {
-      /* old server or bad token: keep ?token= forwarding (v0.1 behaviour) */
+      /* old server or bad token: keep forwarding the token from memory only (v0.1 behaviour) */
     }
+    // the secret never stays in the address bar / history / copied links
+    stripUrlToken();
   }
   try {
     await loadState();

@@ -34,6 +34,15 @@ export function slugify(text) {
  * @param {{ path?: string, exists?: (p:string)=>boolean, byBasename?: (n:string)=>string|null, href?: (p:string, anchor?:string)=>string }} opts
  */
 export function renderMarkdown(src, opts = {}) {
+  try {
+    return renderMarkdownUnsafe(src, opts);
+  } catch {
+    // never let a hostile document break the view: fall back to escaped plain text
+    return `<pre class="md-fallback">${esc(String(src ?? '').slice(0, 200000))}</pre>`;
+  }
+}
+
+function renderMarkdownUnsafe(src, opts) {
   const ctx = {
     dir: opts.path && opts.path.includes('/') ? opts.path.slice(0, opts.path.lastIndexOf('/')) : '',
     exists: opts.exists || (() => false),
@@ -93,8 +102,22 @@ function isBlockStart(l) {
     || HEADING_RE.test(l) || HR_RE.test(l) || QUOTE_RE.test(l) || LIST_RE.test(l);
 }
 
+const MAX_DEPTH = 12; // nested quotes/lists; deeper content is shown as plain text
+const MAX_INLINE = 2000;
+const INLINE_BUDGET = 100000; // total chars of rich inline parsing per document // inline regexes are super-linear on pathological input
+
 /** Parse block-level elements. `off` = 0-based source line of lines[0]. */
 function blocks(lines, off, ctx) {
+  ctx.depth = (ctx.depth || 0) + 1;
+  try {
+    if (ctx.depth > MAX_DEPTH) return [{ type: 'p', inner: esc(lines.join('\n')), html: `<p data-line="${off + 1}">${esc(lines.join('\n'))}</p>` }];
+    return blocksInner(lines, off, ctx);
+  } finally {
+    ctx.depth--;
+  }
+}
+
+function blocksInner(lines, off, ctx) {
   const out = [];
   let i = 0;
   const n = lines.length;
@@ -326,6 +349,17 @@ function decodeSafe(s) {
 
 /** Inline formatting. Uses a placeholder stash so code/links aren't re-processed. */
 export function inline(text, ctx) {
+  ctx.budget = (ctx.budget ?? INLINE_BUDGET) - String(text).length;
+  if (String(text).length > MAX_INLINE || ctx.budget < 0 || (ctx.idepth || 0) > 6) return esc(String(text).replace(/\u0000/g, ''));
+  ctx.idepth = (ctx.idepth || 0) + 1;
+  try {
+    return inlineInner(String(text).replace(/\u0000/g, ''), ctx);
+  } finally {
+    ctx.idepth--;
+  }
+}
+
+function inlineInner(text, ctx) {
   const stash = [];
   const put = (html) => `\u0000${stash.push(html) - 1}\u0000`;
   let t = text;

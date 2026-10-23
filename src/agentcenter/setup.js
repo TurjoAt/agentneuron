@@ -106,16 +106,22 @@ function walk(base, { maxDepth = 6, cap = 40000, skip = SKIP, only = null } = {}
   return out.sort();
 }
 
-function readText(abs) {
+/** Read a small text file. With `confine` (a project root) symlinks that resolve outside it are refused. */
+function readText(abs, confine = null) {
   try {
     const st = fs.statSync(abs);
     if (!st.isFile() || st.size > MAX_FILE) return null;
+    if (confine) {
+      const real = fs.realpathSync(abs);
+      const rootReal = fs.realpathSync(confine);
+      if (real !== rootReal && !real.startsWith(rootReal + path.sep)) return null;
+    }
     return fs.readFileSync(abs, 'utf8');
   } catch { return null; }
 }
 
-function readJsonFile(abs) {
-  const t = readText(abs);
+function readJsonFile(abs, confine = null) {
+  const t = readText(abs, confine);
   if (t == null) return null;
   try { const v = JSON.parse(t.replace(/^﻿/, '')); return v && typeof v === 'object' ? v : null; } catch { return null; }
 }
@@ -130,7 +136,7 @@ export function baseOf(rel) {
 }
 
 const str = (v) => (typeof v === 'string' ? maskSecretsInText(v) : undefined);
-const trunc = (s, n = 300) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim().slice(0, n) : undefined);
+const trunc = (s, n = 300) => (typeof s === 'string' ? maskSecretsInText(s.replace(/\s+/g, ' ').trim().slice(0, n * 2)).slice(0, n) : undefined);
 
 function mcpFromJson(j, source, scope) {
   const out = [];
@@ -199,7 +205,7 @@ function scanBase(base, scope, displayPrefix, tools, index) {
       const fscope = scope === 'global' ? 'global' : spec.local ? 'local' : 'project';
       const kind = spec.kind === 'agents' ? 'agent' : spec.kind === 'skills' ? 'skill' : spec.kind === 'commands' ? 'command' : spec.kind;
       t.files.push({ path: p, kind, scope: fscope });
-      index.push({ tool: spec.tool, rel, abs, p, scope: fscope, spec, set });
+      index.push({ tool: spec.tool, rel, abs, p, scope: fscope, spec, set, confine: scope === 'global' ? null : base });
       break; // a file belongs to the first matching spec
     }
   }
@@ -210,7 +216,7 @@ function populate(tools, index) {
     const t = tools[f.tool];
     const cap = t.capabilities;
     const kind = f.spec.kind;
-    const text = readText(f.abs);
+    const text = readText(f.abs, f.confine);
     const add = (c, item) => { cap[c].items.push(item); };
     if (kind === 'instructions') {
       add('instructions', { path: f.p, scope: f.scope, base: f.scope === 'global' ? '' : baseOf(f.rel), tokens: text ? estimateTokens(text) : 0, lines: text ? text.split('\n').length : 0 });
@@ -222,7 +228,7 @@ function populate(tools, index) {
       add('rules', item);
     } else if (kind === 'agents') {
       if (path.posix.basename(f.rel) === '.roomodes') {
-        const j = readJsonFile(f.abs);
+        const j = readJsonFile(f.abs, f.confine);
         for (const m of Array.isArray(j?.customModes) ? j.customModes : []) {
           add('agents', { path: f.p, scope: f.scope, name: String(m.slug || m.name || 'mode'), description: trunc(m.roleDefinition || m.description || m.name) });
         }
@@ -253,7 +259,7 @@ function populate(tools, index) {
       const n = text ? text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')).length : 0;
       add('ignore', { path: f.p, scope: f.scope, patterns: n });
     } else if (kind === 'mcp' && f.tool !== 'cursor' && !(f.tool === 'claude')) {
-      for (const s of mcpFromJson(readJsonFile(f.abs), f.p, f.scope)) add('mcp', s);
+      for (const s of mcpFromJson(readJsonFile(f.abs, f.confine), f.p, f.scope)) add('mcp', s);
     }
   }
 }

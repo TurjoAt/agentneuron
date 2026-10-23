@@ -197,7 +197,7 @@
           {#each gitLog as c (c.hash)}
             <li>
               <span class="dot"></span>
-              <a class="grow cl" href="#/git?tab=history&commit={c.hash}">
+              <a class="grow cl" href="#/git?tab=history&commit={encodeURIComponent(c.hash)}">
                 <div class="subj">{c.subject}</div>
                 <div class="faint small"><span class="mono">{c.short || c.hash?.slice(0, 7)}</span> · {c.author} · {timeAgo(toMs(c.date), app.now)}</div>
               </a>

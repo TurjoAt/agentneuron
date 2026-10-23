@@ -32,7 +32,7 @@ export function usdOf(usage, model, pricing) {
 
 const zero = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, usd: 0 });
 const round = (n) => Math.round(n * 10000) / 10000;
-const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
+const dayOf = (ts) => { const d = new Date(ts); return Number.isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().slice(0, 10); };
 
 /**
  * @param sessionsList sessions.list() output
