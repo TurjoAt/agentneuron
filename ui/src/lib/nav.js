@@ -9,6 +9,9 @@ export const VIEWS = [
   { id: 'tasks', label: 'Tasks', icon: 'tasks' },
   { id: 'git', label: 'Git', icon: 'git' },
   { id: 'agents', label: 'Agents', icon: 'agents' },
+  { id: 'project', label: 'Project', icon: 'project' },
+  { id: 'reports', label: 'Reports', icon: 'reports' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 export const VIEW_IDS = new Set(VIEWS.map((v) => v.id));

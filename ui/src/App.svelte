@@ -16,8 +16,11 @@
   import Tasks from './views/Tasks.svelte';
   import Git from './views/Git.svelte';
   import Agents from './views/Agents.svelte';
+  import Reports from './views/Reports.svelte';
+  import Project from './views/Project.svelte';
+  import Settings from './views/Settings.svelte';
 
-  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents };
+  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings };
   const View = $derived(COMPONENTS[app.route.view] || Overview);
 
   let tokenInput = $state('');

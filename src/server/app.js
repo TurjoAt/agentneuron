@@ -16,6 +16,8 @@ import { healthScore } from '../health/score.js';
 import { readAgentConfig } from '../health/configview.js';
 import { createSessions } from '../agents/sessions.js';
 import { createConflictRadar } from '../agents/conflicts.js';
+import { createRouter, HttpError } from './router.js';
+import { registerAll } from './routes/index.js';
 
 export const VERSION = globalThis.__MDCTL_VERSION__ || '0.1.0';
 
@@ -229,7 +231,46 @@ export async function startServer(config) {
     return [200, { path: p, from, to, hunks: d.hunks, added: d.added, removed: d.removed }];
   }
 
-  async function handle(req, res, url) {
+  // ---- plugin routes (src/server/routes/*) ------------------------------
+  const LEVELS = ['read', 'edit', 'exec', 'danger'];
+  const router = createRouter();
+  const ctx = {
+    root, config, store, git, sessions, radar, startedAt,
+    analysis, repoInfo, allFiles, broadcast, warn,
+    invalidate: scheduleRecompute,
+    /** Is `level` allowed for `role`? Non-read levels must be enabled in config.actions. */
+    can(level, role) {
+      if (level === 'read') return true;
+      if (!LEVELS.includes(level) || role !== 'admin') return false;
+      return !!(config.actions && config.actions[level]);
+    },
+  };
+  await registerAll(router, ctx);
+
+  async function handlePlugin(req, res, url, role) {
+    const route = router.match(req.method, url.pathname);
+    if (!route) return false;
+    if (!ctx.can(route.level, role)) {
+      bad(res, 403, `action level "${route.level}" is disabled — enable it in .mdctl/config.json (actions.${route.level}: true)`);
+      return true;
+    }
+    let body = {};
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      try { body = await readBody(req); } catch { bad(res, 400, 'bad body'); return true; }
+    }
+    try {
+      const out = await route.fn({ req, res, url, q: url.searchParams, body, ctx, role });
+      if (out !== undefined && !res.headersSent) json(res, 200, out);
+    } catch (e) {
+      if (res.headersSent) { try { res.end(); } catch {} return true; }
+      if (e instanceof HttpError) bad(res, e.status, e.message);
+      else { warn('route ' + url.pathname, e); bad(res, 500, String(e.message || e)); }
+    }
+    return true;
+  }
+
+  async function handle(req, res, url, role = 'admin') {
+    if (await handlePlugin(req, res, url, role)) return;
     const q = url.searchParams;
     const r = url.pathname;
     const A = () => analysis();
