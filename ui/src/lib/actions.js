@@ -26,4 +26,5 @@ export {
   actionsState,
   openJob,
   cancelJob,
+  loadJobs,
 } from './actions.svelte.js';

@@ -4,6 +4,12 @@
 export const PROJECT = { root: '/home/dev/acme-commerce', name: 'acme-commerce' };
 
 /** [path, tool, kind, ageMinutes, content] */
+/** YYYY-MM-DD n days from today (keeps demo due dates fresh). */
+export function dueIn(n) {
+  const d = new Date(Date.now() + n * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
 export const SEED = [
   ['CLAUDE.md', 'claude', 'context', 3, `# Acme Commerce — guide for Claude Code
 
@@ -222,15 +228,17 @@ Docs: [architecture](docs/architecture.md) · [API](docs/api.md) · [roadmap](RO
   ['TODO.md', 'generic', 'todo', 8, `# TODO
 
 ## Now
-- [ ] Fix flaky \`checkout.e2e.ts\` on CI
-- [ ] Add Klarna to payment methods
-- [x] Upgrade to Next 15
-- [ ] Write ADR for search provider
+- [/] Fix flaky \`checkout.e2e.ts\` on CI !urgent #ci @maja @due(${dueIn(1)})
+  - [x] Reproduce locally with \`--repeat-each 20\`
+  - [ ] Stub the 3DS iframe
+- [ ] Add Klarna to payment methods !high #payments @jonas @due(${dueIn(6)})
+- [x] Upgrade to Next 15 #web
+- [ ] Write ADR for search provider #docs @ola @due(${dueIn(3)})
 
 ## Later
-- [ ] Multi-currency price lists
-- [ ] Gift cards
-- [x] Remove moment.js
+- [ ] Multi-currency price lists !med #payments @due(${dueIn(24)})
+- [ ] Gift cards #payments
+- [x] Remove moment.js #web
 
 TODO: audit the cart cookie TTL
 `],
@@ -333,12 +341,12 @@ Tokens live in \`packages/ui/src/tokens.ts\`. Use \`<Button>\`, \`<Stack>\`, \`<
 - Cut checkout p95 from 1.8s to under 800ms.
 
 ## Steps
-- [x] Spike the SDK in a branch
-- [x] Map payment states to order states
-- [ ] Implement \`PaymentIntent\` module in \`apps/api/src/modules/checkout\`
-- [ ] Feature flag \`checkout_v2\`
-- [ ] Shadow traffic for a week
-- [ ] Remove legacy flow
+- [x] Spike the SDK in a branch #payments
+- [x] Map payment states to order states #payments
+- [/] Implement \`PaymentIntent\` module in \`apps/api/src/modules/checkout\` !high #api @claude @due(${dueIn(2)})
+- [ ] Feature flag \`checkout_v2\` #api @due(${dueIn(4)})
+- [ ] Shadow traffic for a week !med #ops @jonas @due(${dueIn(12)})
+- [ ] Remove legacy flow !low #api @due(${dueIn(20)})
 
 ## Risks
 - 3DS challenges on mobile Safari.
@@ -458,4 +466,103 @@ export const EDIT_LINES = [
   '- Keep server actions in `app/(shop)/actions.ts`.',
   '- [ ] Update [the plan](docs/plan.md) after shadow traffic',
   'See @docs/api.md for the endpoint list.',
+];
+
+// ---------------------------------------------------------------- v0.2 seeds
+
+/**
+ * Commit graph seed, newest first: [key, parents, author, minutesAgo, subject, files, refs]
+ * Lanes: main, feat/checkout-v2 (HEAD), feat/search (open), fix/webhook-retries (merged).
+ */
+export const GIT_SEED = [
+  ['h1', ['h2'], 'Maja Lind', 38, 'docs: update checkout v2 plan', ['docs/plan.md'], ['HEAD -> feat/checkout-v2']],
+  ['h2', ['h3'], 'Claude', 95, 'chore(agents): add reviewer agent', ['.claude/agents/reviewer.md', 'CLAUDE.md'], ['origin/feat/checkout-v2']],
+  ['s1', ['s2'], 'Ola Berg', 140, 'feat(search): meilisearch adapter skeleton', ['docs/adr/0003-search.md'], ['feat/search']],
+  ['h3', ['m1', 'w2'], 'Jonas Ek', 190, "Merge branch 'fix/webhook-retries' into feat/checkout-v2", ['docs/api.md', 'AGENTS.md'], []],
+  ['w2', ['w1'], 'Codex', 210, 'docs(api): webhook retries with jitter', ['docs/api.md'], ['fix/webhook-retries']],
+  ['s2', ['m3'], 'Ola Berg', 600, 'adr: draft search provider comparison', ['docs/adr/0003-search.md', 'ROADMAP.md'], []],
+  ['w1', ['m2'], 'Codex', 720, 'docs(agents): retry policy in AGENTS.md', ['AGENTS.md'], []],
+  ['m1', ['m2'], 'Claude', 60 * 18, 'feat(checkout): PaymentIntent state machine notes', ['docs/plan.md', 'apps/api/CLAUDE.md'], []],
+  ['m2', ['m3'], 'Maja Lind', 60 * 26, 'release: 2.14.0', ['CHANGELOG.md'], ['tag: v2.14.0', 'origin/main', 'main']],
+  ['m3', ['m4'], 'Codex', 60 * 30, 'docs: codex sandbox notes in AGENTS.md', ['AGENTS.md'], []],
+  ['m4', ['m5', 'r2'], 'Jonas Ek', 60 * 44, "Merge pull request #212 from acme/feat/rules-cleanup", ['.cursorrules', '.windsurfrules'], []],
+  ['r2', ['r1'], 'Maja Lind', 60 * 47, 'rules: dedupe strict-mode rule across tools', ['.cursorrules', '.windsurfrules'], []],
+  ['m5', ['m6'], 'Jonas Ek', 60 * 50, 'adr: propose search provider', ['docs/adr/0003-search.md', 'ROADMAP.md'], []],
+  ['r1', ['m6'], 'Maja Lind', 60 * 52, 'rules: move frontend rules to .cursor/rules', ['.cursor/rules/frontend.mdc'], []],
+  ['m6', ['m7'], 'Maja Lind', 60 * 120, 'cursor: testing rules always apply', ['.cursor/rules/testing.mdc'], ['tag: v2.13.1']],
+  ['m7', ['m8'], 'Ola Berg', 60 * 300, 'docs: architecture overview', ['docs/architecture.md', 'README.md'], []],
+  ['m8', ['m9'], 'Claude', 60 * 410, 'chore(claude): release skill + deploy command', ['.claude/skills/release/SKILL.md', '.claude/commands/deploy.md'], []],
+  ['m9', ['m10'], 'Maja Lind', 60 * 500, 'docs: design system tokens', ['docs/design-system.md'], ['tag: v2.13.0']],
+  ['m10', ['m11'], 'Jonas Ek', 60 * 720, 'chore: mcp servers for github + postgres', ['.mcp.json'], []],
+  ['m11', ['m12'], 'Ola Berg', 60 * 900, 'docs: copilot instructions for api', ['.github/instructions/api.instructions.md', '.github/copilot-instructions.md'], []],
+  ['m12', ['m13'], 'Maja Lind', 60 * 1300, 'adr: monorepo with pnpm + turbo', ['docs/adr/0002-monorepo.md', 'DECISIONS.md'], []],
+  ['m13', [], 'Maja Lind', 60 * 2900, 'Initial commit', ['README.md', 'CLAUDE.md', 'docs/adr/0001-postgres.md'], ['tag: v2.0.0']],
+];
+
+export const NATIVE_TASKS = (now) => [
+  {
+    id: 'n-onboard', title: 'Onboard Codex to the monorepo', description: 'Make sure **AGENTS.md** covers the same ground as `CLAUDE.md`.\n\n- sandbox notes\n- test commands\n\nSee [the plan](docs/plan.md).',
+    status: 'backlog', priority: 'med', labels: ['agents', 'docs'], due: null, assignee: 'ola', files: ['AGENTS.md', 'CLAUDE.md'],
+    checklist: [{ text: 'Diff AGENTS.md vs CLAUDE.md', done: true }, { text: 'Add sandbox section', done: false }, { text: 'Ask Codex to self-review', done: false }],
+    comments: [{ id: 'c1', ts: now - 3 * 3600_000, author: 'admin', text: 'Sync view in Agents shows 64% similarity — worth a pass.' }],
+    createdAt: now - 4 * 86400_000, updatedAt: now - 3 * 3600_000,
+  },
+  {
+    id: 'n-secrets', title: 'Rotate leaked Anthropic key in memory/notes.md', description: 'Health flagged a key in `memory/notes.md`. Rotate it, then replace with `${ANTHROPIC_API_KEY}`.',
+    status: 'review', priority: 'urgent', labels: ['security'], due: null, assignee: 'maja', files: ['memory/notes.md'],
+    checklist: [{ text: 'Rotate key in console', done: true }, { text: 'Apply Health quick fix', done: false }],
+    comments: [], createdAt: now - 26 * 3600_000, updatedAt: now - 2 * 3600_000,
+  },
+  {
+    id: 'n-metrics', title: 'Weekly context-budget report', description: 'Export Reports → Markdown every Monday and attach to the eng sync notes.',
+    status: 'todo', priority: 'low', labels: ['ops'], due: null, assignee: null, files: [],
+    checklist: [], comments: [], createdAt: now - 9 * 86400_000, updatedAt: now - 9 * 86400_000,
+  },
+  {
+    id: 'n-glossary', title: 'Fill docs/glossary.md or delete it', description: '',
+    status: 'backlog', priority: 'none', labels: ['docs'], due: null, assignee: null, files: ['docs/glossary.md'],
+    checklist: [], comments: [], createdAt: now - 12 * 86400_000, updatedAt: now - 12 * 86400_000,
+  },
+];
+
+const S = (label, extra = {}) => ({ type: 'string', label, ...extra });
+const PATHS = { type: 'string[]', required: true, label: 'Paths' };
+const MANAGER = { type: 'enum', enum: ['pnpm', 'npm', 'composer'], required: true, label: 'Manager', default: 'pnpm' };
+
+/** Mock action registry (mirrors the server registry shapes). */
+export const MOCK_ACTIONS = [
+  { id: 'mdctl.rescan', title: 'Rescan project', category: 'mdctl', level: 'state', description: 'Re-index every tracked file and recompute the graph and health.', params: {} },
+  { id: 'mdctl.snapshot', title: 'Record metrics snapshot', category: 'mdctl', level: 'state', description: 'Append a metrics snapshot to .mdctl/metrics.jsonl.', params: {} },
+  { id: 'mdctl.history.clear', title: 'Clear file history', category: 'mdctl', level: 'danger', description: 'Delete all local version snapshots in .mdctl/history.', params: {} },
+  { id: 'mdctl.terminal', title: 'Run command', category: 'mdctl', level: 'danger', flag: 'terminal', description: 'Run a command line (split into argv, no shell).', params: { command: S('Command line', { required: true }) } },
+  { id: 'files.create', title: 'Create file', category: 'files', level: 'edit', description: 'Create a new file (refuses to overwrite).', params: { path: { type: 'path', required: true, label: 'Path' }, content: { type: 'text', label: 'Content' } } },
+  { id: 'files.rename', title: 'Rename / move file', category: 'files', level: 'edit', description: 'Rename a file and rewrite every link to it.', params: { from: { type: 'path', required: true, label: 'From' }, to: { type: 'path', required: true, label: 'To' }, rewriteLinks: { type: 'boolean', default: true, label: 'Rewrite links' } } },
+  { id: 'files.delete', title: 'Delete file (to trash)', category: 'files', level: 'edit', description: 'Move a file to .mdctl/trash (restorable).', params: { path: { type: 'path', required: true, label: 'Path' } } },
+  { id: 'files.replace', title: 'Find and replace', category: 'files', level: 'edit', description: 'Replace text across tracked files.', params: { q: S('Find', { required: true }), replace: S('Replace with'), regex: { type: 'boolean', default: false } } },
+  { id: 'git.stage', title: 'Stage files', category: 'git', level: 'edit', description: 'git add the given paths', params: { paths: PATHS } },
+  { id: 'git.unstage', title: 'Unstage files', category: 'git', level: 'edit', description: 'Remove paths from the index', params: { paths: PATHS } },
+  { id: 'git.commit', title: 'Commit', category: 'git', level: 'edit', description: 'Commit staged changes', params: { message: { type: 'text', label: 'Message' }, amend: { type: 'boolean', default: false } } },
+  { id: 'git.branch.create', title: 'Create branch', category: 'git', level: 'edit', description: 'Create a branch (optionally from a ref) and switch to it', params: { name: S('Branch name', { required: true, pattern: '^[\\w./-]+$' }), from: S('Start point') } },
+  { id: 'git.branch.switch', title: 'Switch branch', category: 'git', level: 'edit', description: 'Switch to an existing branch', params: { name: S('Branch', { required: true }) } },
+  { id: 'git.stash.push', title: 'Stash changes', category: 'git', level: 'edit', description: 'Stash working changes', params: { message: S('Message') } },
+  { id: 'git.stash.pop', title: 'Pop stash', category: 'git', level: 'edit', description: 'Apply and drop a stash entry', params: { index: { type: 'number', default: 0, label: 'Index' } } },
+  { id: 'git.tag.create', title: 'Create tag', category: 'git', level: 'edit', description: 'Create a (annotated) tag at HEAD', params: { name: S('Tag', { required: true }), message: S('Message') } },
+  { id: 'git.changelog.write', title: 'Write changelog', category: 'git', level: 'edit', description: 'Prepend a conventional-commits changelog section to CHANGELOG.md', params: { from: S('From ref'), to: S('To ref') } },
+  { id: 'git.fetch', title: 'Fetch', category: 'git', level: 'exec', description: 'Fetch from a remote (default: all)', params: { remote: S('Remote') } },
+  { id: 'git.pull', title: 'Pull', category: 'git', level: 'exec', description: 'Pull (fast-forward only)', params: {} },
+  { id: 'git.push', title: 'Push', category: 'git', level: 'exec', description: 'Push the current branch', params: { setUpstream: { type: 'boolean', default: false, label: 'Set upstream (origin)' } } },
+  { id: 'git.discard', title: 'Discard changes', category: 'git', level: 'danger', description: 'Discard unstaged changes and delete untracked files at the given paths', params: { paths: PATHS } },
+  { id: 'git.branch.delete', title: 'Delete branch', category: 'git', level: 'danger', description: 'Delete a local branch', params: { name: S('Branch', { required: true }), force: { type: 'boolean', default: false } } },
+  { id: 'git.stash.drop', title: 'Drop stash', category: 'git', level: 'danger', description: 'Delete a stash entry', params: { index: { type: 'number', required: true, label: 'Index' } } },
+  { id: 'packages.install', title: 'Install dependencies', category: 'packages', level: 'exec', description: 'Install all dependencies from the lockfile.', params: { manager: MANAGER } },
+  { id: 'packages.add', title: 'Add package', category: 'packages', level: 'exec', description: 'Add a dependency.', params: { manager: MANAGER, name: S('Package', { required: true, pattern: '^(@[a-z0-9][\\w.-]*\\/)?[a-z0-9][\\w.-]*$' }), version: S('Version'), dev: { type: 'boolean', default: false, label: 'Dev dependency' } } },
+  { id: 'packages.remove', title: 'Remove package', category: 'packages', level: 'exec', description: 'Remove a dependency.', params: { manager: MANAGER, name: S('Package', { required: true }) } },
+  { id: 'packages.update', title: 'Update packages', category: 'packages', level: 'exec', description: 'Update one or all dependencies.', params: { manager: MANAGER, name: S('Package') } },
+  { id: 'packages.outdated', title: 'Check outdated packages', category: 'packages', level: 'exec', description: 'List outdated dependencies.', params: { manager: MANAGER } },
+  { id: 'packages.audit', title: 'Security audit', category: 'packages', level: 'exec', description: 'Audit dependencies for known vulnerabilities.', params: { manager: MANAGER } },
+  { id: 'scripts.run', title: 'Run script', category: 'scripts', level: 'exec', description: 'Run a script defined in package.json.', params: { manager: MANAGER, name: { type: 'enum', enum: ['build', 'dev', 'lint', 'test', 'typecheck'], required: true, label: 'Script' } } },
+  { id: 'agents.create', title: 'Create agent file from template', category: 'agents', level: 'edit', description: 'Render a template into a new file.', params: { template: S('Template', { required: true }), vars: { type: 'text', label: 'Variables (JSON)' }, path: { type: 'path', label: 'Path' } } },
+  { id: 'agents.mcp.test', title: 'Test MCP server', category: 'agents', level: 'exec', description: 'Spawn the server, initialize and list tools (15 s timeout).', params: { name: S('Server', { required: true }) } },
+  { id: 'tasks.export', title: 'Export native tasks to markdown', category: 'tasks', level: 'edit', description: 'Write native board tasks into TASKS.md.', params: { path: { type: 'path', default: 'TASKS.md', label: 'Path' } } },
+  { id: 'workspace.open', title: 'Open project in mdctl', category: 'workspace', level: 'exec', description: 'Start another mdctl instance for a sibling project.', params: { path: { type: 'string', required: true, label: 'Project path' } } },
 ];

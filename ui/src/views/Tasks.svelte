@@ -1,46 +1,80 @@
 <script>
   import { untrack } from 'svelte';
-  import { api } from '../lib/api.js';
-  import { app, openFile, navigate, fileIndex } from '../lib/store.svelte.js';
+  import { api, post } from '../lib/api.js';
+  import { app, openFile, navigate, onStream, toast, saveLocal } from '../lib/store.svelte.js';
   import { resource } from '../lib/resource.svelte.js';
   import { fmtDay, toMs } from '../lib/format.js';
+  import { canRun, levelReason, runAction } from '../lib/actions.js';
+  import { openTask, createTask } from '../lib/fileActions.js';
   import Tabs from '../lib/Tabs.svelte';
-  import ToolBadge from '../lib/ToolBadge.svelte';
-  import Counter from '../lib/Counter.svelte';
   import Icon from '../lib/Icon.svelte';
   import Empty from '../lib/Empty.svelte';
+  import BoardView from '../lib/board/BoardView.svelte';
+  import ListView from '../lib/board/ListView.svelte';
+  import TableView from '../lib/board/TableView.svelte';
+  import CalendarView from '../lib/board/CalendarView.svelte';
+  import TimelineView from '../lib/board/TimelineView.svelte';
+  import { applyFilters, PRIORITIES, PRIO, isOverdue } from '../lib/board/util.js';
 
   let { params = {} } = $props();
 
-  const tasks = resource(() => api('/api/tasks'));
-  const decisions = resource(() => api('/api/decisions'));
-  let tab = $state(untrack(() => params.tab) === 'decisions' ? 'decisions' : 'board');
-  let q = $state('');
-
-  const all = $derived(Array.isArray(tasks.data) ? tasks.data : []);
-  const filtered = $derived(q ? all.filter((t) => `${t.text} ${t.path} ${t.section || ''}`.toLowerCase().includes(q.toLowerCase())) : all);
-  const open = $derived(filtered.filter((t) => !t.done));
-  const done = $derived(filtered.filter((t) => t.done));
-  const pct = $derived(all.length ? Math.round((all.filter((t) => t.done).length / all.length) * 100) : 0);
-
-  function byFile(list) {
-    const m = new Map();
-    for (const t of list) {
-      if (!m.has(t.path)) m.set(t.path, []);
-      m.get(t.path).push(t);
-    }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
-  }
-  const progress = $derived.by(() => {
-    const m = new Map();
-    for (const t of all) {
-      const p = m.get(t.path) || { total: 0, done: 0 };
-      p.total++;
-      if (t.done) p.done++;
-      m.set(t.path, p);
-    }
-    return m;
+  const VIEWS = ['board', 'list', 'table', 'calendar', 'timeline', 'decisions'];
+  const initTab = untrack(() => params.tab || params.view);
+  let tab = $state(VIEWS.includes(initTab) ? initTab : 'board');
+  $effect(() => {
+    const t = params.tab || params.view;
+    if (t && VIEWS.includes(t) && t !== tab) tab = t;
   });
+
+  const board = resource(() => api('/api/board'));
+  const decisions = resource(() => api('/api/decisions'), { enabled: () => tab === 'decisions' });
+  $effect(() => onStream('board', () => board.reload()));
+
+  let swimlane = $state(load('mdctl.tasks.swimlane', 'none'));
+  function load(k, d) {
+    try { return localStorage.getItem(k) || d; } catch { return d; }
+  }
+  $effect(() => { try { localStorage.setItem('mdctl.tasks.swimlane', swimlane); } catch {} });
+
+  let f = $state({ q: '', label: '', priority: '', assignee: '', source: '', due: '' });
+  const columns = $derived(board.data?.columns || []);
+  const all = $derived(board.data?.tasks || []);
+  const tasks = $derived(applyFilters(all, f));
+  const filtering = $derived(Object.values(f).some(Boolean));
+  const mutOk = $derived(canRun('state'));
+  const reason = $derived(levelReason('state'));
+  const open = $derived(all.filter((t) => t.status !== 'done').length);
+  const overdue = $derived(all.filter(isOverdue).length);
+
+  function setTab(t) {
+    navigate('tasks', t === 'board' ? {} : { tab: t });
+  }
+
+  async function move(id, status, order) {
+    const t = board.data?.tasks.find((x) => x.id === id);
+    if (t) { t.status = status; t.order = order; } // optimistic
+    try {
+      const res = await post('/api/board/move', { id, status, order });
+      if (res?.mdSynced === false) toast('Moved on board only — ' + (res.reason || 'markdown not updated'), 'warn', 6000);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+    board.reload();
+  }
+  async function setStatus(id, status) {
+    const t = board.data?.tasks.find((x) => x.id === id);
+    const order = Math.max(0, ...all.filter((x) => x.status === status).map((x) => x.order ?? 0)) + 1000;
+    await move(id, status, t ? order : undefined);
+  }
+  async function quickAdd(status, title) {
+    try {
+      const order = Math.max(0, ...all.filter((x) => x.status === status).map((x) => x.order ?? 0)) + 1000;
+      await post('/api/board/task', { task: { title, status, order } });
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+    board.reload();
+  }
 
   const decs = $derived(
     (Array.isArray(decisions.data) ? decisions.data : [])
@@ -48,78 +82,71 @@
       .sort((a, b) => (b.ms || 0) - (a.ms || 0))
   );
   const STATUS = { accepted: 'ok', proposed: 'info', draft: 'info', rejected: 'err', superseded: 'warn', deprecated: 'warn' };
-  const tool = (p) => fileIndex().byPath.get(p)?.tool;
 </script>
 
 <div class="page">
   <div class="page-h">
     <div>
-      <h1>Tasks & decisions</h1>
-      <p>Every checkbox, TODO and decision across your markdown — linked to its source line.</p>
+      <h1>Tasks</h1>
+      <p>
+        {#if board.data}<b class="tnum">{open}</b> open{#if overdue} · <span class="od"><b class="tnum">{overdue}</b> overdue</span>{/if} · markdown checkboxes and native cards on one board.{:else}Markdown checkboxes and native cards on one board.{/if}
+      </p>
     </div>
     <span class="spacer"></span>
+    <button class="btn" onclick={() => runAction('tasks.export')} title="Write native tasks to TASKS.md"><Icon name="download" size={13} />Export</button>
+    <button class="btn primary" disabled={!mutOk} title={mutOk ? '' : reason} onclick={() => createTask({})}><Icon name="plus" size={13} />New task</button>
+  </div>
+
+  <div class="tabrow">
     <Tabs
-      tabs={[{ id: 'board', label: 'Task board', count: all.filter((t) => !t.done).length }, { id: 'decisions', label: 'Decisions', count: decs.length }]}
+      tabs={[
+        { id: 'board', label: 'Board' }, { id: 'list', label: 'List' }, { id: 'table', label: 'Table' },
+        { id: 'calendar', label: 'Calendar' }, { id: 'timeline', label: 'Timeline' },
+        { id: 'decisions', label: 'Decisions', count: decs.length || undefined },
+      ]}
       bind:active={tab}
-      onchange={(t) => navigate('tasks', t === 'decisions' ? { tab: t } : {})}
+      onchange={setTab}
     />
   </div>
 
-  {#if tab === 'board'}
-    <div class="summary card">
-      <div class="col" style="gap:2px">
-        <span class="eyebrow">Completion</span>
-        <span class="big tnum"><Counter value={pct} />%</span>
-      </div>
-      <div class="pbar"><span style="width:{pct}%"></span></div>
-      <div class="row small muted"><b class="tnum">{all.filter((t) => !t.done).length}</b> open · <b class="tnum">{all.filter((t) => t.done).length}</b> done · {progress.size} files</div>
+  {#if tab !== 'decisions'}
+    <div class="filters">
       <div class="searchbox">
-        <Icon name="filter" size={14} />
-        <input class="input" placeholder="Filter tasks…" bind:value={q} aria-label="Filter tasks" />
+        <Icon name="search" size={14} />
+        <input class="input" placeholder="Search tasks…" bind:value={f.q} aria-label="Search tasks" />
       </div>
+      <select class="input" bind:value={f.label} aria-label="Label"><option value="">All labels</option>{#each board.data?.labels || [] as l (l)}<option>{l}</option>{/each}</select>
+      <select class="input" bind:value={f.priority} aria-label="Priority"><option value="">Any priority</option>{#each PRIORITIES as p (p)}<option value={p}>{PRIO[p].label}</option>{/each}</select>
+      <select class="input" bind:value={f.assignee} aria-label="Assignee"><option value="">Anyone</option><option value="__none">Unassigned</option>{#each board.data?.assignees || [] as a (a)}<option>{a}</option>{/each}</select>
+      <select class="input" bind:value={f.source} aria-label="Source"><option value="">All sources</option><option value="md">Markdown</option><option value="native">Native</option></select>
+      <select class="input" bind:value={f.due} aria-label="Due"><option value="">Any due date</option><option value="overdue">Overdue</option><option value="week">Due this week</option></select>
+      {#if tab === 'board'}
+        <select class="input" bind:value={swimlane} aria-label="Swimlanes">
+          <option value="none">No swimlanes</option><option value="label">Lanes: label</option><option value="priority">Lanes: priority</option>
+          <option value="assignee">Lanes: assignee</option><option value="file">Lanes: file</option>
+        </select>
+      {/if}
+      {#if filtering}<button class="btn ghost sm" onclick={() => (f = { q: '', label: '', priority: '', assignee: '', source: '', due: '' })}>Clear</button>{/if}
+      <span class="faint small tnum">{tasks.length}/{all.length}</span>
     </div>
+    {#if !mutOk}<div class="ro small"><Icon name="lock" size={12} />Read-only: {reason}. Dragging and editing are disabled.</div>{/if}
 
-    {#if tasks.error}
-      <Empty icon="alert" title="Could not load tasks">{tasks.error.message}</Empty>
-    {:else if !tasks.data}
+    {#if board.error}
+      <Empty icon="alert" title="Could not load the board">{board.error.message}</Empty>
+    {:else if !board.data}
       <div class="skel" style="height:300px"></div>
-    {:else}
-      <div class="board">
-        {#each [['Open', open, 'open'], ['Done', done, 'done']] as [title, list, cls] (cls)}
-          <section class="lane {cls}">
-            <div class="lane-h">
-              <span class="ld"></span>{title} <span class="faint tnum">{list.length}</span>
-            </div>
-            {#each byFile(list) as [path, items] (path)}
-              {@const p = progress.get(path)}
-              <div class="card fcard">
-                <button class="fh" onclick={() => openFile(path, { drawer: true })}>
-                  <ToolBadge tool={tool(path)} compact />
-                  <span class="mono ellipsis grow">{path}</span>
-                  {#if p}<span class="faint small tnum">{p.done}/{p.total}</span>{/if}
-                </button>
-                {#if p}<div class="mini"><span style="width:{(p.done / p.total) * 100}%"></span></div>{/if}
-                <ul>
-                  {#each items as t (t.path + ':' + t.line)}
-                    <li>
-                      <button class="task" class:done={t.done} onclick={() => openFile(t.path, { line: t.line })}>
-                        <span class="cb">{#if t.done}<Icon name="check" size={11} stroke={3} />{/if}</span>
-                        <span class="grow">
-                          <span class="tt">{t.text}</span>
-                          {#if t.section}<span class="sec">{t.section}</span>{/if}
-                        </span>
-                        <span class="ln tnum">L{t.line}</span>
-                      </button>
-                    </li>
-                  {/each}
-                </ul>
-              </div>
-            {:else}
-              <div class="faint small pad">Nothing here.</div>
-            {/each}
-          </section>
-        {/each}
-      </div>
+    {:else if !all.length}
+      <Empty icon="tasks" title="No tasks yet">Add <code>- [ ] something</code> to any markdown file, or create a native card with “New task”.</Empty>
+    {:else if tab === 'board'}
+      <BoardView {tasks} allTasks={all} {columns} {swimlane} canMutate={mutOk} {reason} onmove={move} onadd={quickAdd} onopen={openTask} />
+    {:else if tab === 'list'}
+      <ListView {tasks} {columns} canMutate={mutOk} {reason} onstatus={setStatus} onopen={openTask} />
+    {:else if tab === 'table'}
+      <TableView {tasks} {columns} onopen={openTask} />
+    {:else if tab === 'calendar'}
+      <CalendarView {tasks} canMutate={mutOk} onopen={openTask} oncreate={(due) => createTask({ due })} />
+    {:else if tab === 'timeline'}
+      <TimelineView {tasks} onopen={openTask} />
     {/if}
   {:else}
     {#if decisions.error}
@@ -150,33 +177,15 @@
 </div>
 
 <style>
-  .summary { display: flex; align-items: center; gap: 20px; padding: 14px 18px; margin-bottom: 16px; flex-wrap: wrap; }
-  .big { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
-  .pbar { flex: 1; min-width: 140px; height: 8px; border-radius: 99px; background: var(--panel-active); overflow: hidden; }
-  .pbar span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--ok)); border-radius: inherit; transition: width 0.8s var(--ease); }
+  .tabrow { margin-bottom: 12px; display: flex; }
+  .od { color: var(--err); }
+  .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .filters select.input { height: 32px; width: auto; max-width: 150px; font-size: 12.5px; }
   .searchbox { position: relative; display: flex; align-items: center; color: var(--text-3); }
   .searchbox :global(.icon) { position: absolute; left: 10px; pointer-events: none; }
-  .searchbox .input { padding-left: 30px; width: 220px; }
+  .searchbox .input { padding-left: 30px; width: 200px; height: 32px; }
   .small { font-size: 12px; }
-  .board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  .lane { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-  .lane-h { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 13px; padding: 0 4px; }
-  .ld { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-  .done .ld { background: var(--ok); }
-  .fcard { padding: 4px 6px 6px; }
-  .fh { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; border: 0; background: transparent; cursor: pointer; font-size: 12.5px; font-weight: 600; text-align: left; border-radius: 8px; }
-  .fh:hover { color: var(--accent); }
-  .mini { height: 2px; margin: 0 8px 4px; background: var(--panel-active); border-radius: 2px; overflow: hidden; }
-  .mini span { display: block; height: 100%; background: var(--ok); }
-  ul { list-style: none; margin: 0; padding: 0; }
-  .task { display: flex; align-items: flex-start; gap: 10px; width: 100%; border: 0; background: transparent; padding: 7px 8px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 13px; }
-  .task:hover { background: var(--panel-hover); }
-  .cb { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--border-strong); display: grid; place-items: center; flex-shrink: 0; margin-top: 2px; color: white; }
-  .task.done .cb { background: var(--ok); border-color: var(--ok); }
-  .task.done .tt { color: var(--text-3); text-decoration: line-through; }
-  .sec { display: block; font-size: 11px; color: var(--text-3); margin-top: 1px; }
-  .ln { font: 11px var(--mono); color: var(--text-3); padding-top: 2px; }
-  .pad { padding: 10px; }
+  .ro { display: flex; align-items: center; gap: 6px; color: var(--text-3); margin: -6px 0 12px; }
   .timeline { list-style: none; margin: 0; padding: 0 0 0 130px; position: relative; display: flex; flex-direction: column; gap: 12px; }
   .timeline::before { content: ''; position: absolute; left: 112px; top: 6px; bottom: 6px; width: 2px; background: linear-gradient(var(--accent), var(--border)); border-radius: 2px; }
   .timeline li { position: relative; }
@@ -190,12 +199,11 @@
   .dcard:hover { border-color: var(--border-strong); transform: translateX(3px); }
   .dt { font-weight: 600; }
   @media (max-width: 860px) {
-    .board { grid-template-columns: 1fr; }
     .timeline { padding-left: 24px; }
     .timeline::before { left: 6px; }
     .tdate { position: static; text-align: left; width: auto; margin-bottom: 4px; }
     .tdot { left: -23px; top: 4px; }
-    .searchbox .input { width: 100%; }
-    .searchbox { width: 100%; }
+    .searchbox, .searchbox .input { width: 100%; }
+    .filters select.input { flex: 1; min-width: 120px; }
   }
 </style>

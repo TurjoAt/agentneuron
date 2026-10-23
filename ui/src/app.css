@@ -278,6 +278,12 @@ textarea {
   color: white;
   box-shadow: 0 6px 18px -8px var(--accent);
 }
+.btn.danger {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--err) 90%, white), var(--err));
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 6px 18px -8px var(--err);
+}
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.ghost:hover { background: var(--panel-hover); }
 .btn.sm { height: 26px; padding: 0 9px; font-size: 12px; border-radius: 7px; }
@@ -435,6 +441,56 @@ select.input option { background: var(--panel-solid); color: var(--text); }
   gap: 6px;
 }
 
+/* toggle switch (checkbox.sw) */
+input.sw {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 99px;
+  background: var(--panel-active);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  transition: background 0.2s var(--ease), border-color 0.2s;
+}
+input.sw::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.22s var(--ease-spring), background 0.2s;
+}
+input.sw:checked { background: var(--accent); border-color: transparent; }
+input.sw:checked::after { transform: translateX(14px); background: white; }
+input.sw:disabled { opacity: 0.45; cursor: not-allowed; }
+input.sw.sm { width: 28px; height: 16px; }
+input.sw.sm::after { width: 10px; height: 10px; }
+input.sw.sm:checked::after { transform: translateX(12px); }
+
+/* segmented control */
+.segc { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--inset); border: 1px solid var(--border); gap: 1px; }
+.segc button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; height: 26px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 550; color: var(--text-2); cursor: pointer; white-space: nowrap; }
+.segc button:hover { color: var(--text); }
+.segc button.on { background: var(--panel-solid); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--border); }
+
+/* tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; font-size: 11px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 0; background: var(--panel-solid); z-index: 1; }
+.tbl td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover td { background: var(--panel-hover); }
+
+/* avatar */
+.ava { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 9.5px; font-weight: 700; color: white; flex-shrink: 0; background: linear-gradient(135deg, hsl(var(--h, 250) 62% 58%), hsl(calc(var(--h, 250) + 40) 62% 46%)); letter-spacing: 0.02em; }
+
 /* ---------- markdown ---------- */
 .md {
   font-size: 14.5px;
@@ -473,6 +529,8 @@ select.input option { background: var(--panel-solid); color: var(--text); }
   place-items: center;
 }
 .md .md-task.done > .md-check { background: var(--ok); border-color: var(--ok); }
+.md .md-task.doing > .md-check { border-color: var(--accent); }
+.md .md-task.doing > .md-check i { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
 .md .md-check svg { width: 12px; height: 12px; fill: none; stroke: white; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .md .md-task.done > .md-task-body { color: var(--text-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-3) 60%, transparent); }
 .md code {

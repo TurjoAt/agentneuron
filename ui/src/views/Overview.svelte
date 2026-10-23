@@ -1,70 +1,114 @@
 <script>
-  import { app, openFile, isPulsing } from '../lib/store.svelte.js';
-  import { TOOLS, TOOL_ORDER, KINDS, toolOf } from '../lib/tools.js';
-  import { fmtNum, timeAgo, basename, dirname } from '../lib/format.js';
+  import { api } from '../lib/api.js';
+  import { app, openFile, isPulsing, navigate } from '../lib/store.svelte.js';
+  import { resource } from '../lib/resource.svelte.js';
+  import { KINDS } from '../lib/tools.js';
+  import { fmtNum, timeAgo, basename, dirname, toMs } from '../lib/format.js';
+  import { openTask, newFile } from '../lib/fileActions.js';
   import HealthRing from '../lib/HealthRing.svelte';
   import Counter from '../lib/Counter.svelte';
   import ActivityFeed from '../lib/ActivityFeed.svelte';
   import ToolBadge from '../lib/ToolBadge.svelte';
   import GitStatus from '../lib/GitStatus.svelte';
-  import TokenBar from '../lib/TokenBar.svelte';
   import Icon from '../lib/Icon.svelte';
+  import Kpi from './overview/Kpi.svelte';
+  import ToolCard from './overview/ToolCard.svelte';
+  import ActionBtn from './overview/ActionBtn.svelte';
 
   let { params: _params } = $props();
 
-  const files = $derived(app.files);
-  const totalTokens = $derived(files.reduce((a, f) => a + (f.tokens || 0), 0));
-  const byTool = $derived.by(() => {
-    const m = {};
-    for (const f of files) {
-      const t = toolOf(f.tool);
-      m[t] ??= { tool: t, files: 0, tokens: 0 };
-      m[t].files++;
-      m[t].tokens += f.tokens || 0;
-    }
-    return TOOL_ORDER.map((t) => m[t]).filter(Boolean);
+  const DAY = 86_400_000;
+  const TOOL_BUDGET = 12_000; // suggested instruction-token budget per tool
+
+  // ------------------------------------------------------------ data
+  const setup = resource(() => api('/api/agents/setup'));
+  const board = resource(() => api('/api/board'));
+  const project = resource(() => api('/api/project'), { live: false });
+  const gitInfo = resource(() => api('/api/git'));
+  const healthFull = resource(() => api('/api/health'));
+  const trends = resource(async () => {
+    const to = Date.now();
+    const from = to - 14 * DAY;
+    const q = (metric) => api('/api/reports/series', { from, to, bucket: 'day', metric }).catch(() => null);
+    const [summary, tokens, health, changes] = await Promise.all([
+      api('/api/reports/summary', { from, to }).catch(() => null),
+      q('tokens'),
+      q('health'),
+      q('changes'),
+    ]);
+    return { summary, tokens: tokens?.series?.[0]?.values, health: health?.series?.[0]?.values, changes: changes?.series?.[0]?.values };
   });
-  const maxToolTokens = $derived(Math.max(1, ...byTool.map((t) => t.tokens)));
+
+  const files = $derived(app.files);
+  const fileByPath = $derived(new Map(files.map((f) => [f.path, f])));
+  const totalTokens = $derived(files.reduce((a, f) => a + (f.tokens || 0), 0));
   const byKind = $derived.by(() => {
     const m = {};
     for (const f of files) m[f.kind] = (m[f.kind] || 0) + 1;
     return Object.entries(m).sort((a, b) => b[1] - a[1]);
   });
-
-  const DAY = 86_400_000;
   const changes24h = $derived(app.events.filter((e) => app.now - e.ts < DAY).length);
-  const activeAgents = $derived(new Set(app.events.filter((e) => e.agent && app.now - e.ts < 30 * 60_000).map((e) => e.agent.sessionId)).size);
+  const health = $derived(app.health || app.state?.health);
+  const git = $derived(app.state?.git);
 
-  // hottest files: churn from the event ring
+  // ------------------------------------------------------------ tools
+  const tools = $derived(setup.data?.tools || []);
+  const detected = $derived(tools.filter((t) => t.detected));
+  const missing = $derived(tools.filter((t) => !t.detected));
+  function toolTokens(t) {
+    const seen = new Set();
+    let n = 0;
+    for (const f of t.files || []) {
+      if (seen.has(f.path)) continue;
+      seen.add(f.path);
+      n += fileByPath.get(f.path)?.tokens || 0;
+    }
+    return n;
+  }
+  const issuesByTool = $derived.by(() => {
+    const m = {};
+    const owner = new Map();
+    for (const t of tools) for (const f of t.files || []) owner.set(f.path, t.id);
+    for (const i of healthFull.data?.issues || []) {
+      const id = owner.get(i.path);
+      if (!id) continue;
+      const o = (m[id] ??= { error: 0, warn: 0 });
+      if (i.severity === 'error') o.error++;
+      else if (i.severity === 'warn') o.warn++;
+    }
+    return m;
+  });
+
+  // ------------------------------------------------------------ tasks
+  const cols = $derived(board.data?.columns || []);
+  const tasks = $derived(board.data?.tasks || []);
+  const doneId = $derived(cols.find((c) => c.id === 'done')?.id ?? cols[cols.length - 1]?.id);
+  const openTasks = $derived(tasks.filter((t) => t.status !== doneId));
+  const PR = { urgent: 0, high: 1, med: 2, low: 3, none: 4 };
+  const topTasks = $derived(
+    [...openTasks].sort((a, b) => (PR[a.priority] ?? 4) - (PR[b.priority] ?? 4) || (toMs(a.due) || 9e15) - (toMs(b.due) || 9e15)).slice(0, 4)
+  );
+  const colCounts = $derived(cols.map((c) => ({ ...c, n: tasks.filter((t) => t.status === c.id).length })));
+  const overdue = $derived(openTasks.filter((t) => t.due && toMs(t.due) < app.now - DAY).length);
+
+  // ------------------------------------------------------------ misc
   const hot = $derived.by(() => {
     const m = new Map();
     for (const e of app.events) {
       if (e.type === 'unlink') continue;
-      const h = m.get(e.path) || { path: e.path, count: 0, churn: 0, last: 0 };
+      const h = m.get(e.path) || { path: e.path, count: 0, last: 0 };
       h.count++;
-      h.churn += (e.stats?.added || 0) + (e.stats?.removed || 0);
       h.last = Math.max(h.last, e.ts);
       m.set(e.path, h);
     }
-    return [...m.values()].sort((a, b) => b.count - a.count || b.churn - a.churn).slice(0, 7);
+    return [...m.values()].sort((a, b) => b.count - a.count || b.last - a.last).slice(0, 6);
   });
   const maxHot = $derived(Math.max(1, ...hot.map((h) => h.count)));
-
-  // sparkline: events per 2-min bucket over the last hour
-  const spark = $derived.by(() => {
-    const buckets = new Array(30).fill(0);
-    for (const e of app.events) {
-      const age = app.now - e.ts;
-      if (age < 0 || age >= 3600_000) continue;
-      buckets[29 - Math.floor(age / 120_000)]++;
-    }
-    return buckets;
-  });
-  const sparkMax = $derived(Math.max(1, ...spark));
-
-  const health = $derived(app.health || app.state?.health);
-  const git = $derived(app.state?.git);
-  const fileByPath = $derived(new Map(files.map((f) => [f.path, f])));
+  const stacks = $derived((project.data?.stacks || []).slice(0, 14));
+  const commits = $derived((gitInfo.data?.recent || []).slice(0, 3));
+  const sum = $derived(trends.data?.summary);
+  const tokensDelta = $derived(sum?.kpis ? [sum.kpis.tokensNow, sum.kpis.tokensNow - sum.kpis.tokensDelta] : [null, null]);
+  const healthDelta = $derived(sum?.kpis ? [sum.kpis.healthNow, sum.kpis.healthNow - sum.kpis.healthDelta] : [null, null]);
 </script>
 
 <div class="page">
@@ -83,70 +127,142 @@
           </div>
         {/each}
       </div>
-      <a class="btn sm" href="#/agents">Radar</a>
+      <a class="btn sm" href="#/agents?tab=radar">Radar</a>
     </div>
   {/if}
 
+  <div class="page-h">
+    <div>
+      <h1>Overview</h1>
+      <p>Your AI context at a glance — what every tool can see, what it costs, and what changed.</p>
+    </div>
+    <span class="spacer"></span>
+    <div class="qa">
+      <ActionBtn id="agents.create" params={{ template: 'claude-md' }} label="CLAUDE.md" icon="plus" cls="sm" />
+      <ActionBtn id="agents.create" params={{ template: 'agents-md' }} label="AGENTS.md" icon="plus" cls="sm" />
+      <button class="btn sm" onclick={() => newFile()}><Icon name="file" size={14} /> New file</button>
+      <a class="btn sm" href="#/agents?tab=sync"><Icon name="merge" size={14} /> Sync tools</a>
+      <ActionBtn id="mdctl.rescan" label="Rescan" icon="refresh" cls="sm" opts={{ silent: false }} />
+    </div>
+  </div>
+
+  <section class="kpis" aria-label="Key metrics">
+    <Kpi label="Tracked files" value={files.length} href="#/files" sub="{detected.length || '–'} tools · {byKind.length} kinds" />
+    <Kpi label="Context tokens" value={totalTokens} href="#/reports" spark={trends.data?.tokens} color="var(--accent)" now={tokensDelta[0]} prev={tokensDelta[1]} sub="14-day trend" />
+    <Kpi label="Health" value={health?.score ?? 0} suffix={health?.grade ? ` ${health.grade}` : ''} href="#/health" spark={trends.data?.health} color="var(--ok)" now={healthDelta[0]} prev={healthDelta[1]} sub="{health?.counts?.error ?? 0} errors · {health?.counts?.warn ?? 0} warnings" />
+    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : '…'} />
+    <Kpi label="Uncommitted" value={git?.available ? git.dirty || 0 : 0} href="#/git" sub={git?.available ? `on ${git.branch}` : 'git unavailable'} />
+    <Kpi label="Changes · 24h" value={changes24h} href="#/reports" spark={trends.data?.changes} color="var(--tool-claude)" sub="14-day activity" />
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">
+      <h2>AI tools</h2>
+      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_BUDGET)} budget</span>
+      <span class="spacer"></span>
+      <a class="btn sm ghost" href="#/agents?tab=matrix">Capability matrix <Icon name="chevron" size={13} /></a>
+    </div>
+    {#if setup.error}
+      <div class="card pad faint small">Could not load the agent setup: {setup.error.message}</div>
+    {:else if !setup.data}
+      <div class="tgrid">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
+    {:else}
+      <div class="tgrid">
+        {#each detected as t (t.id)}
+          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
+        {:else}
+          <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
+        {/each}
+      </div>
+      {#if missing.length}
+        <div class="miss">
+          <span class="faint small">Not set up:</span>
+          {#each missing as t (t.id)}
+            <a class="chip" href="#/agents?tab=templates&tool={t.id}"><Icon name="plus" size={11} /> {t.name}</a>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+
   <div class="grid">
-    <section class="card health-card">
-      <div class="card-h">Context health <span class="sub">live lint + secret scan</span></div>
-      <div class="hb">
-        <HealthRing score={health?.score ?? 0} grade={health?.grade ?? '–'} />
-        <div class="sev">
-          {#each [['error', 'Errors', 'err'], ['warn', 'Warnings', 'warn'], ['info', 'Info', 'info']] as [k, label, cls] (k)}
-            <a class="sev-row" href="#/health?severity={k}">
-              <span class="sd {cls}"></span>
-              <span class="grow">{label}</span>
-              <b class="tnum"><Counter value={health?.counts?.[k] ?? 0} /></b>
-            </a>
-          {/each}
-          <a class="btn sm" href="#/health" style="margin-top:6px">Open health report <Icon name="chevron" size={13} /></a>
-        </div>
+    <section class="card activity">
+      <div class="card-h">
+        <span class="live-dot"></span> Live activity
+        <span class="sub">{app.events.length} events</span>
       </div>
+      <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
     </section>
 
-    <section class="stats">
-      <div class="card stat">
-        <div class="eyebrow">Tracked files</div>
-        <div class="big"><Counter value={files.length} /></div>
-        <div class="faint small">{byTool.length} tools · {byKind.length} kinds</div>
-      </div>
-      <div class="card stat">
-        <div class="eyebrow">Context tokens</div>
-        <div class="big"><Counter value={totalTokens} /></div>
-        <div class="faint small">≈ total across all files</div>
-      </div>
-      <div class="card stat">
-        <div class="eyebrow">Changes · 24h</div>
-        <div class="big"><Counter value={changes24h} /></div>
-        <svg class="spark" viewBox="0 0 120 24" preserveAspectRatio="none" aria-label="Changes over the last hour">
-          {#each spark as v, i (i)}
-            <rect x={i * 4 + 0.5} y={24 - (v / sparkMax) * 22 - 1} width="3" height={(v / sparkMax) * 22 + 1} rx="1" class:hot={v > 0} />
-          {/each}
-        </svg>
-      </div>
-      <div class="card stat">
-        <div class="eyebrow">Active agents · 30m</div>
-        <div class="big"><Counter value={activeAgents} /></div>
-        <div class="faint small">
-          {#if git?.available}<Icon name="branch" size={12} /> <span class="mono">{git.branch}</span>{#if git.dirty} · <span class="warn">{git.dirty} dirty</span>{/if}{:else}git unavailable{/if}
+    <div class="side">
+      <section class="card">
+        <div class="card-h">Context health <span class="sub">lint + secret scan</span></div>
+        <div class="hb">
+          <HealthRing score={health?.score ?? 0} grade={health?.grade ?? '–'} size={112} stroke={9} />
+          <div class="sev">
+            {#each [['error', 'Errors', 'err'], ['warn', 'Warnings', 'warn'], ['info', 'Info', 'info']] as [k, label, cls] (k)}
+              <a class="sev-row" href="#/health?severity={k}">
+                <span class="sd {cls}"></span><span class="grow">{label}</span>
+                <b class="tnum"><Counter value={health?.counts?.[k] ?? 0} /></b>
+              </a>
+            {/each}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="card tools">
-      <div class="card-h">By tool <span class="sub">files · tokens</span></div>
-      <div class="card-b col" style="gap:12px">
-        {#each byTool as t (t.tool)}
-          <a class="trow" href="#/files?tool={t.tool}">
-            <div class="row">
-              <ToolBadge tool={t.tool} />
-              <span class="spacer"></span>
-              <span class="faint small tnum">{t.files} files</span>
-              <b class="tnum small">{fmtNum(t.tokens)}</b>
+      <section class="card">
+        <div class="card-h">Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks">Board</a></div>
+        <div class="card-b col" style="gap:10px">
+          {#if colCounts.length}
+            <div class="stk" aria-label="Tasks per column">
+              {#each colCounts as c, i (c.id)}
+                <span style="flex:{c.n || 0.001};opacity:{0.35 + (0.65 * (i + 1)) / colCounts.length}" title="{c.title}: {c.n}"></span>
+              {/each}
             </div>
-            <TokenBar value={t.tokens} max={maxToolTokens} tool={t.tool} />
-          </a>
+            <div class="legend">
+              {#each colCounts as c (c.id)}<span class="faint small">{c.title} <b class="tnum">{c.n}</b></span>{/each}
+            </div>
+          {/if}
+          {#each topTasks as t (t.id)}
+            <button class="list-row trow" onclick={() => openTask(t.id)}>
+              <span class="pr {t.priority}"></span>
+              <span class="grow ellipsis small">{t.title}</span>
+              {#if t.due}<span class="faint tiny">{t.due}</span>{/if}
+            </button>
+          {:else}
+            <div class="faint small">{board.data ? 'No open tasks.' : 'Loading…'}</div>
+          {/each}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><Icon name="branch" size={14} /> Git <span class="sub">{git?.available ? git.branch : 'unavailable'}</span><span class="spacer"></span><a class="btn sm ghost" href="#/git">Open</a></div>
+        <div class="card-b col" style="gap:8px">
+          {#if git?.available}
+            <a class="gline" href="#/git"><b class="tnum">{git.dirty || 0}</b> <span class="muted">uncommitted {git.dirty === 1 ? 'change' : 'changes'}</span></a>
+            {#each commits as c (c.hash)}
+              <a class="gline" href="#/git">
+                <code class="mono tiny">{(c.short || c.hash || '').slice(0, 7)}</code>
+                <span class="ellipsis small grow">{c.subject || c.message}</span>
+                <span class="faint tiny">{timeAgo(toMs(c.date || c.ts), app.now)}</span>
+              </a>
+            {/each}
+          {:else}
+            <div class="faint small">This folder is not a git repository.</div>
+          {/if}
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <div class="card-h"><Icon name="layers" size={14} /> Project stack <span class="spacer"></span><a class="btn sm ghost" href="#/project">Details</a></div>
+      <div class="card-b stacks">
+        {#each stacks as s (s.id)}
+          <a class="chip" href="#/project" title={s.source}>{s.name}{#if s.version}<span class="n">{s.version}</span>{/if}</a>
+        {:else}
+          <span class="faint small">{project.data ? 'No stack detected.' : 'Detecting…'}</span>
         {/each}
       </div>
       <div class="card-b kinds">
@@ -156,17 +272,7 @@
       </div>
     </section>
 
-    <section class="card activity">
-      <div class="card-h">
-        <span class="live-dot"></span> Live activity
-        <span class="sub">{app.events.length} events</span>
-      </div>
-      <div class="card-b feed-wrap">
-        <ActivityFeed limit={30} />
-      </div>
-    </section>
-
-    <section class="card hot">
+    <section class="card">
       <div class="card-h"><Icon name="flame" size={15} /> Hottest files <span class="sub">by recent changes</span></div>
       <div class="card-b col" style="gap:2px">
         {#each hot as h (h.path)}
@@ -194,40 +300,45 @@
 </div>
 
 <style>
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 16px;
-  }
-  .health-card { grid-column: span 5; }
-  .stats { grid-column: span 7; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  .tools { grid-column: span 4; }
-  .activity { grid-column: span 5; grid-row: span 2; display: flex; flex-direction: column; }
-  .hot { grid-column: span 3; }
-  .hb { display: flex; align-items: center; gap: 26px; padding: 6px 20px 20px; flex-wrap: wrap; }
-  .sev { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 4px; }
-  .sev-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; color: var(--text-2); font-size: 13px; text-decoration: none; }
+  .qa { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .sec { margin-bottom: 22px; }
+  .sec-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .sec-h h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .miss { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .miss .chip { text-decoration: none; }
+  .pad { padding: 16px; }
+  .small { font-size: 12px; }
+  .tiny { font-size: 11px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .activity { display: flex; flex-direction: column; }
+  .feed-wrap { overflow: auto; max-height: 640px; }
+  .hb { display: flex; align-items: center; gap: 20px; padding: 4px 18px 18px; flex-wrap: wrap; }
+  .sev { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 2px; }
+  .sev-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px; color: var(--text-2); font-size: 13px; text-decoration: none; }
   .sev-row:hover { background: var(--panel-hover); color: var(--text); text-decoration: none; }
   .sev-row b { color: var(--text); font-size: 15px; }
   .sd { width: 9px; height: 9px; border-radius: 3px; }
   .sd.err { background: var(--err); box-shadow: 0 0 10px var(--err); }
   .sd.warn { background: var(--warn); }
   .sd.info { background: var(--info); }
-  .stat { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
-  .big { font-size: 32px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.15; }
-  .small { font-size: 12px; }
-  .tiny { font-size: 11px; }
-  .warn { color: var(--warn); }
-  .spark { width: 100%; height: 24px; margin-top: 2px; }
-  .spark rect { fill: var(--border-strong); transition: y 0.5s var(--ease), height 0.5s var(--ease); }
-  .spark rect.hot { fill: var(--accent); }
-  .trow { display: flex; flex-direction: column; gap: 7px; color: inherit; text-decoration: none; border-radius: 8px; }
-  .trow:hover { text-decoration: none; }
-  .trow:hover :global(.tb) { filter: brightness(1.2); }
+  .stk { display: flex; height: 8px; border-radius: 99px; overflow: hidden; gap: 2px; background: var(--panel-active); }
+  .stk span { background: var(--accent); min-width: 2px; transition: flex 0.5s var(--ease); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .trow { padding: 6px 4px; gap: 9px; }
+  .pr { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
+  .pr.urgent { background: var(--err); }
+  .pr.high { background: var(--warn); }
+  .pr.med { background: var(--info); }
+  .gline { display: flex; align-items: center; gap: 9px; color: inherit; text-decoration: none; min-width: 0; font-size: 13px; }
+  .gline:hover { text-decoration: none; color: var(--accent); }
+  .stacks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stacks .chip, .kinds .chip { text-decoration: none; }
   .kinds { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
-  .kinds .chip { text-decoration: none; }
-  .feed-wrap { flex: 1; overflow: auto; max-height: 620px; }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: live 2s infinite; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: live 2s infinite; }
   @keyframes live {
     0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); }
     70% { box-shadow: 0 0 0 7px transparent; }
@@ -236,37 +347,20 @@
   .hrow { padding: 8px; }
   .heat { height: 3px; border-radius: 3px; background: var(--panel-active); overflow: hidden; display: block; }
   .heat span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--err)); border-radius: inherit; transition: width 0.6s var(--ease); }
-  .conflict {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    margin-bottom: 16px;
-    border-color: color-mix(in srgb, var(--err) 45%, transparent);
-    background: linear-gradient(90deg, var(--err-soft), var(--panel));
-  }
-  .cicon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--err-soft); color: var(--err); animation: alarm 1.6s infinite; }
-  @keyframes alarm { 50% { box-shadow: 0 0 0 6px transparent, 0 0 22px color-mix(in srgb, var(--err) 50%, transparent); } }
+  .conflict { display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 16px; border-color: color-mix(in srgb, var(--err) 45%, transparent); background: linear-gradient(90deg, var(--err-soft), var(--panel)); }
+  .cicon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--err-soft); color: var(--err); }
   .ct { font-weight: 650; color: var(--err); }
   .cd { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
   .lnk { border: 0; background: none; color: var(--text); font-weight: 600; cursor: pointer; padding: 0; }
   .lnk:hover { color: var(--accent); }
 
-  @media (max-width: 1280px) {
-    .health-card { grid-column: span 12; }
-    .stats { grid-column: span 12; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .tools { grid-column: span 5; }
-    .activity { grid-column: span 7; }
-    .hot { grid-column: span 5; }
-  }
+  @media (max-width: 1280px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 900px) {
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .tools, .activity, .hot { grid-column: span 12; grid-row: auto; }
-    .feed-wrap { max-height: 440px; }
+    .grid, .grid2 { grid-template-columns: 1fr; }
+    .feed-wrap { max-height: 420px; }
   }
-  @media (max-width: 420px) {
-    .grid, .stats { gap: 10px; }
-    .big { font-size: 26px; }
-    .hb { justify-content: center; }
+  @media (max-width: 520px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .qa { width: 100%; }
   }
 </style>

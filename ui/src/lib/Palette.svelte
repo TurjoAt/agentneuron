@@ -9,6 +9,10 @@
   import { dur } from './motion.js';
   import Icon from './Icon.svelte';
   import ToolBadge from './ToolBadge.svelte';
+  import { actionsState, runAction, actionEnabled, jobs } from './actions.svelte.js';
+  import { LEVELS, CATEGORY_ICON } from './levels.js';
+  import { newFile, findReplace, createTask, renameFile, deleteFile, copyPath } from './fileActions.js';
+  import { isBookmarked, toggleBookmark, logout } from './store.svelte.js';
 
   let q = $state('');
   let sel = $state(0);
@@ -28,7 +32,7 @@
   $effect(() => {
     const query = q.trim();
     clearTimeout(timer);
-    if (query.length < 2) {
+    if (query.length < 2 || query.startsWith('>')) {
       remote = { q: '', items: [], loading: false };
       return;
     }
@@ -41,37 +45,70 @@
   });
 
   const items = $derived.by(() => {
-    const query = q.trim();
+    const raw = q.trim();
+    const cmdMode = raw.startsWith('>');
+    const query = cmdMode ? raw.slice(1).trim() : raw;
     const out = [];
+    const cur = app.route.view === 'files' ? app.route.params.path : null;
     const cmds = [
-      ...VIEWS.map((v, i) => ({ kind: 'view', label: `Go to ${v.label}`, icon: v.icon, key: String(i + 1), run: () => navigate(v.id) })),
-      { kind: 'action', label: `Switch to ${app.theme === 'dark' ? 'light' : 'dark'} theme`, icon: app.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme },
-      { kind: 'action', label: 'Reconnect live stream', icon: 'refresh', run: reconnect },
+      ...VIEWS.map((v, i) => ({ kind: 'view', label: `Go to ${v.label}`, icon: v.icon, key: i < 9 ? String(i + 1) : '', run: () => navigate(v.id) })),
+      { kind: 'cmd', label: 'New file…', icon: 'filePlus', key: 'n', run: () => newFile() },
+      { kind: 'cmd', label: 'Find & replace in files…', icon: 'replace', run: () => findReplace(query) },
+      { kind: 'cmd', label: 'New task…', icon: 'tasks', run: () => createTask({}) },
+      { kind: 'cmd', label: jobs.dock ? 'Hide jobs dock' : 'Show jobs dock', icon: 'terminal', run: () => { jobs.dockVisible = true; jobs.dock = !jobs.dock; } },
+      ...(cur
+        ? [
+            { kind: 'cmd', label: `Edit ${cur}`, icon: 'edit', run: () => openFile(cur, { tab: 'edit' }) },
+            { kind: 'cmd', label: `${isBookmarked(cur) ? 'Unpin' : 'Pin'} ${cur}`, icon: 'pin', run: () => toggleBookmark(cur) },
+            { kind: 'cmd', label: `Rename / move ${cur}…`, icon: 'replace', run: () => renameFile(cur) },
+            { kind: 'cmd', label: `Copy path ${cur}`, icon: 'copy', run: () => copyPath(cur) },
+            { kind: 'cmd', label: `Move ${cur} to trash`, icon: 'trash', run: () => deleteFile(cur) },
+          ]
+        : []),
+      { kind: 'cmd', label: `Switch to ${app.theme === 'dark' ? 'light' : 'dark'} theme`, icon: app.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme },
+      { kind: 'cmd', label: 'Keyboard shortcuts', icon: 'command', key: '?', run: () => (app.modal = { kind: 'shortcuts', props: {} }) },
+      { kind: 'cmd', label: 'Reconnect live stream', icon: 'refresh', run: reconnect },
+      ...(app.me?.tokenRequired ? [{ kind: 'cmd', label: 'Sign out', icon: 'logout', run: logout }] : []),
     ];
     for (const c of cmds) {
       const m = fuzzy(query, c.label);
       if (m) out.push({ ...c, section: 'Commands', score: m.score + (query ? 0 : 1000), html: highlight(c.label, m.idx) });
     }
-    if (query) {
-      const files = [];
-      for (const f of app.files) {
-        const m = fuzzy(query, f.path);
-        if (m) files.push({ kind: 'file', section: 'Files', path: f.path, tool: f.tool, score: m.score, html: highlight(f.path, m.idx), run: () => openFile(f.path) });
-      }
-      files.sort((a, b) => b.score - a.score);
-      out.sort((a, b) => b.score - a.score);
-      const cmdsTop = out.slice(0, 4);
-      out.length = 0;
-      out.push(...files.slice(0, 12), ...cmdsTop);
-      const needle = query.toLowerCase();
-      for (const r of remote.q === query ? remote.items : []) {
-        const t = r.text || '';
-        const i = t.toLowerCase().indexOf(needle);
-        const html = i < 0 ? escapeHtml(t) : escapeHtml(t.slice(0, i)) + '<mark>' + escapeHtml(t.slice(i, i + query.length)) + '</mark>' + escapeHtml(t.slice(i + query.length));
-        out.push({ kind: 'hit', section: 'In content', path: r.path, line: r.line, html, run: () => openFile(r.path, { line: r.line }) });
-      }
+    const acts = [];
+    for (const a of actionsState.list) {
+      const label = `${a.title}`;
+      const m = fuzzy(query, `${a.title} ${a.id} ${a.category}`);
+      if (!m) continue;
+      const st = actionEnabled(a.id);
+      const mt = fuzzy(query, label);
+      acts.push({
+        kind: 'action', section: 'Actions', label, id: a.id, level: a.level, enabled: st.enabled, reason: st.reason,
+        icon: CATEGORY_ICON[a.category] || 'zap', score: m.score - (st.enabled ? 0 : 30), html: mt ? highlight(label, mt.idx) : escapeHtml(label),
+        run: () => runAction(a.id, {}),
+      });
     }
-    return out;
+    acts.sort((a, b) => b.score - a.score);
+    if (!query) {
+      out.sort((a, b) => b.score - a.score);
+      return cmdMode ? [...out, ...acts] : [...out.slice(0, 16), ...acts.slice(0, 6)];
+    }
+    out.sort((a, b) => b.score - a.score);
+    if (cmdMode) return [...out.slice(0, 10), ...acts.slice(0, 30)];
+    const files = [];
+    for (const f of app.files) {
+      const m = fuzzy(query, f.path);
+      if (m) files.push({ kind: 'file', section: 'Files', path: f.path, tool: f.tool, score: m.score, html: highlight(f.path, m.idx), run: () => openFile(f.path) });
+    }
+    files.sort((a, b) => b.score - a.score);
+    const res = [...files.slice(0, 10), ...out.slice(0, 4), ...acts.slice(0, 5)];
+    const needle = query.toLowerCase();
+    for (const r of remote.q === query ? remote.items : []) {
+      const t = r.text || '';
+      const i = t.toLowerCase().indexOf(needle);
+      const html = i < 0 ? escapeHtml(t) : escapeHtml(t.slice(0, i)) + '<mark>' + escapeHtml(t.slice(i, i + query.length)) + '</mark>' + escapeHtml(t.slice(i + query.length));
+      res.push({ kind: 'hit', section: 'In content', path: r.path, line: r.line, html, run: () => openFile(r.path, { line: r.line }) });
+    }
+    return res;
   });
 
   $effect(() => {
@@ -105,7 +142,7 @@
         bind:this={inputEl}
         bind:value={q}
         {onkeydown}
-        placeholder="Search files, content, commands…"
+        placeholder="Search files, content… or type > for commands & actions"
         aria-label="Search"
         autocomplete="off"
         spellcheck="false"
@@ -128,6 +165,11 @@
               <span class="hit-text">{@html it.html}</span>
               <span class="faint mono small">{it.path}:{it.line}</span>
             </span>
+          {:else if it.kind === 'action'}
+            <Icon name={it.icon} size={15} />
+            <span class="lbl" class:dim={!it.enabled}>{@html it.html} <span class="aid mono">{it.id}</span></span>
+            {#if !it.enabled}<span class="lock" title={it.reason}><Icon name="lock" size={12} /></span>{/if}
+            <span class="lvl {LEVELS[it.level]?.tone}">{LEVELS[it.level]?.label || it.level}</span>
           {:else}
             <Icon name={it.icon} size={15} />
             <span class="lbl">{@html it.html}</span>
@@ -141,6 +183,7 @@
     <div class="foot">
       <span><span class="kbd">↑</span><span class="kbd">↓</span> navigate</span>
       <span><span class="kbd">↵</span> open</span>
+      <span><span class="kbd">&gt;</span> actions</span>
       <span class="spacer"></span>
       <span class="faint">{app.files.length} files indexed</span>
     </div>
@@ -188,6 +231,14 @@
   .hit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .small { font-size: 11px; }
   .it :global(mark) { background: transparent; color: var(--accent); font-weight: 700; }
+  .dim { opacity: 0.55; }
+  .aid { font-size: 11px; color: var(--text-3); margin-left: 6px; }
+  .lock { color: var(--text-3); display: grid; }
+  .lvl { font-size: 10px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: var(--panel-active); color: var(--text-3); }
+  .lvl.accent { background: var(--accent-soft); color: var(--accent); }
+  .lvl.warn { background: var(--warn-soft); color: var(--warn); }
+  .lvl.err { background: var(--err-soft); color: var(--err); }
+  .lvl.info { background: var(--info-soft); color: var(--info); }
   .none { padding: 30px; text-align: center; color: var(--text-3); }
   .foot { display: flex; align-items: center; gap: 14px; padding: 9px 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text-3); }
   .foot span { display: inline-flex; gap: 4px; align-items: center; }

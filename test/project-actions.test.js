@@ -101,7 +101,7 @@ test('outdated/audit parsers and cache + routes', async () => {
   }
   const router = createRouter();
   await projectRoutes(router, { root, allFiles: () => [], git: null });
-  const call = async (p, q = {}) => router.match('GET', p).fn({ q });
+  const call = async (p, q = {}) => router.match('GET', p).fn({ q: new URLSearchParams(q) });
   const out = await call('/api/project/outdated');
   assert.equal(out.managers.npm.items[0].name, 'lodash');
   const p = await call('/api/project');

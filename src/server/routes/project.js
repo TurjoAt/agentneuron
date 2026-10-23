@@ -16,14 +16,14 @@ async function cached(key, sigFn, fn) {
 export default async function register(router, ctx) {
   const root = ctx.root;
   // Detection result's own cache keys on manifest mtimes; use its stats-free identity as signature.
-  const proj = (q) => detectProject(root, { refresh: q?.refresh === '1' });
+  const proj = (q) => detectProject(root, { refresh: q?.get?.('refresh') === '1' });
   const sigOf = async () => { const p = await detectProject(root); return p.framework?.laravel ? JSON.stringify(p.framework.laravel) : 'none'; };
 
   router.get('/api/project', async ({ q }) => proj(q));
   router.get('/api/project/stats', async ({ q }) => (await proj(q)).stats);
 
   router.get('/api/project/deps', async ({ q }) => {
-    const manager = q.manager || null;
+    const manager = q.get('manager') || null;
     if (manager && !MANAGERS.includes(manager) && !['go', 'cargo', 'bundler', 'maven', 'gradle', 'nuget', 'deno', 'uv'].includes(manager)) throw new HttpError(400, 'invalid manager');
     const p = await proj();
     const outdated = await readOutdatedCache(root);

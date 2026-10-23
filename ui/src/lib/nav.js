@@ -9,8 +9,8 @@ export const VIEWS = [
   { id: 'tasks', label: 'Tasks', icon: 'tasks' },
   { id: 'git', label: 'Git', icon: 'git' },
   { id: 'agents', label: 'Agents', icon: 'agents' },
-  { id: 'project', label: 'Project', icon: 'project' },
-  { id: 'reports', label: 'Reports', icon: 'reports' },
+  { id: 'project', label: 'Project', icon: 'layers' },
+  { id: 'reports', label: 'Reports', icon: 'activity' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 

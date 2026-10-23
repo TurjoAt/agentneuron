@@ -43,6 +43,11 @@ class AppState {
   unread = $state(0);
   /** bumped on SSE `board` */
   boardTick = $state(0);
+  /** bumped when annotations change (SSE files {changed:'annotations'}) */
+  annotTick = $state(0);
+  /** global find & replace panel / sidebar sections */
+  sideRecentOpen = $state(loadLocal('mdctl.side.recent', true));
+  sidePinnedOpen = $state(loadLocal('mdctl.side.pinned', true));
   /** pinned files (bookmarks) [{ path, label? }] */
   bookmarks = $state.raw([]);
   /** recently opened files (newest first) */
@@ -326,9 +331,14 @@ function onStreamEvent(name, data) {
   if (name === 'notify' && data) pushNotification(data);
   else if (name === 'board') app.boardTick++;
   else if (name === 'files') {
-    loadFiles().catch(() => {});
-    app.dataTick++;
-    app.graphTick++;
+    const what = data?.changed;
+    if (what === 'bookmarks') loadBookmarks();
+    else if (what === 'annotations') app.annotTick++;
+    else {
+      loadFiles().catch(() => {});
+      app.dataTick++;
+      app.graphTick++;
+    }
   }
   if (name === 'event') applyEvent(data);
   else if (name === 'health' && data) {
@@ -376,7 +386,9 @@ export function reconnect() {
 /** GET /api/auth/me; tolerate older servers without the route. */
 async function loadMe() {
   try {
-    app.me = await api('/api/auth/me');
+    const me = await api('/api/auth/me');
+    if (me && !me.role && me.tokenRequired) throw Object.assign(new Error('unauthorized'), { status: 401 });
+    app.me = me;
   } catch (e) {
     if (e.status === 401 || e.status === 403) throw e;
     // v0.1 server: no auth routes → derive from /api/state
@@ -436,9 +448,6 @@ export async function boot(again = false) {
     }
   }
   try {
-    if (app.mock && new URLSearchParams(location.search).has('login') && !again) {
-      throw Object.assign(new Error('login'), { status: 401 });
-    }
     await loadState();
   } catch (e) {
     if (e.status === 401 || e.status === 403) {
