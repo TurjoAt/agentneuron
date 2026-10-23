@@ -15,7 +15,14 @@ before(async () => {
   srv = await startServer(loadConfig(root, { port: 0, token: VIEW, adminToken: ADMIN }));
   base = `http://127.0.0.1:${srv.port}`;
 });
-after(async () => { await srv.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); });
+after(async () => { await srv.close(); rmTemp(root); });
+
+// Windows can keep directory handles (file watcher, exiting git children) open briefly after
+// an in-process close(); a locked temp dir there is left for the OS instead of failing the run.
+function rmTemp(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  catch (e) { if (process.platform !== 'win32' || !['EBUSY', 'EPERM'].includes(e.code)) throw e; }
+}
 
 const jpost = (p, body, headers = {}) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 async function login(token) {
