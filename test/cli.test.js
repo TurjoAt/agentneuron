@@ -46,7 +46,7 @@ test('status prints summary; init creates .agentneuron/config.json', () => {
   assert.ok(fs.existsSync(path.join(d, '.agentneuron/config.json')));
 });
 
-test('start prints URL banner and stops on SIGINT', async () => {
+test('start prints URL banner and stops on SIGINT', { skip: process.platform === 'win32' && 'Windows cannot deliver SIGINT to a child process' }, async () => {
   const d = tmp();
   fs.writeFileSync(path.join(d, 'CLAUDE.md'), '# hi\n');
   const p = spawn(process.execPath, [cli, 'start', d, '--port', '0', '--token', 'tk'], { stdio: ['ignore', 'pipe', 'pipe'] });

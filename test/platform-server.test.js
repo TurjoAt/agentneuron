@@ -15,7 +15,7 @@ before(async () => {
   srv = await startServer(loadConfig(root, { port: 0, token: VIEW, adminToken: ADMIN }));
   base = `http://127.0.0.1:${srv.port}`;
 });
-after(async () => { await srv.close(); fs.rmSync(root, { recursive: true, force: true }); });
+after(async () => { await srv.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); });
 
 const jpost = (p, body, headers = {}) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 async function login(token) {

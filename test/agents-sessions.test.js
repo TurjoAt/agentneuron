@@ -32,7 +32,8 @@ function transcript(root, sid, { start = T0, edit = 'CLAUDE.md' } = {}) {
 }
 
 test('projectDirName replaces every non-alphanumeric char', () => {
-  assert.equal(projectDirName('/opt/a-b/c.d_e'), '-opt-a-b-c-d-e');
+  if (process.platform === 'win32') assert.match(projectDirName('/opt/a-b/c.d_e'), /^[A-Za-z]--opt-a-b-c-d-e$/);
+  else assert.equal(projectDirName('/opt/a-b/c.d_e'), '-opt-a-b-c-d-e');
 });
 
 test('list: stats, title, relative files, outside-root dropped', async () => {

@@ -24,7 +24,7 @@ function mkWs() {
 
 test('findProjects: depth <= 2, skips ignores and non-projects', () => {
   const r = mkWs();
-  const names = findProjects(r).map((p) => path.relative(r, p)).sort();
+  const names = findProjects(r).map((p) => path.relative(r, p).split(path.sep).join('/')).sort();
   assert.deepEqual(names, ['group/nested', 'proj-a', 'proj-b']);
 });
 

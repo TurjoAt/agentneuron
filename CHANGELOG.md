@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 From monitor to control center. Everything that changes anything is opt-in and off by default.
 
+### Fixed
+
+- Terminal action on Windows: backslashes in paths such as `C:\Program Files\nodejs\node.exe` are no longer treated as escape characters.
+- Test suite runs on Windows; CI builds on Node 20.19+/22 (required by the UI build tools) and smoke-tests the bundle on Node 18.
+
 ### Changed
 
 - **Renamed from `mdctl` to AgentNeuron.** The npm package and command are now `agentneuron`; the data folder is `.agentneuron/`. An existing `.mdctl/` folder is moved to `.agentneuron/` automatically on first run, keeping history and config. The bundle is `agentneuron.mjs`.

@@ -21,7 +21,7 @@ before(async () => {
   srv = await startServer(config);
   base = `http://127.0.0.1:${srv.port}`;
 });
-after(async () => { await srv.close(); fs.rmSync(root, { recursive: true, force: true }); });
+after(async () => { await srv.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); });
 
 const get = async (p, extra = '') => {
   const r = await fetch(`${base}${p}${p.includes('?') ? '&' : '?'}token=${TOKEN}${extra}`);

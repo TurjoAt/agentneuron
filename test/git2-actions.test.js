@@ -13,7 +13,7 @@ const w = (d, f, c) => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive
 
 function setup() {
   const d = tmp();
-  sh(d, 'init', '-q', '-b', 'main'); sh(d, 'config', 'user.name', 't'); sh(d, 'config', 'user.email', 't@t');
+  sh(d, 'init', '-q', '-b', 'main'); sh(d, 'config', 'core.autocrlf', 'false'); sh(d, 'config', 'user.name', 't'); sh(d, 'config', 'user.email', 't@t');
   w(d, 'a.md', 'a\n'); sh(d, 'add', '-A'); sh(d, 'commit', '-q', '-m', 'init');
   const defs = new Map();
   const registry = { register: (x) => defs.set(x.id, x) };

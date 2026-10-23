@@ -2,17 +2,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Simple shell-words split (quotes + backslash escapes). Never passed to a shell. */
-export function splitWords(line) {
+/**
+ * Simple shell-words split (quotes + backslash escapes). Never passed to a shell.
+ * On Windows a backslash is a path separator, so it only escapes a following quote.
+ */
+export function splitWords(line, { windows = process.platform === 'win32' } = {}) {
   const out = []; let cur = ''; let q = null; let has = false;
+  const escapes = (next) => !windows || next === '"';
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (q) {
       if (c === q) q = null;
-      else if (c === '\\' && q === '"' && i + 1 < line.length) cur += line[++i];
+      else if (c === '\\' && q === '"' && i + 1 < line.length && escapes(line[i + 1])) cur += line[++i];
       else cur += c;
     } else if (c === '"' || c === "'") { q = c; has = true; }
-    else if (c === '\\' && i + 1 < line.length) { cur += line[++i]; has = true; }
+    else if (c === '\\' && i + 1 < line.length && escapes(line[i + 1])) { cur += line[++i]; has = true; }
     else if (/\s/.test(c)) { if (cur || has) out.push(cur); cur = ''; has = false; }
     else cur += c;
   }
