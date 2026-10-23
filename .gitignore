@@ -16,3 +16,4 @@ npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea/
+test-results.tap
