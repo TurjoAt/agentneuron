@@ -1,0 +1,58 @@
+{
+  "patterns": [
+    { "glob": "**/CLAUDE.md", "tool": "claude", "kind": "context", "description": "Claude Code project memory / instructions" },
+    { "glob": "**/CLAUDE.local.md", "tool": "claude", "kind": "context", "description": "Personal (gitignored) Claude Code instructions" },
+    { "glob": "**/.claude/agents/**/*.md", "tool": "claude", "kind": "agent", "description": "Claude Code subagent definition" },
+    { "glob": "**/.claude/skills/**/SKILL.md", "tool": "claude", "kind": "skill", "description": "Claude Code skill entry point" },
+    { "glob": "**/.claude/skills/**/*.md", "tool": "claude", "kind": "skill", "description": "Claude Code skill resource" },
+    { "glob": "**/.claude/commands/**/*.md", "tool": "claude", "kind": "command", "description": "Claude Code slash command" },
+    { "glob": "**/.claude/rules/**/*.md", "tool": "claude", "kind": "rules", "description": "Claude Code modular rules" },
+    { "glob": "**/.claude/settings*.json", "tool": "claude", "kind": "config", "description": "Claude Code settings (permissions, hooks)" },
+    { "glob": "**/.claude/**/*.md", "tool": "claude", "kind": "doc", "description": "Other Claude Code markdown" },
+    { "glob": "**/.mcp.json", "tool": "claude", "kind": "config", "description": "MCP server configuration" },
+
+    { "glob": "**/AGENTS.md", "tool": "codex", "kind": "context", "description": "Codex / generic agent instructions" },
+    { "glob": "**/AGENTS.override.md", "tool": "codex", "kind": "context", "description": "Codex instruction override" },
+    { "glob": "**/codex.md", "tool": "codex", "kind": "context", "description": "Legacy Codex instructions" },
+    { "glob": "**/.codex/**/*.md", "tool": "codex", "kind": "context", "description": "Codex markdown files" },
+    { "glob": "**/.codex/**/*.{toml,json}", "tool": "codex", "kind": "config", "description": "Codex configuration" },
+
+    { "glob": "**/.cursorrules", "tool": "cursor", "kind": "rules", "description": "Legacy Cursor rules" },
+    { "glob": "**/.cursor/rules/**/*.{mdc,md}", "tool": "cursor", "kind": "rules", "description": "Cursor project rules" },
+    { "glob": "**/.cursor/mcp.json", "tool": "cursor", "kind": "config", "description": "Cursor MCP configuration" },
+
+    { "glob": ".github/copilot-instructions.md", "tool": "copilot", "kind": "context", "description": "Copilot repository instructions" },
+    { "glob": ".github/instructions/**/*.instructions.md", "tool": "copilot", "kind": "rules", "description": "Copilot path-specific instructions" },
+    { "glob": ".github/prompts/*.prompt.md", "tool": "copilot", "kind": "command", "description": "Copilot prompt file" },
+    { "glob": ".github/chatmodes/*.chatmode.md", "tool": "copilot", "kind": "agent", "description": "Copilot chat mode" },
+
+    { "glob": "**/.windsurfrules", "tool": "windsurf", "kind": "rules", "description": "Legacy Windsurf rules" },
+    { "glob": "**/.windsurf/rules/**", "tool": "windsurf", "kind": "rules", "description": "Windsurf rules" },
+    { "glob": "**/.windsurf/workflows/**", "tool": "windsurf", "kind": "command", "description": "Windsurf workflows" },
+
+    { "glob": "**/GEMINI.md", "tool": "gemini", "kind": "context", "description": "Gemini CLI context" },
+    { "glob": "**/.gemini/**/*.md", "tool": "gemini", "kind": "context", "description": "Gemini markdown files" },
+    { "glob": "**/.gemini/**/*.{json,toml}", "tool": "gemini", "kind": "config", "description": "Gemini configuration" },
+
+    { "glob": "**/README{,.*}.md", "tool": "generic", "kind": "readme", "description": "Readme" },
+    { "glob": "**/TODO*.md", "tool": "generic", "kind": "todo", "description": "Todo list" },
+    { "glob": "**/ROADMAP*.md", "tool": "generic", "kind": "plan", "description": "Roadmap" },
+    { "glob": "**/PLAN*.md", "tool": "generic", "kind": "plan", "description": "Plan" },
+    { "glob": "**/DECISIONS*.md", "tool": "generic", "kind": "decision", "description": "Decision log" },
+    { "glob": "**/adr/**/*.md", "tool": "generic", "kind": "decision", "description": "Architecture decision record" },
+    { "glob": "**/adrs/**/*.md", "tool": "generic", "kind": "decision", "description": "Architecture decision record" },
+    { "glob": "**/CHANGELOG*.md", "tool": "generic", "kind": "changelog", "description": "Changelog" },
+    { "glob": "**/memory/**/*.md", "tool": "generic", "kind": "memory", "description": "Agent memory files" },
+    { "glob": "**/MEMORY.md", "tool": "generic", "kind": "memory", "description": "Agent memory index" },
+    { "glob": "docs/**/*.{md,mdx}", "tool": "generic", "kind": "doc", "description": "Documentation" }
+  ],
+  "docKinds": [
+    { "regex": "(^|/)readme([._-][^/]*)?\\.md$", "kind": "readme" },
+    { "regex": "(^|/)(changelog|changes|history|release[-_]?notes)[^/]*\\.md$", "kind": "changelog" },
+    { "regex": "(^|/)(todo|tasks?|backlog)[^/]*\\.md$", "kind": "todo" },
+    { "regex": "(^|/)(decisions?|adrs?)([/._-]|$)", "kind": "decision" },
+    { "regex": "(^|/)(plan|roadmap|spec|design|milestones?)[^/]*\\.md$", "kind": "plan" },
+    { "regex": "(^|/)(memory|notes)([/._-]|$)", "kind": "memory" },
+    { "regex": "(^|/)(docs?|documentation)/", "kind": "doc" }
+  ]
+}

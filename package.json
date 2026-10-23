@@ -1,0 +1,31 @@
+{
+  "name": "mdctl",
+  "version": "0.1.0",
+  "description": "Live monitor for AI-context markdown (CLAUDE.md, AGENTS.md, Cursor rules, skills, docs) with git, history, link graph and health checks.",
+  "type": "module",
+  "bin": {
+    "mdctl": "dist/mdctl.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "node src/cli.js start",
+    "ui:dev": "vite --config ui/vite.config.js",
+    "ui:build": "vite build --config ui/vite.config.js",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "chokidar": "^4.0.3",
+    "d3-force": "^3.0.0",
+    "esbuild": "^0.28.2",
+    "svelte": "^5.57.2",
+    "vite": "^8.3.5"
+  }
+}
