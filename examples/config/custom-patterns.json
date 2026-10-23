@@ -1,0 +1,11 @@
+{
+  "ignore": ["vendor-docs", "**/*.generated.md", "packages/*/CHANGELOG.md"],
+  "extraPatterns": [
+    { "glob": "prompts/**/*.md", "tool": "generic", "kind": "doc", "description": "Prompt library" },
+    { "glob": ".ai/rules.md", "tool": "claude", "kind": "rules", "description": "Shared team rules" }
+  ],
+  "includeAllMarkdown": false,
+  "pricing": {
+    "sonnet": { "input": 3, "output": 15, "cacheRead": 0.3, "cacheWrite": 3.75 }
+  }
+}

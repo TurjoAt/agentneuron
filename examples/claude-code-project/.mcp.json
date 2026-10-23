@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agentneuron": {
+      "command": "npx",
+      "args": ["-y", "agentneuron", "mcp", "."]
+    }
+  }
+}

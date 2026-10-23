@@ -1,0 +1,6 @@
+React + TypeScript single-page app (Orbit Dashboard).
+
+- Use TypeScript strict mode. No `any` without a comment explaining why.
+- Use 2 spaces for indentation.
+- Components live in `src/components/`, one folder per component.
+- See @docs/accessibility.md for the accessibility checklist.

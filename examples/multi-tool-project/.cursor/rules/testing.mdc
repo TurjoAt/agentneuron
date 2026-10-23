@@ -1,0 +1,8 @@
+---
+description: Testing rules for hooks and components
+globs: src/**/*.test.tsx
+alwaysApply: false
+---
+
+- Write a test for every new hook.
+- Use Testing Library queries by role, not by test id.

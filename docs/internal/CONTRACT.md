@@ -1,6 +1,6 @@
 # agentneuron — Module & API Contract (source of truth for all agents)
 
-Read `docs/VISION.md` for the why. This file is the **how**. Do not change a
+Read `docs/internal/VISION.md` for the why. This file is the **how**. Do not change a
 signature here without telling the lead (it breaks other agents' work).
 
 ## Ground rules

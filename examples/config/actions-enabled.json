@@ -1,0 +1,7 @@
+{
+  "port": 4747,
+  "host": "127.0.0.1",
+  "actions": { "edit": true, "exec": true, "danger": false, "terminal": false },
+  "historyLimitPerFile": 500,
+  "maxFileSize": 2097152
+}

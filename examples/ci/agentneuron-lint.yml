@@ -1,0 +1,57 @@
+# Fail pull requests when AI-context files have errors
+# (broken links or @imports, oversized context files, committed secrets).
+# Copy to .github/workflows/agentneuron-lint.yml
+name: AgentNeuron lint
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "**/*.mdc"
+      - ".claude/**"
+      - ".cursor/**"
+      - ".github/copilot-instructions.md"
+      - ".windsurfrules"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Exits 1 if any issue has severity "error". Warnings and info do not fail the job.
+      # Pin the version you tested; bump it deliberately.
+      - name: Lint AI context
+        run: npx --yes agentneuron@0.2.0 lint --json . > agentneuron-report.json
+
+      # Runs even when the lint step failed, so reviewers can read the report.
+      - name: Summarize
+        if: always()
+        run: |
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("agentneuron-report.json","utf8"));
+            const lines = [`### AgentNeuron: score ${r.health.score} (${r.health.grade})`, "",
+              `${r.files} files, ${r.health.counts.error} errors, ${r.health.counts.warn} warnings, ${r.health.counts.info} info`, ""];
+            for (const i of r.issues.filter(i => i.severity === "error"))
+              lines.push(`- **${i.rule}** \`${i.path}${i.line ? ":" + i.line : ""}\` ${i.message}`);
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentneuron-report
+          path: agentneuron-report.json

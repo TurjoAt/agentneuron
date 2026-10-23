@@ -1,0 +1,16 @@
+{
+  "port": 4747,
+  "notifications": {
+    "browser": true,
+    "webhooks": [
+      {
+        "url": "https://hooks.slack.com/services/REPLACE/WITH/YOURWEBHOOK",
+        "events": ["secret", "health-drop", "job-failed"]
+      },
+      {
+        "url": "https://discord.com/api/webhooks/000000000000000000/REPLACE_WITH_WEBHOOK_TOKEN",
+        "events": ["conflict", "job-done", "job-failed"]
+      }
+    ]
+  }
+}

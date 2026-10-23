@@ -1,6 +1,6 @@
 # agentneuron v0.2 — Contract (binding for all agents)
 
-Read first: `docs/PLAN-v0.2.md` (what & why), `docs/CONTRACT.md` (v0.1 types, rules —
+Read first: `docs/internal/PLAN-v0.2.md` (what & why), `docs/internal/CONTRACT.md` (v0.1 types, rules —
 still valid), `README.md`. v0.1 code is committed (`git log`). Do not break v0.1
 endpoints the UI uses today.
 

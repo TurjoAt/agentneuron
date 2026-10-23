@@ -1,0 +1,22 @@
+# Caddy terminates TLS (certificates are obtained automatically) and proxies to AgentNeuron on loopback.
+# AgentNeuron: agentneuron /srv/myapp --host 127.0.0.1 --port 4747 with tokens set.
+agentneuron.example.com {
+	encode zstd gzip
+
+	# Optional extra layer: HTTP basic auth in front of the token login.
+	# Generate the hash with: caddy hash-password
+	# basicauth {
+	#	team JDJhJDE0JFJFUExBQ0VfV0lUSF9ZT1VSX0hBU0g
+	# }
+
+	reverse_proxy 127.0.0.1:4747 {
+		# Do not buffer: /api/stream is Server-Sent Events
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+}

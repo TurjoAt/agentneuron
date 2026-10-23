@@ -1,0 +1,7 @@
+{
+  "port": 4747,
+  "host": "127.0.0.1",
+  "adminToken": "REPLACE_WITH_A_DIFFERENT_openssl_rand_hex_24",
+  "token": "REPLACE_WITH_OUTPUT_OF_openssl_rand_hex_24",
+  "actions": { "edit": true, "exec": false, "danger": false, "terminal": false }
+}

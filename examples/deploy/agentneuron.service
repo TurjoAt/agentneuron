@@ -1,0 +1,33 @@
+# /etc/systemd/system/agentneuron.service
+#
+# Runs AgentNeuron for one project as an unprivileged user, on loopback only.
+# Put a reverse proxy (Caddyfile / nginx.conf in this folder) or an SSH tunnel in front of it.
+#
+# Tokens: put them in /srv/myapp/.agentneuron/config.json (owned by the service user, chmod 600)
+# rather than on the command line, where `ps` would show them to other users:
+#   { "host": "127.0.0.1", "port": 4747, "adminToken": "<openssl rand -hex 24>", "token": "<another>" }
+[Unit]
+Description=AgentNeuron for /srv/myapp
+After=network.target
+
+[Service]
+Type=simple
+User=agentneuron
+Group=agentneuron
+WorkingDirectory=/srv/myapp
+ExecStart=/usr/bin/node /opt/agentneuron/agentneuron.mjs /srv/myapp
+Restart=on-failure
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+# Read-only monitoring: AgentNeuron writes only its own data folder.
+ReadWritePaths=/srv/myapp/.agentneuron
+# If you enable the "edit" level, the project itself must be writable too:
+# ReadWritePaths=/srv/myapp
+
+[Install]
+WantedBy=multi-user.target

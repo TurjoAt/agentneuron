@@ -1,0 +1,6 @@
+---
+description: Always-on project overview
+alwaysApply: true
+---
+
+Orbit Dashboard is a React + TypeScript single-page app. Use 2 spaces for indentation. Components live in `src/components/`, one folder per component.
