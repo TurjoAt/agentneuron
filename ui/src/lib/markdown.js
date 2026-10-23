@@ -40,6 +40,16 @@ export function renderMarkdown(src, opts = {}) {
     byBasename: opts.byBasename || (() => null),
     href: opts.href || ((p, a) => `#/files?path=${encodeURIComponent(p)}${a ? `&anchor=${encodeURIComponent(a)}` : ''}`),
     slugs: new Map(),
+    linkPaths: opts.linkPaths !== false,
+  };
+  ctx.find = (t) => {
+    const clean = String(t).trim().replace(/^\.\//, '');
+    if (!clean || /\s/.test(clean) || clean.length > 200) return null;
+    const rel = resolvePath(ctx.dir, clean);
+    if (ctx.exists(rel)) return rel;
+    const root = resolvePath('', clean);
+    if (ctx.exists(root)) return root;
+    return null;
   };
   const lines = String(src ?? '').replace(/\u0000/g, '').replace(/\r\n?/g, '\n').split('\n');
   let start = 0;
@@ -261,9 +271,9 @@ function list(lines, i, off, ctx) {
       i++;
     }
     let task = null;
-    const tm = body[0].match(/^\[( |x|X)\]\s+/);
+    const tm = body[0].match(/^\[( |x|X|\/)\]\s+/);
     if (tm) {
-      task = tm[1] !== ' ';
+      task = tm[1] === '/' ? 'doing' : tm[1] !== ' ';
       body[0] = body[0].slice(tm[0].length);
       hasTasks = true;
     }
@@ -276,7 +286,7 @@ function list(lines, i, off, ctx) {
     items.push(
       task === null
         ? `<li data-line="${lineNo}">${html}</li>`
-        : `<li class="md-task${task ? ' done' : ''}" data-line="${lineNo}"><span class="md-check" aria-hidden="true">${task ? '<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg>' : ''}</span><span class="md-task-body">${html}</span></li>`
+        : `<li class="md-task${task === 'doing' ? ' doing' : task ? ' done' : ''}" data-line="${lineNo}"><span class="md-check" aria-hidden="true">${task === 'doing' ? '<i></i>' : task ? '<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg>' : ''}</span><span class="md-task-body">${html}</span></li>`
     );
     // skip blank lines between sibling items
     let j = i;
@@ -322,7 +332,13 @@ export function inline(text, ctx) {
   // escaped chars
   t = t.replace(/\\([\\`*_{}[\]()#+\-.!|~@<>])/g, (_, c) => put(esc(c)));
   // code spans
-  t = t.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, (_, _t, c) => put(`<code>${esc(c.trim())}</code>`));
+  t = t.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, (_, _t, c) => {
+    const code = c.trim();
+    const target = ctx.linkPaths && /[./]/.test(code) ? ctx.find(code) : null;
+    return put(target
+      ? `<a href="${esc(ctx.href(target))}" class="md-int md-codelink" data-path="${esc(target)}"><code>${esc(code)}</code></a>`
+      : `<code>${esc(code)}</code>`);
+  });
   // images → safe chip (never load remote images)
   t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (_, alt, url) =>
     put(`<span class="md-img" title="${esc(url)}">${esc(alt || basename(url))}</span>`)
@@ -346,6 +362,13 @@ export function inline(text, ctx) {
     if (!ctx.exists(target)) return pre + put(`<span class="md-import md-broken" title="Unresolved import">@${esc(p)}</span>`);
     return pre + put(`<a href="${esc(ctx.href(target))}" class="md-int md-import" data-path="${esc(target)}">@${esc(p)}</a>`);
   });
+  // plain path mentions of existing files (docs/plan.md, ./README.md)
+  if (ctx.linkPaths) {
+    t = t.replace(/(^|[\s(,;:])((?:\.{1,2}\/)?(?:[\w@.-]+\/)*[\w@-][\w@.-]*\.(?:md|mdc|markdown|mdx|json|toml|ya?ml|txt))(?=$|[\s),;:!?]|\.(?:\s|$))/g, (m, pre, p) => {
+      const target = ctx.find(p);
+      return target ? pre + put(`<a href="${esc(ctx.href(target))}" class="md-int md-path" data-path="${esc(target)}">${esc(p)}</a>`) : m;
+    });
+  }
   t = esc(t);
   t = t
     .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>')

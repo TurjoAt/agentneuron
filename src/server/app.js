@@ -18,8 +18,15 @@ import { createSessions } from '../agents/sessions.js';
 import { createConflictRadar } from '../agents/conflicts.js';
 import { createRouter, HttpError } from './router.js';
 import { registerAll } from './routes/index.js';
+import { VERSION } from './version.js';
+import { createRegistry } from '../actions/registry.js';
+import { registerActions } from '../actions/index.js';
+import { createPersist } from '../persist/index.js';
+import { createNotifier } from '../notify/index.js';
 
-export const VERSION = globalThis.__MDCTL_VERSION__ || '0.1.0';
+export { VERSION };
+const SESSION_COOKIE = 'mdctl_session';
+const SESSION_TTL = 7 * 24 * 3600 * 1000;
 
 const FALLBACK_HTML = `<!doctype html><meta charset="utf-8"><title>mdctl</title>
 <body style="font:15px system-ui;background:#0b0d12;color:#dde;padding:2rem">
@@ -132,6 +139,7 @@ export async function startServer(config) {
         const a = await analysis();
         broadcast('health', { score: a.health.score, grade: a.health.grade, counts: a.health.counts });
         broadcast('graph', { changed: true });
+        try { afterAnalysis(a); } catch (e) { warn('afterAnalysis', e); }
       } catch (e) { warn('recompute', e); }
     }, 300);
     recomputeTimer.unref?.();
@@ -142,13 +150,17 @@ export async function startServer(config) {
   store.on('event', (ev) => {
     scheduleRecompute();
     repo.ts = 0;
-    if (ev.type === 'unlink') { broadcast('event', ev); return; }
+    if (ev.type === 'unlink') { ctx.persist.events.append(ev); broadcast('event', ev); return; }
     // attribute best-effort, short timeout, then broadcast
     withTimeout(sessions.attribute(ev.path, ev.ts), 400, null).then((agent) => {
       if (agent) {
         ev.agent = agent;
-        try { radar.note(ev); const act = radar.active(); if (act.length) broadcast('conflict', act); } catch (e) { warn('radar', e); }
+        try {
+          radar.note(ev); const act = radar.active();
+          if (act.length) { broadcast('conflict', act); notifyConflicts(act); }
+        } catch (e) { warn('radar', e); }
       }
+      ctx.persist.events.append(ev);
       broadcast('event', ev);
     });
   });
@@ -176,12 +188,87 @@ export async function startServer(config) {
     return p;
   }
 
-  function authOk(req, url) {
-    if (!config.token) return true;
+  // ---- auth: cookie session OR ?token= OR Bearer ----------------------
+  const tokenRequired = () => !!(config.token || config.adminToken);
+  const sessionsMap = new Map(); // sid -> { role, exp }
+  const failures = new Map(); // ip -> { n, until }
+  const eq = (given, want) => {
+    if (!want) return false;
+    const a = Buffer.from(String(given)), b = Buffer.from(String(want));
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  };
+  /** Role for a token value, or null. */
+  function roleForToken(given) {
+    if (!given) return null;
+    if (config.adminToken) {
+      if (eq(given, config.adminToken)) return 'admin';
+      if (config.token && eq(given, config.token)) return 'viewer';
+      return null;
+    }
+    return eq(given, config.token) ? 'admin' : null;
+  }
+  function parseCookies(req) {
+    const out = {};
+    for (const part of String(req.headers.cookie || '').split(';')) {
+      const i = part.indexOf('='); if (i < 0) continue;
+      out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+    }
+    return out;
+  }
+  function sessionRole(req) {
+    const sid = parseCookies(req)[SESSION_COOKIE];
+    const s = sid && sessionsMap.get(sid);
+    if (!s) return null;
+    if (s.exp < Date.now()) { sessionsMap.delete(sid); return null; }
+    return s.role;
+  }
+  /** -> { role, via } or null when unauthenticated. */
+  function authenticate(req, url) {
+    if (!tokenRequired()) return { role: 'admin', via: 'none' };
     const h = req.headers.authorization || '';
     const given = url.searchParams.get('token') || (h.startsWith('Bearer ') ? h.slice(7) : '');
-    const a = Buffer.from(given), b = Buffer.from(String(config.token));
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (given) { const r = roleForToken(given); if (r) return { role: r, via: 'token' }; return null; }
+    const r = sessionRole(req);
+    return r ? { role: r, via: 'cookie' } : null;
+  }
+  const cookieHeader = (sid, maxAge) =>
+    `${SESSION_COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+  function levelsFor(role) {
+    const l = { read: true, state: ctx.can('state', role), edit: ctx.can('edit', role), exec: ctx.can('exec', role), danger: ctx.can('danger', role), terminal: ctx.can('terminal', role) };
+    return l;
+  }
+  async function handleAuth(req, res, url) {
+    const p = url.pathname;
+    if (p === '/api/auth/me' && req.method === 'GET') {
+      const a = authenticate(req, url);
+      const role = a ? a.role : null;
+      return json(res, 200, { role, levels: role ? levelsFor(role) : { read: false, state: false, edit: false, exec: false, danger: false, terminal: false }, tokenRequired: tokenRequired() });
+    }
+    if (p === '/api/auth/login' && req.method === 'POST') {
+      const ip = req.socket.remoteAddress || '?';
+      const f = failures.get(ip);
+      if (f && f.until > Date.now()) return bad(res, 429, 'too many attempts, try again later');
+      let body; try { body = await readBody(req); } catch { return bad(res, 400, 'bad body'); }
+      const role = tokenRequired() ? roleForToken(typeof body.token === 'string' ? body.token : '') : 'admin';
+      if (!role) {
+        const n = (f?.n || 0) + 1;
+        failures.set(ip, { n, until: n >= 5 ? Date.now() + 30000 : 0 });
+        ctx.persist.audit.log({ role: null, ip, route: 'POST /api/auth/login', status: 401 });
+        return bad(res, 401, 'invalid token');
+      }
+      failures.delete(ip);
+      const sid = crypto.randomBytes(24).toString('hex');
+      sessionsMap.set(sid, { role, exp: Date.now() + SESSION_TTL });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': cookieHeader(sid, SESSION_TTL / 1000) });
+      return res.end(JSON.stringify({ role, levels: levelsFor(role), tokenRequired: tokenRequired() }));
+    }
+    if (p === '/api/auth/logout' && req.method === 'POST') {
+      const sid = parseCookies(req)[SESSION_COOKIE];
+      if (sid) sessionsMap.delete(sid);
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'set-cookie': cookieHeader('', 0) });
+      return res.end('{"ok":true}');
+    }
+    return bad(res, 404, 'unknown endpoint');
   }
 
   async function countsState() {
@@ -204,7 +291,8 @@ export async function startServer(config) {
       counts: { files: files.length, tokens, byTool, byKind },
       health: { score: a.health.score, grade: a.health.grade, counts: a.health.counts },
       git: { available: a.gitAvail, branch, dirty: dirtyN },
-      allowWrite: !!config.allowWrite,
+      allowWrite: !!(config.actions && config.actions.edit),
+      actions: { ...config.actions },
     };
   }
 
@@ -232,26 +320,71 @@ export async function startServer(config) {
   }
 
   // ---- plugin routes (src/server/routes/*) ------------------------------
-  const LEVELS = ['read', 'edit', 'exec', 'danger'];
   const router = createRouter();
+  const canLevel = (level, role) => {
+    if (level === 'read') return true;
+    if (role !== 'admin') return false;
+    if (level === 'state') return true;
+    if (!['edit', 'exec', 'danger', 'terminal'].includes(level)) return false;
+    return !!(config.actions && config.actions[level]);
+  };
   const ctx = {
     root, config, store, git, sessions, radar, startedAt,
     analysis, repoInfo, allFiles, broadcast, warn,
     invalidate: scheduleRecompute,
-    /** Is `level` allowed for `role`? Non-read levels must be enabled in config.actions. */
-    can(level, role) {
-      if (level === 'read') return true;
-      if (!LEVELS.includes(level) || role !== 'admin') return false;
-      return !!(config.actions && config.actions[level]);
-    },
+    /** read: always; state: admin; edit/exec/danger/terminal: admin AND config.actions[level]. */
+    can: canLevel,
   };
+  ctx.notify = createNotifier(ctx);
+  ctx.persist = createPersist(ctx);
+  ctx.actions = createRegistry(ctx);
+  await registerActions(ctx.actions, ctx);
   await registerAll(router, ctx);
+
+  // ---- notification triggers -------------------------------------------
+  const seenSecrets = new Set();
+  let secretsPrimed = false;
+  let lastScore = null;
+  const conflictSeen = new Map();
+  function afterAnalysis(a) {
+    ctx.persist.metrics.onHealth(a.health.score);
+    const cur = new Set();
+    for (const i of a.issues) if (i.rule === 'secret') cur.add(i.id);
+    if (secretsPrimed) {
+      for (const i of a.issues) {
+        if (i.rule === 'secret' && !seenSecrets.has(i.id)) {
+          ctx.notify('secret', { title: 'Possible secret in context file', body: `${i.path}${i.line ? ':' + i.line : ''}`, path: i.path });
+        }
+      }
+    }
+    seenSecrets.clear(); for (const id of cur) seenSecrets.add(id);
+    secretsPrimed = true;
+    if (lastScore != null && lastScore - a.health.score >= 10) {
+      ctx.notify('health-drop', { title: `Health dropped to ${a.health.score} (${a.health.grade})`, body: `was ${lastScore}` });
+    }
+    lastScore = a.health.score;
+  }
+  function notifyConflicts(act) {
+    const now = Date.now();
+    for (const c of act) {
+      const key = c.path || JSON.stringify(c);
+      if (now - (conflictSeen.get(key) || 0) < 5 * 60 * 1000) continue;
+      conflictSeen.set(key, now);
+      ctx.notify('conflict', { title: 'Agent conflict', body: c.path || 'multiple agents editing the same file', path: c.path });
+    }
+  }
+  analysis().then((a) => { lastScore = a.health.score; for (const i of a.issues) if (i.rule === 'secret') seenSecrets.add(i.id); secretsPrimed = true; }).catch(() => {});
+  ctx.persist.start();
 
   async function handlePlugin(req, res, url, role) {
     const route = router.match(req.method, url.pathname);
     if (!route) return false;
+    const audited = route.level !== 'read';
+    const ip = req.socket?.remoteAddress || null;
     if (!ctx.can(route.level, role)) {
-      bad(res, 403, `action level "${route.level}" is disabled — enable it in .mdctl/config.json (actions.${route.level}: true)`);
+      const why = route.level === 'state' ? 'requires the admin role' : `action level "${route.level}" is disabled - enable it in .mdctl/config.json (actions.${route.level}: true) or start with --enable ${route.level}`;
+      if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, status: 403 });
+      bad(res, 403, why);
       return true;
     }
     let body = {};
@@ -261,7 +394,10 @@ export async function startServer(config) {
     try {
       const out = await route.fn({ req, res, url, q: url.searchParams, body, ctx, role });
       if (out !== undefined && !res.headersSent) json(res, 200, out);
+      if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, params: req.method === 'GET' ? Object.fromEntries(url.searchParams) : body, status: res.statusCode || 200 });
     } catch (e) {
+      const status = e instanceof HttpError ? e.status : 500;
+      if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, params: req.method === 'GET' ? Object.fromEntries(url.searchParams) : body, status });
       if (res.headersSent) { try { res.end(); } catch {} return true; }
       if (e instanceof HttpError) bad(res, e.status, e.message);
       else { warn('route ' + url.pathname, e); bad(res, 500, String(e.message || e)); }
@@ -303,15 +439,6 @@ export async function startServer(config) {
         const content = store.history.get(p, q.get('id') || '');
         if (content == null) return bad(res, 404, 'not found');
         return json(res, 200, { content });
-      }
-      case '/api/restore': {
-        if (req.method !== 'POST') return bad(res, 405, 'POST only');
-        if (!config.allowWrite) return bad(res, 403, 'writes disabled (start with --write)');
-        let body; try { body = await readBody(req); } catch { return bad(res, 400, 'bad body'); }
-        const p = safePath(body.path);
-        if (!p || !body.id) return bad(res, 400, 'path and id required');
-        try { return json(res, 200, store.history.restore(p, body.id)); }
-        catch (e) { return bad(res, 404, String(e.message || e)); }
       }
       case '/api/events': {
         const since = Number(q.get('since') || 0);
@@ -373,11 +500,20 @@ export async function startServer(config) {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
-      if (!authOk(req, url)) {
-        res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
-        return res.end(JSON.stringify({ error: 'unauthorized' }));
+      if (url.pathname.startsWith('/api/auth/')) return await handleAuth(req, res, url);
+      if (url.pathname.startsWith('/api/')) {
+        const auth = authenticate(req, url);
+        if (!auth) {
+          res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
+          return res.end(JSON.stringify({ error: 'unauthorized' }));
+        }
+        // CSRF guard for cookie sessions: a cross-origin Origin header on writes is refused.
+        if (auth.via === 'cookie' && req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin) {
+          let oh = ''; try { oh = new URL(req.headers.origin).host; } catch { /* bad origin */ }
+          if (oh !== req.headers.host) return bad(res, 403, 'cross-origin request refused');
+        }
+        return await handle(req, res, url, auth.role);
       }
-      if (url.pathname.startsWith('/api/')) return await handle(req, res, url);
       if (req.method !== 'GET' && req.method !== 'HEAD') return bad(res, 405, 'method not allowed');
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       res.end(html);
@@ -394,17 +530,21 @@ export async function startServer(config) {
   const addr = server.address();
   const shown = config.host === '0.0.0.0' || config.host === '::' ? 'localhost' : config.host;
   const base = `http://${shown.includes(':') ? `[${shown}]` : shown}:${addr.port}`;
-  const url = config.token ? `${base}/?token=${config.token}` : `${base}/`;
+  const shareToken = config.adminToken || config.token;
+  const url = shareToken ? `${base}/?token=${shareToken}` : `${base}/`;
+  ctx.url = `${base}/`;
 
   let closed = false;
   async function close() {
     if (closed) return; closed = true;
     clearInterval(ping); clearTimeout(recomputeTimer);
+    try { ctx.actions.cancelAll(); ctx.persist.stop(); } catch {}
+    try { ctx.workspace?.cleanup?.(); } catch {}
     for (const res of clients) { try { res.end(); } catch {} }
     clients.clear();
     try { await watcher.close(); } catch {}
     server.closeAllConnections?.();
     await new Promise((r) => server.close(() => r()));
   }
-  return { url, port: addr.port, token: config.token || null, close, store };
+  return { url, port: addr.port, token: config.token || null, adminToken: config.adminToken || null, close, store, ctx };
 }

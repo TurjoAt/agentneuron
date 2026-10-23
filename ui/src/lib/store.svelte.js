@@ -1,7 +1,7 @@
 // Global reactive app state (Svelte 5 runes) + boot, live stream, routing,
 // theme and toasts.
 
-import { api, connectStream, enableMock, isMock, mockRequested } from './api.js';
+import { api, post, connectStream, enableMock, isMock, mockRequested, urlToken, setToken, stripUrlToken } from './api.js';
 import { parseHash, href } from './nav.js';
 import { basename } from './format.js';
 
@@ -34,6 +34,42 @@ class AppState {
   drawer = $state(null); // { path, line? }
   palette = $state(false);
   toasts = $state([]);
+
+  /** { role, levels: {read,state,edit,exec,danger,terminal}, tokenRequired } */
+  me = $state.raw(null);
+  loginError = $state('');
+  /** notifications from SSE `notify` (newest first) */
+  notifications = $state.raw([]);
+  unread = $state(0);
+  /** bumped on SSE `board` */
+  boardTick = $state(0);
+  /** pinned files (bookmarks) [{ path, label? }] */
+  bookmarks = $state.raw([]);
+  /** recently opened files (newest first) */
+  recent = $state.raw(loadLocal('mdctl.recent', []));
+  /** in-app navigation stack (hashes) for back/forward */
+  navStack = $state.raw([location.hash || '#/overview']);
+  navPos = $state(0);
+  /** global modal: { kind, props } rendered by App (file dialogs etc.) */
+  modal = $state.raw(null);
+  /** dirty editors: path → true (warn before leaving) */
+  dirty = $state.raw({});
+}
+
+function loadLocal(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || 'null');
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+export function saveLocal(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 export const app = new AppState();
@@ -81,10 +117,105 @@ export function openFile(path, opts = {}) {
   navigate('files', { path, line: opts.line, tab: opts.tab });
 }
 
+let navIntent = 0; // -1 back, +1 forward, 0 new
 window.addEventListener('hashchange', () => {
   app.route = parseHash(location.hash);
   app.drawer = null;
+  const h = location.hash || '#/overview';
+  if (navIntent) {
+    app.navPos = Math.max(0, Math.min(app.navStack.length - 1, app.navPos + navIntent));
+    navIntent = 0;
+  } else if (app.navStack[app.navPos] !== h) {
+    // detect browser back/forward to an adjacent entry
+    if (app.navStack[app.navPos - 1] === h) app.navPos--;
+    else if (app.navStack[app.navPos + 1] === h) app.navPos++;
+    else {
+      app.navStack = [...app.navStack.slice(0, app.navPos + 1), h].slice(-100);
+      app.navPos = app.navStack.length - 1;
+    }
+  }
+  trackRecent();
 });
+
+export const canBack = () => app.navPos > 0;
+export const canForward = () => app.navPos < app.navStack.length - 1;
+export function goBack() {
+  if (!canBack()) return;
+  navIntent = -1;
+  history.back();
+}
+export function goForward() {
+  if (!canForward()) return;
+  navIntent = 1;
+  history.forward();
+}
+
+function trackRecent() {
+  const r = app.route;
+  if (r.view !== 'files' || !r.params.path) return;
+  const p = r.params.path;
+  app.recent = [p, ...app.recent.filter((x) => x !== p)].slice(0, 15);
+  saveLocal('mdctl.recent', app.recent);
+}
+trackRecent();
+
+// ---------------------------------------------------------------- bookmarks (pinned)
+export const isBookmarked = (path) => app.bookmarks.some((b) => b.path === path);
+let bookmarksLocal = false;
+export async function loadBookmarks() {
+  try {
+    const b = await api('/api/bookmarks');
+    app.bookmarks = Array.isArray(b) ? b : b?.bookmarks || [];
+    bookmarksLocal = false;
+  } catch {
+    bookmarksLocal = true;
+    app.bookmarks = loadLocal('mdctl.bookmarks', []);
+  }
+}
+export async function toggleBookmark(path, label) {
+  const on = isBookmarked(path);
+  const canState = !!app.me?.levels?.state;
+  if (bookmarksLocal || !canState) {
+    app.bookmarks = on ? app.bookmarks.filter((b) => b.path !== path) : [...app.bookmarks, { path, label, local: true }];
+    saveLocal('mdctl.bookmarks', app.bookmarks.filter((b) => b.local));
+    toast(on ? 'Unpinned' : 'Pinned (this browser only — sign in as admin to share pins)', 'info');
+    return;
+  }
+  try {
+    if (on) await post('/api/bookmarks/remove', { path });
+    else await post('/api/bookmarks', { path, label });
+    await loadBookmarks();
+    toast(on ? 'Unpinned' : 'Pinned to sidebar', 'ok', 2200);
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+// ---------------------------------------------------------------- notifications
+export function pushNotification(n) {
+  const item = { id: Math.random().toString(36).slice(2), ts: Date.now(), level: 'info', ...n };
+  app.notifications = [item, ...app.notifications].slice(0, 60);
+  app.unread++;
+  const kind = item.level === 'error' ? 'error' : item.level === 'warn' ? 'warn' : item.level === 'ok' || item.level === 'success' ? 'ok' : 'info';
+  toast(item.title + (item.body ? ` — ${item.body}` : ''), kind, kind === 'error' ? 7000 : 4500);
+  try {
+    const want = loadLocal('mdctl.browserNotify', false);
+    if (want && typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+      new Notification(item.title, { body: item.body || '', tag: item.type || 'mdctl' });
+    }
+  } catch {
+    /* notifications unavailable */
+  }
+}
+
+// ---------------------------------------------------------------- stream hooks
+const streamHooks = new Map();
+/** Subscribe to a named SSE event (job, joblog, board, files, notify…). Returns unsubscribe. */
+export function onStream(name, fn) {
+  if (!streamHooks.has(name)) streamHooks.set(name, new Set());
+  streamHooks.get(name).add(fn);
+  return () => streamHooks.get(name)?.delete(fn);
+}
 
 // ---------------------------------------------------------------- theme
 export function setTheme(t) {
@@ -100,21 +231,31 @@ export const toggleTheme = () => setTheme(app.theme === 'dark' ? 'light' : 'dark
 
 // ---------------------------------------------------------------- toasts
 let toastId = 0;
-export function toast(message, kind = 'info', ms = 4200) {
+/**
+ * @param {string} message
+ * @param {'info'|'ok'|'warn'|'error'} [kind]
+ * @param {number} [ms]
+ * @param {{ label: string, run: () => void }} [action] optional inline button (e.g. Undo)
+ */
+export function toast(message, kind = 'info', ms = 4200, action = null) {
   const id = ++toastId;
-  app.toasts = [...app.toasts, { id, message, kind }];
-  setTimeout(() => (app.toasts = app.toasts.filter((t) => t.id !== id)), ms);
+  app.toasts = [...app.toasts, { id, message, kind, action }].slice(-5);
+  setTimeout(() => dismissToast(id), ms);
+  return id;
+}
+export function dismissToast(id) {
+  app.toasts = app.toasts.filter((t) => t.id !== id);
 }
 
 // ---------------------------------------------------------------- data loading
-async function loadState() {
+export async function loadState() {
   const s = await api('/api/state');
   app.state = s;
   if (s?.health) app.health = { ...(app.health || {}), ...s.health };
   if (s?.project?.name) document.title = `${s.project.name} · mdctl`;
 }
 
-async function loadFiles() {
+export async function loadFiles() {
   const files = await api('/api/files');
   app.files = Array.isArray(files) ? files : [];
 }
@@ -174,6 +315,21 @@ function applyEvent(ev) {
 
 function onStreamEvent(name, data) {
   app.lastPing = Date.now();
+  const hooks = streamHooks.get(name);
+  if (hooks) for (const fn of hooks) {
+    try {
+      fn(data);
+    } catch (e) {
+      console.warn('stream hook', name, e);
+    }
+  }
+  if (name === 'notify' && data) pushNotification(data);
+  else if (name === 'board') app.boardTick++;
+  else if (name === 'files') {
+    loadFiles().catch(() => {});
+    app.dataTick++;
+    app.graphTick++;
+  }
   if (name === 'event') applyEvent(data);
   else if (name === 'health' && data) {
     const prev = app.health?.score;
@@ -217,11 +373,72 @@ export function reconnect() {
   stream?.reconnect();
 }
 
-export async function boot() {
+/** GET /api/auth/me; tolerate older servers without the route. */
+async function loadMe() {
+  try {
+    app.me = await api('/api/auth/me');
+  } catch (e) {
+    if (e.status === 401 || e.status === 403) throw e;
+    // v0.1 server: no auth routes → derive from /api/state
+    const w = app.state?.allowWrite;
+    app.me = { role: 'admin', legacy: true, tokenRequired: false, levels: { read: true, state: true, edit: !!w, exec: false, danger: false, terminal: false } };
+  }
+}
+
+/** POST /api/auth/login → cookie session, then (re)boot. */
+export async function login(tok) {
+  app.loginError = '';
+  try {
+    await post('/api/auth/login', { token: tok });
+    setToken('');
+    stripUrlToken();
+    app.authRequired = false;
+    app.ready = false;
+    await boot(true);
+    return true;
+  } catch (e) {
+    app.loginError = e.status === 401 || e.status === 403 ? 'That token was not accepted.' : e.message;
+    return false;
+  }
+}
+
+export async function logout() {
+  try {
+    await post('/api/auth/logout', {});
+  } catch {
+    /* ignore */
+  }
+  stream?.close();
+  app.me = null;
+  app.authRequired = true;
+}
+
+export async function refreshMe() {
+  try {
+    await loadMe();
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function boot(again = false) {
   if (mockRequested) enableMock();
   app.mock = isMock();
   if (app.mock) app.mockReason = 'Demo mode (?mock=1)';
+  // a ?token= in the URL → exchange for a cookie session and strip it
+  if (!again && urlToken && !app.mock) {
+    try {
+      await post('/api/auth/login', { token: urlToken });
+      setToken('');
+      stripUrlToken();
+    } catch {
+      /* old server or bad token: keep ?token= forwarding (v0.1 behaviour) */
+    }
+  }
   try {
+    if (app.mock && new URLSearchParams(location.search).has('login') && !again) {
+      throw Object.assign(new Error('login'), { status: 401 });
+    }
     await loadState();
   } catch (e) {
     if (e.status === 401 || e.status === 403) {
@@ -240,9 +457,23 @@ export async function boot() {
       return;
     }
   }
-  await Promise.allSettled([loadFiles(), loadEvents(), loadConflicts()]);
+  try {
+    await loadMe();
+  } catch (e) {
+    app.authRequired = true;
+    app.ready = true;
+    return;
+  }
+  await Promise.allSettled([loadFiles(), loadEvents(), loadConflicts(), loadBookmarks()]);
   app.ready = true;
   startStream();
+  for (const fn of bootHooks) fn();
+}
+
+const bootHooks = new Set();
+/** Run after a successful boot (used by actions/jobs). */
+export function onBoot(fn) {
+  bootHooks.add(fn);
 }
 
 setInterval(() => (app.now = Date.now()), 1000);

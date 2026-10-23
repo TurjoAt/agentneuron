@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
-import { loadConfig, ensureMdctlDir } from './core/config.js';
+import { loadConfig, ensureMdctlDir, parseEnable } from './core/config.js';
 import { createStore } from './core/store.js';
 import { buildGraph } from './analysis/graph.js';
 import { lint } from './health/lint.js';
@@ -12,7 +12,9 @@ import { startServer, VERSION } from './server/app.js';
 const HELP = `mdctl ${VERSION} - live monitor for AI-context markdown
 
 Usage:
-  mdctl [start] [dir] [--port n] [--host h] [--token t] [--open] [--write]
+  mdctl [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--open]
+  mdctl workspace [dir]         start in workspace mode (dir = folder holding your projects)
+  mdctl mcp [dir]               run the MCP server on stdio (for AI tools)
   mdctl lint [--json] [dir]     exit 1 if any error-level issue
   mdctl status [dir]            short text summary
   mdctl init [dir]              create .mdctl/ (config + copy of this bundle)
@@ -21,15 +23,18 @@ Usage:
 Options:
   --port, -p <n>   port (default 4747; 0 = random)
   --host <h>       bind host (default 127.0.0.1; non-loopback requires/auto-creates a token)
-  --token <t>      require ?token=<t> or Authorization: Bearer <t>
+  --token <t>      require a token (login screen, ?token=<t> or Authorization: Bearer <t>)
+  --admin-token <t>  admin token; then --token becomes the read-only viewer token
+  --enable <list>  enable action levels (comma list of: edit, exec, danger, terminal).
+                   Everything beyond read/state is OFF by default; or set "actions" in .mdctl/config.json
+  --write          alias for --enable edit
   --open           open the browser
-  --write          allow write actions (history restore)
   --json           machine-readable output (lint)
 `;
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -111,15 +116,27 @@ function cmdInit(root) {
   return 0;
 }
 
-async function cmdStart(root, flags) {
+async function cmdMcp(root, flags) {
+  const { runMcpServer } = await import('./mcp/server.js');
+  const config = loadConfig(root, {});
+  await runMcpServer(root, config);
+  return 0;
+}
+
+async function cmdStart(root, flags, workspace = false) {
   const overrides = {};
   const port = flags.port ?? flags.p;
   if (port !== undefined) overrides.port = Number(port);
   if (flags.host) overrides.host = String(flags.host);
   if (flags.token) overrides.token = String(flags.token);
+  if (flags['admin-token']) overrides.adminToken = String(flags['admin-token']);
   if (flags.open) overrides.openBrowser = true;
+  let enable;
+  try { enable = parseEnable(flags.enable); } catch (e) { console.error(`mdctl: --enable: ${e.message}`); return 2; }
+  if (flags.write) enable.push('edit');
+  if (enable.length) overrides.actions = Object.fromEntries(enable.map((l) => [l, true]));
+  if (workspace) overrides.workspaceRoot = root;
   const config = loadConfig(root, overrides);
-  if (flags.write) config.allowWrite = true;
   const srv = await startServer(config);
   console.log('');
   console.log(`  mdctl ${VERSION}  -  AI-context monitor`);
@@ -127,7 +144,10 @@ async function cmdStart(root, flags) {
   console.log(`  files   : ${srv.store.files.size}`);
   console.log(`  open    : ${srv.url}`);
   if (srv.token && config.tokenGenerated) console.log(`  token   : ${srv.token} (auto-generated, host is not loopback)`);
-  if (config.allowWrite) console.log('  writes  : enabled (--write)');
+  if (config.adminToken) console.log('  roles   : admin token set (--token / config token = read-only viewer)');
+  const on = Object.entries(config.actions).filter(([, v]) => v).map(([k]) => k);
+  console.log(`  actions : ${on.length ? on.join(', ') + ' enabled' : 'read-only (enable with --enable edit,exec,...)'}`);
+  if (workspace) console.log(`  mode    : workspace (${root})`);
   console.log('  Ctrl+C to stop\n');
   if (config.openBrowser) {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
@@ -149,7 +169,7 @@ export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
   if (flags.help || flags.h) { console.log(HELP); return 0; }
   if (flags.version || flags.v) { console.log(VERSION); return 0; }
-  const cmds = new Set(['start', 'lint', 'status', 'init', 'help']);
+  const cmds = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace']);
   let cmd = 'start';
   if (_.length && cmds.has(_[0])) cmd = _.shift();
   if (cmd === 'help') { console.log(HELP); return 0; }
@@ -161,6 +181,8 @@ export async function main(argv = process.argv.slice(2)) {
     case 'lint': return cmdLint(root, flags);
     case 'status': return cmdStatus(root);
     case 'init': return cmdInit(root);
+    case 'mcp': return cmdMcp(root, flags);
+    case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }
 }

@@ -65,3 +65,42 @@ npm run build       # vite build + esbuild -> dist/mdctl.mjs (use -- --strict to
 ```
 
 Requires Node >= 18.
+
+## v0.2: control center, permissions and auth
+
+Everything that changes something is **off by default**. mdctl starts read-only.
+
+| Level | Meaning | Enabled by |
+|---|---|---|
+| `read` | monitor, search, graph, health | always |
+| `state` | mdctl's own data in `.mdctl/` (board, bookmarks, annotations, rescan) | admin role |
+| `edit` | write project files, git stage/commit, history restore | `actions.edit` |
+| `exec` | run commands (packages, scripts, git fetch/pull/push, MCP test) | `actions.exec` |
+| `danger` | discard, delete, migrate, clear history | `actions.danger` |
+| `terminal` | free-form command runner (also needs `danger`) | `actions.terminal` |
+
+Enable in `.mdctl/config.json`:
+
+```json
+{ "actions": { "edit": true, "exec": false, "danger": false, "terminal": false },
+  "token": "viewer-or-only-token", "adminToken": null,
+  "notifications": { "webhooks": [ { "url": "https://hooks.slack.com/...", "events": ["secret", "job-failed"] } ], "browser": true } }
+```
+
+or per run: `mdctl start --enable edit,exec` (`--write` = `--enable edit`).
+
+**Roles / auth.** No token: everyone is admin (loopback only by default). Only `token`: its holder is admin.
+With `adminToken` (or `--admin-token`): that token is admin and `token` is a read-only viewer.
+The UI shows a login screen (`POST /api/auth/login` sets an HttpOnly `mdctl_session` cookie);
+`?token=` and `Authorization: Bearer` keep working for scripts.
+
+**Actions and jobs.** `GET /api/actions` lists actions with `enabled`/`reason`; `POST /api/actions/run` starts a job
+(live output over SSE `job`/`joblog`, cancel via `POST /api/jobs/cancel`). Commands are spawned without a shell.
+Every action run and every state/edit route call is appended to `.mdctl/audit.jsonl` (secrets masked).
+
+**Persistence.** `.mdctl/events.jsonl` (all file events), `.mdctl/metrics.jsonl` (snapshot on start, hourly, on health change);
+files over 20 MB rotate (3 kept).
+
+**Notifications.** Secrets, conflicts, health drops of 10+ points and job results go to the UI (SSE `notify`) and to webhooks (Slack/Discord compatible).
+
+**Other commands.** `mdctl mcp [dir]` runs the MCP server on stdio; `mdctl workspace [dir]` starts in workspace mode.

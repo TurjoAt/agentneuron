@@ -5,7 +5,19 @@
 import { createMock } from '../mock.js';
 
 const pageParams = new URLSearchParams(location.search);
-export const token = pageParams.get('token') || '';
+let token = pageParams.get('token') || '';
+/** Token passed in the page URL (used once for cookie login, then stripped). */
+export const urlToken = token;
+export function setToken(t) {
+  token = t || '';
+}
+/** Remove ?token= from the address bar (after a successful cookie login). */
+export function stripUrlToken() {
+  const u = new URL(location.href);
+  if (!u.searchParams.has('token')) return;
+  u.searchParams.delete('token');
+  history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+}
 export const mockRequested = pageParams.has('mock') && pageParams.get('mock') !== '0';
 
 let mock = null;
@@ -16,9 +28,10 @@ export function enableMock() {
 export const isMock = () => !!mock;
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, body = null) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -37,13 +50,14 @@ export async function api(path, params, init = {}) {
     try {
       return await mock.request(path, params, init);
     } catch (e) {
-      throw new ApiError(e.status || 500, e.message);
+      throw new ApiError(e.status || 500, e.message, e.body || null);
     }
   }
   let res;
   try {
     res = await fetch(apiUrl(path, params), {
       ...init,
+      credentials: 'same-origin',
       headers: { Accept: 'application/json', ...(init.headers || {}) },
     });
   } catch (e) {
@@ -51,13 +65,14 @@ export async function api(path, params, init = {}) {
   }
   if (!res.ok) {
     let msg = res.statusText;
+    let body = null;
     try {
-      const body = await res.json();
+      body = await res.json();
       msg = body.error || body.message || msg;
     } catch {
       /* not json */
     }
-    throw new ApiError(res.status, msg || `HTTP ${res.status}`);
+    throw new ApiError(res.status, msg || `HTTP ${res.status}`, body);
   }
   return res.json();
 }
@@ -70,7 +85,7 @@ export function post(path, body) {
   });
 }
 
-const STREAM_EVENTS = ['event', 'health', 'graph', 'conflict', 'ping'];
+const STREAM_EVENTS = ['event', 'health', 'graph', 'conflict', 'ping', 'job', 'joblog', 'notify', 'board', 'files'];
 
 /**
  * Open the live stream with exponential-backoff reconnect.
@@ -90,7 +105,7 @@ export function connectStream({ onEvent, onStatus }) {
   const open = () => {
     clearTimeout(timer);
     onStatus(attempt ? 'reconnecting' : 'connecting');
-    es = new EventSource(apiUrl('/api/stream'));
+    es = new EventSource(apiUrl('/api/stream'), { withCredentials: true });
     es.onopen = () => {
       attempt = 0;
       onStatus('live');

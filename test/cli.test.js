@@ -63,3 +63,29 @@ test('start prints URL banner and stops on SIGINT', async () => {
   p.kill('SIGINT');
   assert.equal(await exited, 0);
 });
+
+test('--enable validates levels; banner shows enabled actions; admin token roles', async () => {
+  const d = tmp();
+  fs.writeFileSync(path.join(d, 'CLAUDE.md'), '# hi\n');
+  const bad = run(['start', d, '--port', '0', '--enable', 'root']);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /unknown level/);
+  const p = spawn(process.execPath, [cli, 'start', d, '--port', '0', '--token', 'view', '--admin-token', 'adm', '--enable', 'edit,exec'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  p.stdout.on('data', (x) => (out += x));
+  const url = await new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error('no banner: ' + out)), 15000);
+    p.stdout.on('data', () => { const m = out.match(/open\s+:\s+(\S+)/); if (m && /Ctrl\+C/.test(out)) { clearTimeout(t); res(m[1]); } });
+  });
+  try {
+    assert.match(out, /actions : edit, exec enabled/);
+    const base = url.split('/?')[0];
+    const me = await (await fetch(`${base}/api/auth/me`, { headers: { authorization: 'Bearer adm' } })).json();
+    assert.equal(me.role, 'admin'); assert.equal(me.levels.exec, true); assert.equal(me.levels.danger, false);
+    const vw = await (await fetch(`${base}/api/auth/me`, { headers: { authorization: 'Bearer view' } })).json();
+    assert.equal(vw.role, 'viewer'); assert.equal(vw.levels.edit, false);
+  } finally {
+    const exited = new Promise((r2) => p.on('exit', (c) => r2(c)));
+    p.kill('SIGINT'); await exited;
+  }
+});

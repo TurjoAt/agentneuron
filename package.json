@@ -1,6 +1,6 @@
 {
   "name": "mdctl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Live monitor for AI-context markdown (CLAUDE.md, AGENTS.md, Cursor rules, skills, docs) with git, history, link graph and health checks.",
   "type": "module",
   "bin": {
