@@ -10,8 +10,10 @@ const uiCfg = path.join(root, 'ui/vite.config.js');
 const uiOut = path.join(root, 'ui/dist/index.html');
 
 if (fs.existsSync(uiCfg)) {
-  const vite = path.join(root, 'node_modules/.bin/vite');
-  const r = spawnSync(vite, ['build', '--config', 'ui/vite.config.js'], { cwd: root, stdio: 'inherit' });
+  // Run vite's JS entry with this Node binary: node_modules/.bin/vite is a shell shim on Windows.
+  const vite = path.join(root, 'node_modules/vite/bin/vite.js');
+  const r = spawnSync(process.execPath, [vite, 'build', '--config', 'ui/vite.config.js'], { cwd: root, stdio: 'inherit' });
+  if (r.error) console.error(`[build] could not start vite: ${r.error.message}`);
   if (r.status !== 0) {
     if (process.argv.includes('--strict')) { console.error('vite build failed'); process.exit(r.status || 1); }
     console.warn('[build] WARNING: vite build failed - continuing with the last ui/dist (if any) or the fallback page. Use --strict to fail instead.');
