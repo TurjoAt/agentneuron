@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/__GH_OWNER__/agentneuron/security/advisories/new
+    url: https://github.com/TurjoAt/agentneuron/security/advisories/new
     about: Please report security issues privately, not as a public issue.
   - name: Questions and discussion
-    url: https://github.com/__GH_OWNER__/agentneuron/discussions
+    url: https://github.com/TurjoAt/agentneuron/discussions
     about: Ask questions and share ideas in GitHub Discussions.

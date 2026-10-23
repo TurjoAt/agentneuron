@@ -30,13 +30,13 @@
     "email": "hi@turjo.me",
     "url": "https://turjo.me"
   },
-  "homepage": "https://github.com/__GH_OWNER__/agentneuron#readme",
+  "homepage": "https://github.com/TurjoAt/agentneuron#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/__GH_OWNER__/agentneuron.git"
+    "url": "git+https://github.com/TurjoAt/agentneuron.git"
   },
   "bugs": {
-    "url": "https://github.com/__GH_OWNER__/agentneuron/issues",
+    "url": "https://github.com/TurjoAt/agentneuron/issues",
     "email": "hi@turjo.me"
   },
   "license": "MIT",

@@ -50,6 +50,6 @@ Initial release, developed as `mdctl`: a live monitor for AI-context Markdown.
 - Agent session discovery and a concurrent-edit conflict radar.
 - Server-Sent Events live updates, text search, token authentication, `init` and `status` commands.
 
-[Unreleased]: https://github.com/__GH_OWNER__/agentneuron/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/__GH_OWNER__/agentneuron/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/__GH_OWNER__/agentneuron/releases/tag/v0.1.0
+[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/TurjoAt/agentneuron/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/TurjoAt/agentneuron/releases/tag/v0.1.0

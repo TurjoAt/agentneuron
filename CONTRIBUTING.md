@@ -7,7 +7,7 @@ Thanks for helping! AgentNeuron is a local-first tool, so changes are reviewed w
 Requirements: Node.js >= 18 (22 recommended) and npm.
 
 ```bash
-git clone https://github.com/__GH_OWNER__/agentneuron.git
+git clone https://github.com/TurjoAt/agentneuron.git
 cd agentneuron
 npm ci
 npm test                 # node:test, no extra tooling
@@ -114,8 +114,8 @@ One-time setup:
 
 1. Create an npm automation/granular token with publish rights and add it as repository secret **`NPM_TOKEN`**.
 2. Provenance: the release workflow has `id-token: write` and runs `npm publish --provenance`; this requires the repository to be public and published from GitHub-hosted runners.
-3. GitHub Packages: published as `@__GH_OWNER__/agentneuron` using the built-in `GITHUB_TOKEN` (`packages: write`); no extra secret.
-4. ghcr.io: image `ghcr.io/__GH_OWNER__/agentneuron` is pushed with `GITHUB_TOKEN`; after the first push, set the package visibility to public in the package settings.
+3. GitHub Packages: published as `@turjoat/agentneuron` using the built-in `GITHUB_TOKEN` (`packages: write`); no extra secret.
+4. ghcr.io: image `ghcr.io/turjoat/agentneuron` is pushed with `GITHUB_TOKEN`; after the first push, set the package visibility to public in the package settings.
 5. Enable "Private vulnerability reporting" and Discussions in repository settings.
 
 Per release:

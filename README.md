@@ -5,7 +5,7 @@ A live control center for the markdown that steers your AI coding tools: `CLAUDE
 [![npm version](https://img.shields.io/npm/v/agentneuron)](https://www.npmjs.com/package/agentneuron)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node >= 18](https://img.shields.io/badge/node-%3E%3D18-339933.svg)](https://nodejs.org)
-[![CI](https://github.com/__GH_OWNER__/agentneuron/actions/workflows/ci.yml/badge.svg)](https://github.com/__GH_OWNER__/agentneuron/actions/workflows/ci.yml)
+[![CI](https://github.com/TurjoAt/agentneuron/actions/workflows/ci.yml/badge.svg)](https://github.com/TurjoAt/agentneuron/actions/workflows/ci.yml)
 
 ![AgentNeuron overview](docs/assets/overview.png)
 
@@ -144,7 +144,7 @@ Runnable [examples](examples/) cover a Claude Code project, a multi-tool project
 ## Develop
 
 ```sh
-git clone https://github.com/__GH_OWNER__/agentneuron.git
+git clone https://github.com/TurjoAt/agentneuron.git
 cd agentneuron
 npm install
 npm test                # node --test

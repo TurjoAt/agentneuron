@@ -13,7 +13,7 @@ Only the latest minor release receives security fixes while the project is pre-1
 
 Please **do not open a public issue**. Report privately via either:
 
-1. GitHub: [Report a vulnerability](https://github.com/__GH_OWNER__/agentneuron/security/advisories/new) (Security Advisories), or
+1. GitHub: [Report a vulnerability](https://github.com/TurjoAt/agentneuron/security/advisories/new) (Security Advisories), or
 2. Email **hi@turjo.me** with the subject `[agentneuron security]`.
 
 Include the version, a description, reproduction steps or a proof of concept, and the impact you see.
