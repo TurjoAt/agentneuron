@@ -23,6 +23,7 @@ import { createRegistry } from '../actions/registry.js';
 import { registerActions } from '../actions/index.js';
 import { createPersist } from '../persist/index.js';
 import { createNotifier } from '../notify/index.js';
+import { validRev } from '../git2/run.js';
 
 export { VERSION };
 const SESSION_COOKIE = 'agentneuron_session';
@@ -32,6 +33,33 @@ const FALLBACK_HTML = `<!doctype html><meta charset="utf-8"><title>agentneuron</
 <body style="font:15px system-ui;background:#0b0d12;color:#dde;padding:2rem">
 <h1>agentneuron</h1><p>The UI bundle is not built. Run <code>npm run build</code>.</p>
 <p>The JSON API is live: <a style="color:#8cf" href="api/state">/api/state</a></p></body>`;
+
+const MAX_SSE_CLIENTS = 100;
+const FAIL_FREE = 5; // wrong-credential attempts per IP before backoff starts
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+/** Hostname part of a Host header ("[::1]:80" -> "::1", "Localhost:4747" -> "localhost"). */
+export function hostnameOf(h) {
+  h = String(h || '').trim().toLowerCase();
+  if (h.startsWith('[')) { const i = h.indexOf(']'); return i < 0 ? '' : h.slice(1, i); }
+  const i = h.indexOf(':');
+  return (i >= 0 ? h.slice(0, i) : h).replace(/\.$/, '');
+}
+
+/** CSP for the single-file UI: inline scripts are allow-listed by sha256 (no 'unsafe-inline' for scripts). */
+export function uiCsp(html) {
+  const hashes = [];
+  for (const m of String(html).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    if (/\bsrc\s*=/i.test(m[1])) continue;
+    hashes.push(`'sha256-${crypto.createHash('sha256').update(m[2]).digest('base64')}'`);
+  }
+  return [
+    "default-src 'none'", `script-src ${hashes.length ? hashes.join(' ') : "'none'"}`, "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'", "frame-ancestors 'none'",
+    "base-uri 'none'", "form-action 'self'", "object-src 'none'",
+  ].join('; ');
+}
+const API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 function isLoopback(h) {
   return h === '127.0.0.1' || h === 'localhost' || h === '::1';
@@ -128,7 +156,9 @@ export async function startServer(config) {
 
   function broadcast(name, data) {
     const msg = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const res of clients) { try { res.write(msg); } catch { clients.delete(res); } }
+    for (const res of clients) {
+      if (name === 'joblog' && res.agentRole !== 'admin') continue; // command output is admin-only
+      try { res.write(msg); } catch { clients.delete(res); } }
   }
 
   function scheduleRecompute() {
@@ -162,7 +192,7 @@ export async function startServer(config) {
       }
       ctx.persist.events.append(ev);
       broadcast('event', ev);
-    });
+    }).catch((e) => warn('event pipeline', e)); // never an unhandled rejection
   });
 
   const watcher = createWatcher(root, config, (e) => {
@@ -192,11 +222,27 @@ export async function startServer(config) {
   const tokenRequired = () => !!(config.token || config.adminToken);
   const sessionsMap = new Map(); // sid -> { role, exp }
   const failures = new Map(); // ip -> { n, until }
+  // Hash both sides first: constant time regardless of length, no length oracle.
+  const digest = (v) => crypto.createHash('sha256').update(String(v)).digest();
   const eq = (given, want) => {
     if (!want) return false;
-    const a = Buffer.from(String(given)), b = Buffer.from(String(want));
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
+    return crypto.timingSafeEqual(digest(given), digest(want));
   };
+  /** Seconds the IP is locked out for (0 = not blocked). Exponential backoff after FAIL_FREE misses. */
+  function blockedFor(ip) {
+    const f = failures.get(ip);
+    return f && f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 1000) : 0;
+  }
+  function noteFail(ip) {
+    const f = failures.get(ip) || { n: 0, until: 0 };
+    f.n++; f.seen = Date.now();
+    if (f.n >= FAIL_FREE) f.until = Date.now() + Math.min(30000 * 2 ** (f.n - FAIL_FREE), 15 * 60000);
+    failures.set(ip, f);
+    if (failures.size > 1000) { // bounded memory: drop expired, then oldest
+      for (const [k, v] of failures) if (v.until < Date.now() && Date.now() - v.seen > 15 * 60000) failures.delete(k);
+      while (failures.size > 1000) failures.delete(failures.keys().next().value);
+    }
+  }
   /** Role for a token value, or null. */
   function roleForToken(given) {
     if (!given) return null;
@@ -231,8 +277,9 @@ export async function startServer(config) {
     const r = sessionRole(req);
     return r ? { role: r, via: 'cookie' } : null;
   }
-  const cookieHeader = (sid, maxAge) =>
-    `${SESSION_COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+  const isHttps = (req) => !!req.socket?.encrypted || /(^|,)\s*https\s*(,|$)/i.test(String(req.headers['x-forwarded-proto'] || ''));
+  const cookieHeader = (sid, maxAge, req) =>
+    `${SESSION_COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${req && isHttps(req) ? '; Secure' : ''}`;
   function levelsFor(role) {
     const l = { read: true, state: ctx.can('state', role), edit: ctx.can('edit', role), exec: ctx.can('exec', role), danger: ctx.can('danger', role), terminal: ctx.can('terminal', role) };
     return l;
@@ -246,26 +293,25 @@ export async function startServer(config) {
     }
     if (p === '/api/auth/login' && req.method === 'POST') {
       const ip = req.socket.remoteAddress || '?';
-      const f = failures.get(ip);
-      if (f && f.until > Date.now()) return bad(res, 429, 'too many attempts, try again later');
-      let body; try { body = await readBody(req); } catch { return bad(res, 400, 'bad body'); }
+      const wait = blockedFor(ip);
+      if (wait) { res.setHeader('retry-after', String(wait)); return bad(res, 429, 'too many attempts, try again later'); }
+      let body; try { body = await readBody(req); } catch (e) { return bad(res, e.status || 400, e.message || 'bad body'); }
       const role = tokenRequired() ? roleForToken(typeof body.token === 'string' ? body.token : '') : 'admin';
       if (!role) {
-        const n = (f?.n || 0) + 1;
-        failures.set(ip, { n, until: n >= 5 ? Date.now() + 30000 : 0 });
+        noteFail(ip);
         ctx.persist.audit.log({ role: null, ip, route: 'POST /api/auth/login', status: 401 });
         return bad(res, 401, 'invalid token');
       }
       failures.delete(ip);
       const sid = crypto.randomBytes(24).toString('hex');
       sessionsMap.set(sid, { role, exp: Date.now() + SESSION_TTL });
-      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': cookieHeader(sid, SESSION_TTL / 1000) });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': cookieHeader(sid, SESSION_TTL / 1000, req) });
       return res.end(JSON.stringify({ role, levels: levelsFor(role), tokenRequired: tokenRequired() }));
     }
     if (p === '/api/auth/logout' && req.method === 'POST') {
       const sid = parseCookies(req)[SESSION_COOKIE];
       if (sid) sessionsMap.delete(sid);
-      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'set-cookie': cookieHeader('', 0) });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'set-cookie': cookieHeader('', 0, req) });
       return res.end('{"ok":true}');
     }
     return bad(res, 404, 'unknown endpoint');
@@ -293,14 +339,23 @@ export async function startServer(config) {
       git: { available: a.gitAvail, branch, dirty: dirtyN },
       allowWrite: !!(config.actions && config.actions.edit),
       actions: { ...config.actions },
+      fileEnabled: config.fileEnabled || [], // risky levels enabled by .agentneuron/config.json (not by the CLI)
+      configWarning: config.configWarning || null,
     };
   }
 
+  const BODY_LIMIT = Math.max(2e6, (Number(config.maxFileSize) || 0) * 2 + 65536);
   async function readBody(req) {
+    const declared = Number(req.headers['content-length']);
+    if (Number.isFinite(declared) && declared > BODY_LIMIT) throw new HttpError(413, 'body too large');
     const chunks = []; let n = 0;
-    for await (const c of req) { n += c.length; if (n > 1e6) throw new Error('body too large'); chunks.push(c); }
-    const s = Buffer.concat(chunks).toString('utf8');
-    return s ? JSON.parse(s) : {};
+    for await (const c of req) { n += c.length; if (n > BODY_LIMIT) throw new HttpError(413, 'body too large'); chunks.push(c); }
+    const raw = Buffer.concat(chunks).toString('utf8');
+    if (!raw) return {};
+    let v;
+    try { v = JSON.parse(raw); } catch { throw new HttpError(400, 'invalid JSON'); }
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, 'body must be a JSON object');
+    return v;
   }
 
   async function diffRoute(q) {
@@ -308,6 +363,8 @@ export async function startServer(config) {
     if (!p) return [400, { error: 'bad path' }];
     const from = q.get('from') || 'git:HEAD';
     const to = q.get('to') || 'current';
+    // a git ref that starts with "-" would be parsed by `git show` as an option (e.g. --output=FILE)
+    for (const ref of [from, to]) if (ref.startsWith('git:') && ref.length > 4 && !validRev(ref.slice(4))) return [400, { error: 'bad ref' }];
     const resolve = async (ref) => {
       if (ref === 'current') return store.contents.get(p) ?? '';
       if (ref.startsWith('git:')) return (await git.show(p, ref.slice(4) || 'HEAD')) ?? '';
@@ -389,14 +446,14 @@ export async function startServer(config) {
     }
     let body = {};
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      try { body = await readBody(req); } catch { bad(res, 400, 'bad body'); return true; }
+      try { body = await readBody(req); } catch (e) { bad(res, e.status || 400, e.message || 'bad body'); return true; }
     }
     try {
       const out = await route.fn({ req, res, url, q: url.searchParams, body, ctx, role });
       if (out !== undefined && !res.headersSent) json(res, 200, out);
       if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, params: req.method === 'GET' ? Object.fromEntries(url.searchParams) : body, status: res.statusCode || 200 });
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : 500;
+      const status = e instanceof HttpError ? e.status : 500; // unexpected errors are 500, never a process exit
       if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, params: req.method === 'GET' ? Object.fromEntries(url.searchParams) : body, status });
       if (res.headersSent) { try { res.end(); } catch {} return true; }
       if (e instanceof HttpError) bad(res, e.status, e.message);
@@ -482,6 +539,7 @@ export async function startServer(config) {
         return json(res, 200, out);
       }
       case '/api/stream': {
+        if (clients.size >= MAX_SSE_CLIENTS) { res.setHeader('retry-after', '5'); return bad(res, 503, 'too many event streams'); }
         res.writeHead(200, {
           'content-type': 'text/event-stream', 'cache-control': 'no-store',
           connection: 'keep-alive', 'x-accel-buffering': 'no',
@@ -489,6 +547,7 @@ export async function startServer(config) {
         res.write(`retry: 2000\n\n`);
         const lastId = Number(req.headers['last-event-id'] || q.get('since') || 0);
         if (lastId) for (const e of store.events) if (e.id > lastId) res.write(`event: event\ndata: ${JSON.stringify(e)}\n\n`);
+        res.agentRole = role;
         clients.add(res);
         req.on('close', () => clients.delete(res));
         return;
@@ -497,20 +556,50 @@ export async function startServer(config) {
     return bad(res, 404, 'unknown endpoint');
   }
 
+  const htmlCsp = uiCsp(html);
+  const allowedHosts = new Set([...LOOPBACK_HOSTS, hostnameOf(config.host)]);
   const server = http.createServer(async (req, res) => {
+    // security headers on every response (API, UI, errors)
+    res.setHeader('x-content-type-options', 'nosniff');
+    res.setHeader('referrer-policy', 'no-referrer');
+    res.setHeader('x-frame-options', 'DENY');
+    res.setHeader('cross-origin-opener-policy', 'same-origin');
+    res.setHeader('cross-origin-resource-policy', 'same-origin');
+    res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()');
     try {
       const url = new URL(req.url, 'http://localhost');
-      if (url.pathname.startsWith('/api/auth/')) return await handleAuth(req, res, url);
-      if (url.pathname.startsWith('/api/')) {
+      const isApi = url.pathname.startsWith('/api/');
+      res.setHeader('content-security-policy', isApi ? API_CSP : htmlCsp);
+      // DNS rebinding: without a token the only protection is the Host header, so it must name this machine.
+      if (!tokenRequired() && !allowedHosts.has(hostnameOf(req.headers.host))) return bad(res, 403, 'invalid host header');
+      if (isApi) {
+        const ip = req.socket?.remoteAddress || '?';
+        const safeMethod = req.method === 'GET' || req.method === 'HEAD';
+        if (!safeMethod) {
+          // CSRF: browsers always label cross-site requests; a state change must be same-origin JSON.
+          const sfs = req.headers['sec-fetch-site'];
+          if (sfs && sfs !== 'same-origin' && sfs !== 'none') return bad(res, 403, 'cross-origin request refused');
+          const origin = req.headers.origin;
+          if (origin !== undefined) {
+            let oh = ''; try { oh = new URL(origin).host; } catch { /* "null" or malformed */ }
+            if (!oh || oh !== req.headers.host) return bad(res, 403, 'cross-origin request refused');
+          }
+          const hasBody = Number(req.headers['content-length']) > 0 || req.headers['transfer-encoding'] !== undefined;
+          if (hasBody && !/^application\/json\s*(;|$)/i.test(String(req.headers['content-type'] || ''))) return bad(res, 415, 'content-type must be application/json');
+        }
+        // brute force: every wrong token (query, bearer, login) counts against the client IP
+        const h = req.headers.authorization || '';
+        const presented = url.searchParams.get('token') || (h.startsWith('Bearer ') ? h.slice(7) : '');
+        if (presented && tokenRequired() && url.pathname !== '/api/auth/login') {
+          const wait = blockedFor(ip);
+          if (wait) { res.setHeader('retry-after', String(wait)); return bad(res, 429, 'too many attempts, try again later'); }
+          if (roleForToken(presented)) failures.delete(ip); else noteFail(ip);
+        }
+        if (url.pathname.startsWith('/api/auth/')) return await handleAuth(req, res, url);
         const auth = authenticate(req, url);
         if (!auth) {
           res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
           return res.end(JSON.stringify({ error: 'unauthorized' }));
-        }
-        // CSRF guard for cookie sessions: a cross-origin Origin header on writes is refused.
-        if (auth.via === 'cookie' && req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin) {
-          let oh = ''; try { oh = new URL(req.headers.origin).host; } catch { /* bad origin */ }
-          if (oh !== req.headers.host) return bad(res, 403, 'cross-origin request refused');
         }
         return await handle(req, res, url, auth.role);
       }
@@ -519,9 +608,12 @@ export async function startServer(config) {
       res.end(html);
     } catch (e) {
       warn('request', e);
-      if (!res.headersSent) bad(res, 500, String(e.message || e)); else res.end();
+      try { if (!res.headersSent) bad(res, 500, 'internal error'); else res.end(); } catch { /* socket gone */ }
     }
   });
+  server.requestTimeout = 60000; // slow-body clients cannot hold a connection open forever
+  server.headersTimeout = 20000;
+  server.on('clientError', (_e, socket) => { try { socket.end('HTTP/1.1 400 Bad Request\r\nconnection: close\r\n\r\n'); } catch { /* gone */ } });
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);

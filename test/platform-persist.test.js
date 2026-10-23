@@ -70,7 +70,7 @@ test('notify: SSE broadcast + webhook POST (event filter, never throws)', async 
   const sse = [];
   const ctx = {
     broadcast: (n, d) => sse.push([n, d]),
-    config: { notifications: { webhooks: [
+    config: { notifications: { allowPrivate: true, webhooks: [
       { url: `http://127.0.0.1:${port}/all` },
       { url: `http://127.0.0.1:${port}/secrets`, events: ['secret'] },
       { url: 'http://127.0.0.1:1/dead' }, { url: 'not-a-url' },

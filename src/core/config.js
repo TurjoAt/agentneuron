@@ -62,18 +62,27 @@ export function loadConfig(root, overrides = {}) {
   const absRoot = path.resolve(root);
   migrateLegacyDir(absRoot);
   let fileCfg = {};
-  try {
-    const raw = fs.readFileSync(path.join(absRoot, '.agentneuron', 'config.json'), 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) fileCfg = parsed;
-  } catch { /* missing or invalid config: use defaults */ }
+  let configWarning = null;
+  let raw = null;
+  try { raw = fs.readFileSync(path.join(absRoot, '.agentneuron', 'config.json'), 'utf8'); } catch { /* no config file: defaults */ }
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) fileCfg = parsed;
+      else configWarning = '.agentneuron/config.json must be a JSON object; ignoring it and using defaults';
+    } catch (e) { configWarning = `.agentneuron/config.json is not valid JSON (${e.message}); ignoring it and using defaults`; }
+  }
 
   const clean = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== undefined));
   const cfg = { ...DEFAULTS, ...clean(fileCfg), ...clean(overrides), root: absRoot };
   cfg.actions = normalizeActions({ ...(fileCfg.actions || {}), ...(overrides.actions || {}) });
   if (cfg.allowWrite === true) cfg.actions.edit = true;
+  cfg.configWarning = configWarning;
+  // levels a (possibly cloned) project file turns on that can run commands or destroy data
+  const fa = normalizeActions(fileCfg.actions);
+  cfg.fileEnabled = ['exec', 'danger', 'terminal'].filter((l) => fa[l] && cfg.actions[l]);
   const n = cfg.notifications && typeof cfg.notifications === 'object' ? cfg.notifications : {};
-  cfg.notifications = { browser: n.browser !== false, webhooks: Array.isArray(n.webhooks) ? n.webhooks.filter((w) => w && typeof w.url === 'string') : [] };
+  cfg.notifications = { browser: n.browser !== false, allowPrivate: n.allowPrivate === true, webhooks: Array.isArray(n.webhooks) ? n.webhooks.filter((w) => w && typeof w.url === 'string') : [] };
   if (!cfg.pricing || typeof cfg.pricing !== 'object') cfg.pricing = {};
   if (!Array.isArray(cfg.ignore)) cfg.ignore = [];
   if (!Array.isArray(cfg.extraPatterns)) cfg.extraPatterns = [];

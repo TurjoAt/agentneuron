@@ -113,11 +113,11 @@ test('enabled terminal action executes without a shell and streams', async () =>
 });
 
 test('restore requires edit level (alias --write / actions.edit)', async () => {
-  const r = await fetch(`${base}/api/restore?token=${ADMIN}`, { method: 'POST', body: '{"path":"CLAUDE.md","id":"x"}' });
+  const r = await fetch(`${base}/api/restore?token=${ADMIN}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"path":"CLAUDE.md","id":"x"}' });
   assert.equal(r.status, 403);
   const s2 = await startServer(loadConfig(root, { port: 0, allowWrite: true }));
   try {
-    const r2 = await fetch(`http://127.0.0.1:${s2.port}/api/restore`, { method: 'POST', body: '{"path":"CLAUDE.md","id":"nope"}' });
+    const r2 = await fetch(`http://127.0.0.1:${s2.port}/api/restore`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"path":"CLAUDE.md","id":"nope"}' });
     assert.equal(r2.status, 404);
   } finally { await s2.close(); }
 });

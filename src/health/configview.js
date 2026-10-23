@@ -5,8 +5,11 @@ import { maskSecretsInText } from './secrets.js';
 function readText(root, rel) {
   try {
     const abs = path.join(root, rel);
-    const st = fs.statSync(abs);
+    // lstat + realpath of the parent: neither a symlinked file nor a symlinked directory may lead outside the project
+    const st = fs.lstatSync(abs);
     if (!st.isFile() || st.size > 2 * 1024 * 1024) return null;
+    const rr = fs.realpathSync(root), rd = fs.realpathSync(path.dirname(abs));
+    if (rd !== rr && !rd.startsWith(rr + path.sep)) return null;
     return fs.readFileSync(abs, 'utf8');
   } catch {
     return null;

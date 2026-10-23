@@ -1,9 +1,11 @@
-// Actions registry + job runner. See docs/CONTRACT-v0.2.md.
+// Actions registry + job runner. See docs/internal/CONTRACT-v0.2.md.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { HttpError } from '../server/router.js';
+import fs from 'node:fs';
 import { maskSecretsInText } from '../health/secrets.js';
+import { maskDeep } from '../server/mask.js';
 
 const PARAM_TYPES = new Set(['string', 'number', 'boolean', 'enum', 'path', 'text', 'string[]']);
 const LEVELS = new Set(['read', 'state', 'edit', 'exec', 'danger']);
@@ -107,7 +109,7 @@ export function createRegistry(ctx) {
 
   function summary(job) {
     const { id, actionId, title, params, level, status, startedAt, endedAt, exitCode, result, error, command, queuedAt, by } = job;
-    return { id, actionId, title, params: maskedParams(job), level, status, queuedAt, startedAt, endedAt, exitCode, result, error, command, by };
+    return { id, actionId, title, params: maskedParams(job), level, status, queuedAt, startedAt, endedAt, exitCode, result: maskDeep(result), error: maskDeep(error), command: maskDeep(command), by };
   }
   function maskedParams(job) {
     try { return JSON.parse(maskSecretsInText(JSON.stringify(job.params))); } catch { return {}; }
@@ -155,7 +157,11 @@ export function createRegistry(ctx) {
       if (!def) throw new HttpError(404, `unknown action: ${id}`);
       const clean = validateParams(def.params, params);
       if (!def.preview) return { command: null, summary: def.description || def.title, params: clean };
-      const p = await def.preview(clean, ctx);
+      let p;
+      try { p = await def.preview(clean, ctx); } catch (e) {
+        if (e instanceof HttpError) throw e;
+        throw new HttpError(Number.isInteger(e?.status) && e.status >= 400 && e.status < 500 ? e.status : 400, String(e?.message || e));
+      }
       return { ...p, params: clean };
     },
 
@@ -221,7 +227,7 @@ export function createRegistry(ctx) {
       def, role, controller, signal: controller.signal, logBuf, done, resolveDone,
       category: def.category || 'misc',
       log(stream, text) {
-        text = String(text ?? '');
+        text = maskSecretsInText(String(text ?? ''));
         if (!text) return;
         const s = ['stdout', 'stderr', 'info'].includes(stream) ? stream : 'info';
         const chunk = { ts: Date.now(), stream: s, text };
@@ -240,8 +246,12 @@ export function createRegistry(ctx) {
       if (!Array.isArray(args) || args.some((a) => typeof a !== 'string' || a.includes('\0'))) return reject(new Error('args must be strings'));
       const rel = safeRelPath(cwd);
       if (rel == null) return reject(new Error('cwd must be project-relative'));
-      const abs = path.resolve(ctx.root, rel);
+      let abs = path.resolve(ctx.root, rel);
       if (abs !== path.resolve(ctx.root) && !abs.startsWith(path.resolve(ctx.root) + path.sep)) return reject(new Error('cwd escapes project root'));
+      try { // a symlinked directory must not lead out of the project
+        const realRoot = fs.realpathSync(ctx.root); abs = fs.realpathSync(abs);
+        if (abs !== realRoot && !abs.startsWith(realRoot + path.sep)) return reject(new Error('cwd escapes project root'));
+      } catch { return reject(new Error('cwd does not exist')); }
       if (job.signal.aborted) return resolve({ code: null, stdout: '', stderr: '' });
       job.command = [cmd, ...args];
       job.log('info', `$ ${[cmd, ...args].join(' ')}`);
@@ -278,7 +288,7 @@ export function createRegistry(ctx) {
   function finish(job, status, result, error) {
     job.status = status; job.endedAt = Date.now();
     if (status === 'ok') job.result = result ?? null;
-    if (error) job.error = String(error);
+    if (error) job.error = maskSecretsInText(String(error));
     audit({ role: job.role, by: job.by, action: job.actionId, params: job.params, status, jobId: job.id, exitCode: job.exitCode, error: job.error });
     emitJob(job);
     if (status === 'ok') ctx.notify?.('job-done', { title: `${job.title} finished`, body: job.actionId });

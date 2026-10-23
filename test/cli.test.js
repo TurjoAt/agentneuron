@@ -56,8 +56,8 @@ test('start prints URL banner and stops on SIGINT', async () => {
     const t = setTimeout(() => rej(new Error('no banner: ' + out)), 15000);
     p.stdout.on('data', () => { const m = out.match(/open\s+:\s+(\S+)/); if (m) { clearTimeout(t); res(m[1]); } });
   });
-  assert.match(url, /token=tk/);
-  const r = await fetch(url.replace('/?', '/api/state?'));
+  assert.ok(!/token=|tk/.test(url) && !/tk\b/.test(out.replace(/Ctrl\+C|stop/g, '')), 'banner must not print the token');
+  const r = await fetch(`${url}api/state`, { headers: { authorization: 'Bearer tk' } });
   assert.equal(r.status, 200);
   const exited = new Promise((r2) => p.on('exit', (c) => r2(c)));
   p.kill('SIGINT');
@@ -79,7 +79,8 @@ test('--enable validates levels; banner shows enabled actions; admin token roles
   });
   try {
     assert.match(out, /actions : edit, exec enabled/);
-    const base = url.split('/?')[0];
+    const base = url.replace(/\/$/, '');
+    assert.ok(!/adm\b|view\b/.test(out.replace(/enabled|viewer/g, '')) || !/token=/.test(out));
     const me = await (await fetch(`${base}/api/auth/me`, { headers: { authorization: 'Bearer adm' } })).json();
     assert.equal(me.role, 'admin'); assert.equal(me.levels.exec, true); assert.equal(me.levels.danger, false);
     const vw = await (await fetch(`${base}/api/auth/me`, { headers: { authorization: 'Bearer view' } })).json();

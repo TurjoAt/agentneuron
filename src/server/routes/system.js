@@ -1,7 +1,9 @@
 // System routes: actions, jobs, audit, settings, restore. Owner: Agent S1.
 import { HttpError } from '../router.js';
 import { maskUrl } from '../../notify/index.js';
-import { howToEnable, safeRelPath } from '../../actions/registry.js';
+import { howToEnable } from '../../actions/registry.js';
+import { resolveSafe, FileError } from '../../files/paths.js';
+import { getOps } from '../../files/ops.js';
 import { VERSION } from '../version.js';
 
 export default async function register(router, ctx) {
@@ -23,10 +25,11 @@ export default async function register(router, ctx) {
 
   router.get('/api/jobs', async () => reg().listJobs().map((j) => reg().summary(j)));
 
-  router.get('/api/job', async ({ q }) => {
+  router.get('/api/job', async ({ q, role }) => {
     const job = reg().getJob(q.get('id') || '');
     if (!job) throw new HttpError(404, 'job not found');
-    return { ...reg().summary(job), log: job.logBuf };
+    // raw command output (even secret-masked) is admin-only; viewers get the summary
+    return { ...reg().summary(job), log: ctx.can('state', role) ? job.logBuf : [] };
   });
 
   router.post('/api/jobs/cancel', async ({ body, role }) => {
@@ -55,8 +58,12 @@ export default async function register(router, ctx) {
 
   // v0.1 history restore, now an `edit`-level route.
   router.post('/api/restore', async ({ body }) => {
-    const p = safeRelPath(body?.path);
-    if (!p || !body?.id) throw new HttpError(400, 'path and id required');
+    if (typeof body?.path !== 'string' || typeof body?.id !== 'string' || !body.id) throw new HttpError(400, 'path and id required');
+    let p;
+    try { // symlink-safe, tracked file types only (and exec-level config files need actions.exec)
+      p = resolveSafe(ctx.root, body.path).rel;
+      getOps(ctx).assertWritable(p);
+    } catch (e) { if (e instanceof FileError) throw new HttpError(e.status, e.message); throw e; }
     try { return ctx.store.history.restore(p, body.id); }
     catch (e) { throw new HttpError(404, String(e.message || e)); }
   }, { level: 'edit' });

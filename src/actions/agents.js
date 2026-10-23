@@ -3,6 +3,9 @@ import path from 'node:path';
 import { renderTemplate } from '../agentcenter/templates.js';
 import { syncPlan } from '../agentcenter/sync.js';
 import { testMcpServer } from '../agentcenter/mcptest.js';
+import { resolveSafe } from '../files/paths.js';
+import { getOps } from '../files/ops.js';
+import { guardSync } from '../files/syncguard.js';
 
 const SETTINGS_FILES = ['.claude/settings.json', '.claude/settings.local.json'];
 const MCP_FILE = '.mcp.json';
@@ -10,12 +13,8 @@ const NAME_RE = /^[A-Za-z0-9][\w.-]{0,63}$/;
 const HOOK_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop', 'SubagentStop', 'PreCompact', 'SessionStart', 'SessionEnd']);
 
 function rel(root, p) {
-  if (typeof p !== 'string' || !p || p.includes('\0')) throw new Error('invalid path');
-  const r = p.replace(/\\/g, '/').replace(/^\.\//, '');
-  if (r.startsWith('/') || r.split('/').includes('..')) throw new Error(`invalid path: ${p}`);
-  const abs = path.resolve(root, r);
-  if (!abs.startsWith(path.resolve(root) + path.sep)) throw new Error('path escapes project root');
-  return { rel: r, abs };
+  // symlink-safe, refuses .git / .agentneuron / node_modules, absolute paths and ..
+  try { return resolveSafe(root, p); } catch (e) { throw new Error(`invalid path: ${e.message}`); }
 }
 
 function writeAtomic(abs, content) {
@@ -73,6 +72,7 @@ export default function register(registry, ctx) {
     run: async (p, c, job) => {
       const r = renderTemplate(p.template, parseObj(p.vars));
       const t = rel(root, p.path || r.path);
+      getOps(ctx).assertEditable(t.rel); // only tracked markdown / agent-config files, never arbitrary file types
       if (fs.existsSync(t.abs)) throw new Error(`already exists: ${t.rel}`);
       writeAtomic(t.abs, r.content);
       job?.log?.('info', `created ${t.rel}`);
@@ -91,7 +91,8 @@ export default function register(registry, ctx) {
     },
     preview: (p) => ({ summary: `Sync ${p.source} -> ${strList(p.targets).join(', ')}`, command: null }),
     run: async (p, c, job) => {
-      const plan = syncPlan(root, { source: p.source, targets: strList(p.targets), mode: p.mode });
+      const g = guardSync(ctx, { source: p.source, targets: strList(p.targets) });
+      const plan = syncPlan(root, { source: g.source, targets: g.targets, mode: p.mode });
       const written = [];
       for (const it of plan) {
         if (it.unchanged) continue;
@@ -106,7 +107,7 @@ export default function register(registry, ctx) {
   });
 
   registry.register({
-    id: 'agents.permissions.update', title: 'Update Claude permissions', category: 'agents', level: 'edit',
+    id: 'agents.permissions.update', title: 'Update Claude permissions', category: 'agents', level: 'exec',
     description: 'Replace permissions.allow / deny / ask in .claude/settings(.local).json, keeping every other key.',
     params: {
       file: { type: 'enum', enum: SETTINGS_FILES, required: true, label: 'Settings file' },
@@ -126,7 +127,7 @@ export default function register(registry, ctx) {
   });
 
   registry.register({
-    id: 'agents.hooks.update', title: 'Update Claude hooks', category: 'agents', level: 'edit',
+    id: 'agents.hooks.update', title: 'Update Claude hooks', category: 'agents', level: 'exec',
     description: 'Replace the hooks block in .claude/settings(.local).json (validated).',
     params: {
       file: { type: 'enum', enum: SETTINGS_FILES, required: true, label: 'Settings file' },
@@ -146,7 +147,7 @@ export default function register(registry, ctx) {
   });
 
   registry.register({
-    id: 'agents.mcp.add', title: 'Add MCP server', category: 'agents', level: 'edit',
+    id: 'agents.mcp.add', title: 'Add MCP server', category: 'agents', level: 'exec',
     description: 'Add a server to .mcp.json (stdio command or http/sse url).',
     params: {
       name: { type: 'string', required: true, pattern: NAME_RE.source, label: 'Name' },

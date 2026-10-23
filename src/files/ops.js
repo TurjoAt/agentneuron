@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import vm from 'node:vm';
 import { isCandidate } from '../core/classify.js';
 import { readEntry } from '../core/scanner.js';
 import {
@@ -11,6 +12,9 @@ import { rewriteContent, makeIndex, resolveWiki, resolveRel } from './rewrite.js
 import { closestFiles } from './fuzzy.js';
 
 const WALK_CAP = 20000;
+const REGEX_BUDGET_MS = 2000; // total CPU time one find/replace request may spend in user regexes
+// Files that make agent tools run commands (hooks, MCP stdio servers): writing them needs actions.exec, not just edit.
+const EXEC_CONFIG = /(^|\/)(\.claude\/settings(\.local)?\.json|\.mcp\.json|\.cursor\/mcp\.json|\.codex\/config\.toml|\.gemini\/settings\.json)$/;
 const cache = new WeakMap();
 export function getOps(ctx) {
   if (!cache.has(ctx)) cache.set(ctx, createFileOps(ctx));
@@ -51,6 +55,14 @@ export function createFileOps(ctx) {
     if (!isCandidate(rel, config)) throw new FileError(403, 'only tracked project files (markdown and agent config) can be accessed');
   }
 
+  /** assertEditable + files that can make agent tools execute commands need actions.exec. */
+  function assertWritable(rel) {
+    assertEditable(rel);
+    if (EXEC_CONFIG.test(rel) && !(config?.actions && config.actions.exec)) {
+      throw new FileError(403, 'this file can make agent tools run commands; enable actions.exec to modify it');
+    }
+  }
+
   async function sync(type, rel) {
     try { await store.handleFsEvent({ type, path: rel }); } catch { /* best effort */ }
   }
@@ -70,12 +82,12 @@ export function createFileOps(ctx) {
   /** Internal helper: write content to a tracked project file (no hash check). */
   async function writeTracked(relIn, content) {
     const { rel, abs } = resolveSafe(root, relIn);
-    assertEditable(rel);
+    assertWritable(rel);
     return writeFile(rel, abs, content);
   }
 
   function readFresh(rel) {
-    const r = readTextIfExists(path.join(resolveSafe(root, rel).abs));
+    const r = readTextIfExists(path.join(resolveSafe(root, rel).abs), maxSize);
     return r ? r.content : (store.contents.get(rel) ?? null);
   }
 
@@ -86,7 +98,7 @@ export function createFileOps(ctx) {
     let st;
     try { st = fs.lstatSync(abs); } catch { throw new FileError(404, 'file not found'); }
     if (!st.isFile()) throw new FileError(404, 'not a file');
-    if (st.size > Math.max(maxSize, 5 * 1048576)) throw new FileError(413, 'file too large');
+    if (st.size > maxSize) throw new FileError(413, 'file too large');
     const r = readTextIfExists(abs);
     if (!r) throw new FileError(415, 'binary file');
     return { path: rel, content: r.content, hash: r.hash, mtime: r.mtime };
@@ -96,10 +108,11 @@ export function createFileOps(ctx) {
     if (typeof content !== 'string') throw new FileError(400, 'content must be a string');
     if (Buffer.byteLength(content) > maxSize) throw new FileError(413, 'content too large');
     const { rel, abs } = resolveSafe(root, input);
-    assertEditable(rel);
+    assertWritable(rel);
     let st = null;
     try { st = fs.lstatSync(abs); } catch { /* new file */ }
     if (st && !st.isFile()) throw new FileError(400, 'not a file');
+    if (st && st.size > maxSize) throw new FileError(413, 'file too large');
     const cur = st ? readTextIfExists(abs) : null;
     if (st && !cur) throw new FileError(415, 'binary file');
     if (cur) {
@@ -130,7 +143,7 @@ export function createFileOps(ctx) {
     if (!p) throw new FileError(400, 'path required');
     if (Buffer.byteLength(body) > maxSize) throw new FileError(413, 'content too large');
     const { rel, abs } = resolveSafe(root, p);
-    assertEditable(rel);
+    assertWritable(rel);
     if (fs.existsSync(abs)) throw new FileError(409, 'file already exists');
     writeNew(abs, body);
     try { store.history.record(rel, body); } catch { /* ignore */ }
@@ -150,7 +163,7 @@ export function createFileOps(ctx) {
     const isDir = st.isDirectory();
     if (!isDir && !st.isFile()) throw new FileError(400, 'unsupported file type');
     if (isDir && t.rel.startsWith(f.rel + '/')) throw new FileError(400, 'cannot move a directory into itself');
-    if (!isDir) assertEditable(f.rel);
+    if (!isDir) { assertWritable(f.rel); assertWritable(t.rel); } // the destination must be a tracked file type too
     try { fs.lstatSync(t.abs); throw new FileError(409, 'destination already exists'); } catch (e) { if (e instanceof FileError) throw e; }
 
     const moves = new Map();
@@ -273,33 +286,45 @@ export function createFileOps(ctx) {
     const rs = String(rep ?? '');
     const results = [];
     const changed = [];
+    const writes = [];
+    const deadline = Date.now() + REGEX_BUDGET_MS;
+    const sandbox = vm.createContext({});
+    // The user regex runs under a vm watchdog: catastrophic backtracking is interrupted instead of freezing the server.
+    const guarded = (fn) => {
+      sandbox.fn = fn;
+      try { return vm.runInContext('fn()', sandbox, { timeout: Math.max(10, deadline - Date.now()) }); } catch (e) {
+        if (e && e.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT') throw new FileError(400, 'pattern is too slow (possible catastrophic backtracking)');
+        throw e;
+      }
+    };
     for (const rel of targetPaths(paths)) {
       const content = readFresh(rel);
       if (content == null) continue;
       const lines = content.split('\n');
       let count = 0;
       let touched = false;
-      for (let i = 0; i < lines.length; i++) {
-        const raw = lines[i];
-        if (raw.length > 20000) continue;
-        const cr = raw.endsWith('\r');
-        const line = cr ? raw.slice(0, -1) : raw;
-        let n = 0;
-        re.lastIndex = 0;
-        const after = regex
-          ? line.replace(re, (...a) => { n++; return expandRep(rs, a); })
-          : line.replace(re, () => { n++; return rs; });
-        if (!n || after === line) continue;
-        count += n;
-        touched = true;
-        if (!apply) { if (results.length < 2000) results.push({ path: rel, line: i + 1, before: line, after }); else break; } else lines[i] = after + (cr ? '\r' : '');
-      }
-      if (apply && touched) {
-        await writeTracked(rel, lines.join('\n'));
-        changed.push({ path: rel, count });
-      }
+      guarded(() => {
+        for (let i = 0; i < lines.length; i++) {
+          const raw = lines[i];
+          if (raw.length > 20000) continue;
+          const cr = raw.endsWith('\r');
+          const line = cr ? raw.slice(0, -1) : raw;
+          let n = 0;
+          re.lastIndex = 0;
+          const after = regex
+            ? line.replace(re, (...a) => { n++; return expandRep(rs, a); })
+            : line.replace(re, () => { n++; return rs; });
+          if (!n || after === line) continue;
+          count += n;
+          touched = true;
+          if (!apply) { if (results.length < 2000) results.push({ path: rel, line: i + 1, before: line, after }); else break; } else lines[i] = after + (cr ? '\r' : '');
+        }
+      });
+      if (apply && touched) writes.push({ rel, text: lines.join('\n'), count });
       if (!apply && results.length >= 2000) break;
     }
+    // writes happen only after every file scanned cleanly, so a timeout never leaves a half-applied replace
+    for (const w of writes) { await writeTracked(w.rel, w.text); changed.push({ path: w.rel, count: w.count }); }
     return apply ? { changed } : results;
   }
 
@@ -346,7 +371,7 @@ export function createFileOps(ctx) {
 
   return {
     readRaw, save, create, rename, remove, listTrash, restore, purge, replace, resolveLink, backlinks,
-    writeTracked, readFresh, assertEditable,
+    writeTracked, readFresh, assertEditable, assertWritable,
   };
 }
 

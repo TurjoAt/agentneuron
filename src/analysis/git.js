@@ -129,6 +129,8 @@ export function createGit(root) {
   }
 
   async function show(path, rev = 'HEAD') {
+    // a rev starting with "-" would be parsed by git as an option (e.g. --output=FILE)
+    if (typeof rev !== 'string' || typeof path !== 'string' || !rev || rev.startsWith('-') || /[\0\r\n]/.test(rev + path)) return null;
     if (!(await available())) return null;
     const r = await run(root, ['show', `${rev}:./${path}`]);
     return r.ok ? r.out : null;

@@ -5,6 +5,17 @@ import { classify, isCandidate, isIgnored } from './classify.js';
 import { estimateTokens } from './tokens.js';
 
 const DEFAULT_MAX = 1048576;
+const realRoots = new Map();
+
+/** True when the file's real parent directory is inside the real project root (no symlinked-dir escape). */
+async function confined(root, abs) {
+  try {
+    let rr = realRoots.get(root);
+    if (!rr) { rr = await fs.promises.realpath(root); realRoots.set(root, rr); }
+    const rd = await fs.promises.realpath(path.dirname(abs));
+    return rd === rr || rd.startsWith(rr + path.sep);
+  } catch { return false; }
+}
 
 function findTitle(content) {
   let inFence = false;
@@ -36,6 +47,7 @@ export async function readEntry(root, relPath, maxSize = DEFAULT_MAX, extraPatte
   try {
     const st = await fs.promises.lstat(abs);
     if (!st.isFile() || st.size > maxSize) return null;
+    if (!(await confined(root, abs))) return null;
     const buf = await fs.promises.readFile(abs);
     if (buf.includes(0)) return null;
     const content = buf.toString('utf8');

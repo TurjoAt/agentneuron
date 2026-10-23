@@ -1,5 +1,8 @@
 import os from 'node:os';
 import { HttpError } from '../router.js';
+import { maskDeep } from '../mask.js';
+import { guardSync } from '../../files/syncguard.js';
+import { FileError } from '../../files/paths.js';
 import { scanAgentSetup, rulesForFile } from '../../agentcenter/setup.js';
 import { listTemplates, renderTemplate } from '../../agentcenter/templates.js';
 import { syncStatus, syncPlan } from '../../agentcenter/sync.js';
@@ -26,8 +29,9 @@ export default async function register(router, ctx) {
     return setupCache.v;
   };
 
-  router.get('/api/agents/setup', async ({ q }) => {
-    if (q.get('global') === '1') return scanAgentSetup(ctx.root, { home, includeGlobal: true });
+  router.get('/api/agents/setup', async ({ q, role }) => {
+    // the user's home-directory agent config is not project data: admin only
+    if (q.get('global') === '1' && ctx.can('state', role)) return scanAgentSetup(ctx.root, { home, includeGlobal: true });
     return setup(q.get('fresh') === '1');
   });
 
@@ -48,13 +52,18 @@ export default async function register(router, ctx) {
   router.get('/api/agents/sync/status', async () => syncStatus(ctx.root, ctx.allFiles(), ctx.store.contents));
 
   router.post('/api/agents/sync/plan', async ({ body }) => {
-    try { return syncPlan(ctx.root, { source: body.source, targets: body.targets, mode: body.mode }); } catch (e) { throw new HttpError(400, e.message); }
+    try {
+      // source/targets must be tracked, non-symlinked project files: this route is read-level and returns file content
+      const g = guardSync(ctx, { source: body.source, targets: body.targets });
+      return syncPlan(ctx.root, { source: g.source, targets: g.targets, mode: body.mode });
+    } catch (e) { throw new HttpError(e instanceof FileError ? e.status : 400, e.message); }
   });
 
   router.get('/api/agents/session', async ({ q }) => {
     const id = q.get('id');
     if (!id) throw new HttpError(400, 'id required');
-    return sessionTimeline(ctx.sessions, id, { root: ctx.root, home });
+    if (!/^[\w.-]{1,200}$/.test(id)) throw new HttpError(400, 'invalid id');
+    return maskDeep(await sessionTimeline(ctx.sessions, id, { root: ctx.root, home }));
   });
 
   router.get('/api/agents/costs', async ({ q }) => {

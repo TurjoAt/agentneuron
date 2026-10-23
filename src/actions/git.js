@@ -3,9 +3,10 @@ import path from 'node:path';
 import { createGit2 } from '../git2/index.js';
 import { cleanRelPath, validRefName, validRev } from '../git2/run.js';
 import { buildChangelog, prependChangelog } from '../git2/changelog.js';
+import { resolveSafe } from '../files/paths.js';
 import { resolveProjectDir, instances, clearCache } from '../workspace/index.js';
 
-const REMOTE_RE = /^[\w.-]+$/;
+const REMOTE_RE = /^[A-Za-z0-9_][\w.-]*$/; // never starts with '-': would be parsed as a git option
 
 function relPaths(ctx, paths) {
   if (!Array.isArray(paths) || !paths.length) throw new Error('paths required');
@@ -127,7 +128,7 @@ export default function register(registry, ctx) {
     run: async (p, c, job) => {
       const r = await buildChangelog(ctx.root, { from: p.from || undefined, to: p.to || 'HEAD' });
       if (r.error || r.available === false) throw new Error(r.error || r.reason);
-      const file = path.join(ctx.root, 'CHANGELOG.md');
+      const file = resolveSafe(ctx.root, 'CHANGELOG.md').abs; // refuses a symlinked CHANGELOG.md
       let ex = '';
       try { ex = fs.readFileSync(file, 'utf8'); } catch { /* new file */ }
       const next = prependChangelog(ex, r.markdown);

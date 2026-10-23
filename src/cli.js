@@ -129,6 +129,7 @@ async function cmdStart(root, flags, workspace = false) {
   if (port !== undefined) overrides.port = Number(port);
   if (flags.host) overrides.host = String(flags.host);
   if (flags.token) overrides.token = String(flags.token);
+  else if (process.env.AGENTNEURON_TOKEN) overrides.token = String(process.env.AGENTNEURON_TOKEN);
   if (flags['admin-token']) overrides.adminToken = String(flags['admin-token']);
   if (flags.open) overrides.openBrowser = true;
   let enable;
@@ -142,16 +143,26 @@ async function cmdStart(root, flags, workspace = false) {
   console.log(`  AgentNeuron ${VERSION}  -  AI context control center`);
   console.log(`  project : ${root}`);
   console.log(`  files   : ${srv.store.files.size}`);
-  console.log(`  open    : ${srv.url}`);
-  if (srv.token && config.tokenGenerated) console.log(`  token   : ${srv.token} (auto-generated, host is not loopback)`);
-  if (config.adminToken) console.log('  roles   : admin token set (--token / config token = read-only viewer)');
+  const mask = (t) => (String(t).length >= 12 ? `${String(t).slice(0, 4)}****` : "****"); // never reveal short tokens
+  console.log(`  open    : ${srv.ctx.url}`);
+  if (srv.token && config.tokenGenerated) {
+    console.log(`  token   : ${srv.token}`);
+    console.log('            (auto-generated because the host is not loopback; shown ONCE - it is not stored. Keep it out of logs.)');
+  } else if (srv.token || srv.adminToken) {
+    console.log(`  token   : required (${config.adminToken ? 'viewer ' : ''}${mask(srv.token || srv.adminToken)}); enter it on the login screen`);
+  }
+  if (config.adminToken) console.log(`  roles   : admin token set (${mask(config.adminToken)}); --token / config token = read-only viewer`);
+  if (config.configWarning) console.error(`  WARNING : ${config.configWarning}`);
+  if (config.fileEnabled?.length) {
+    console.log(`  WARNING : .agentneuron/config.json enables ${config.fileEnabled.join(', ')}. If you did not write that file (e.g. a cloned repo), stop and review it.`);
+  }
   const on = Object.entries(config.actions).filter(([, v]) => v).map(([k]) => k);
   console.log(`  actions : ${on.length ? on.join(', ') + ' enabled' : 'read-only (enable with --enable edit,exec,...)'}`);
   if (workspace) console.log(`  mode    : workspace (${root})`);
   console.log('  Ctrl+C to stop\n');
   if (config.openBrowser) {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
-    exec(`${cmd} "${srv.url}"`, () => {});
+    exec(`${cmd} "${srv.url}"`, () => {}); // explicit --open: the tokenised URL is only ever passed to the browser launcher
   }
   let stopping = false;
   const stop = async () => {

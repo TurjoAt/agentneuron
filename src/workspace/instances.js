@@ -42,10 +42,12 @@ export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutM
   const ex = children.get(abs);
   if (ex && ex.child.exitCode === null && !ex.child.killed) return Promise.resolve({ url: ex.url, pid: ex.pid, reused: true });
   const args = [cli, 'start', abs, '--port', '0', '--host', host];
-  if (token) args.push('--token', token);
+  // token goes through the environment, not argv: argv is world-readable in `ps`
+  const env = { ...process.env };
+  if (token) env.AGENTNEURON_TOKEN = token; else delete env.AGENTNEURON_TOKEN;
   return new Promise((resolve, reject) => {
     let child;
-    try { child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }); }
+    try { child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env }); }
     catch (e) { return reject(e); }
     let buf = '', done = false;
     const finish = (err, val) => {
@@ -58,7 +60,8 @@ export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutM
       buf += d.toString();
       const m = /https?:\/\/[^\s'"]+/.exec(buf);
       if (m) {
-        const url = m[0];
+        // the child no longer prints its token; hand the admin caller a ready-to-open URL
+        const url = token ? `${m[0].replace(/\/?$/, '/')}?token=${encodeURIComponent(token)}` : m[0];
         children.set(abs, { child, url, startedAt: Date.now(), pid: child.pid });
         finish(null, { url, pid: child.pid, reused: false });
       }

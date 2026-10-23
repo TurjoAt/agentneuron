@@ -81,10 +81,10 @@ export function writeNew(abs, content) {
   }
 }
 
-export function readTextIfExists(abs) {
+export function readTextIfExists(abs, maxBytes = Infinity) {
   try {
     const st = fs.lstatSync(abs);
-    if (!st.isFile()) return null;
+    if (!st.isFile() || st.size > maxBytes) return null;
     const buf = fs.readFileSync(abs);
     if (buf.includes(0)) return null;
     return { content: buf.toString('utf8'), hash: crypto.createHash('sha1').update(buf).digest('hex'), mtime: Math.floor(st.mtimeMs) };

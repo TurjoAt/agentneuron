@@ -75,7 +75,7 @@ test('misc endpoints return JSON', async () => {
 });
 
 test('restore is forbidden without allowWrite; diff works', async () => {
-  const r = await fetch(`${base}/api/restore?token=${TOKEN}`, { method: 'POST', body: '{"path":"CLAUDE.md","id":"x"}' });
+  const r = await fetch(`${base}/api/restore?token=${TOKEN}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"path":"CLAUDE.md","id":"x"}' });
   assert.equal(r.status, 403);
   const hist = (await get('/api/history?path=CLAUDE.md')).body;
   if (hist.length) {
