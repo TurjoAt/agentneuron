@@ -143,18 +143,19 @@ function feed(st, buf, apply) {
 const cache = new Map();
 
 function parseFile(file, kind) {
-  let stat;
-  try { stat = fs.statSync(file); } catch { cache.delete(file); return null; }
+  let fd, stat;
+  try { fd = fs.openSync(file, 'r'); stat = fs.fstatSync(fd); } catch {
+    if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
+    cache.delete(file); return null;
+  }
   let c = cache.get(file);
-  if (c && c.mtimeMs === stat.mtimeMs && c.size === stat.size) return c.state;
+  if (c && c.mtimeMs === stat.mtimeMs && c.size === stat.size) { try { fs.closeSync(fd); } catch { /* ignore */ } return c.state; }
   const apply = kind === 'codex' ? applyCodex : applyClaude;
   if (!c || stat.size < c.offset) {
     c = { offset: 0, state: newState(file) };
     if (kind === 'codex') c.state.tool = 'codex';
   }
-  let fd;
   try {
-    fd = fs.openSync(file, 'r');
     const len = stat.size - c.offset;
     if (len > 0) {
       const buf = Buffer.alloc(len);

@@ -190,7 +190,7 @@ export const dotnet = {
       while ((m = re.exec(t))) deps.push({ name: m[1], version: m[2] || '*', dev: false, manager: 'nuget' });
       const tf = /<TargetFramework>([^<]+)</.exec(t)?.[1] || null;
       if (!res.stacks.length) res.stacks.push(stack('dotnet', '.NET', 'runtime', { version: tf, confidence: 0.95, source: p }));
-      if (/Microsoft\.NET\.Sdk\.Web/.test(t) && !res.stacks.some((s) => s.id === 'aspnet')) res.stacks.push(stack('aspnet', 'ASP.NET Core', 'framework', { version: tf, confidence: 0.9, source: p }));
+      if (t.includes('Microsoft.NET.Sdk.Web') && !res.stacks.some((s) => s.id === 'aspnet')) res.stacks.push(stack('aspnet', 'ASP.NET Core', 'framework', { version: tf, confidence: 0.9, source: p }));
       res.manifests.push({ path: p, type: 'dotnet', name: p.split('/').pop().replace(/\.\w+$/, ''), version: null, scripts: {}, deps });
     }
     return res;

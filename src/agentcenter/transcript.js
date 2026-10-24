@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { maskSecretsInText } from '../health/secrets.js';
 import { projectDirName } from '../agents/sessions.js';
+import { readRegular } from '../files/safeio.js';
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const MAX_BYTES = 64 * 1024 * 1024;
@@ -61,13 +62,9 @@ export function locateTranscript(id, { root, home = os.homedir() } = {}) {
 }
 
 function readLines(file) {
-  let st;
-  try { st = fs.statSync(file); } catch { return []; }
-  let buf;
-  if (st.size > MAX_BYTES) {
-    const fd = fs.openSync(file, 'r');
-    try { buf = Buffer.alloc(MAX_BYTES); fs.readSync(fd, buf, 0, MAX_BYTES, st.size - MAX_BYTES); } finally { fs.closeSync(fd); }
-  } else buf = fs.readFileSync(file);
+  const r = readRegular(file, { follow: true, tail: MAX_BYTES });
+  if (!r) return [];
+  const buf = r.buf;
   const out = [];
   for (const line of buf.toString('utf8').split('\n')) {
     if (!line.trim()) continue;

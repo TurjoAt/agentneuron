@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { readRegular } from './safeio.js';
 
 export class FileError extends Error {
   constructor(status, message, extra = null) { super(message); this.status = status; this.extra = extra; }
@@ -82,13 +83,9 @@ export function writeNew(abs, content) {
 }
 
 export function readTextIfExists(abs, maxBytes = Infinity) {
-  try {
-    const st = fs.lstatSync(abs);
-    if (!st.isFile() || st.size > maxBytes) return null;
-    const buf = fs.readFileSync(abs);
-    if (buf.includes(0)) return null;
-    return { content: buf.toString('utf8'), hash: crypto.createHash('sha1').update(buf).digest('hex'), mtime: Math.floor(st.mtimeMs) };
-  } catch { return null; }
+  const r = readRegular(abs, { maxBytes });
+  if (!r || r.buf.includes(0)) return null;
+  return { content: r.buf.toString('utf8'), hash: crypto.createHash('sha1').update(r.buf).digest('hex'), mtime: Math.floor(r.st.mtimeMs) };
 }
 
 export function atomicJson(abs, data) {

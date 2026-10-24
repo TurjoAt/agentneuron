@@ -1,19 +1,11 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { maskSecretsInText } from './secrets.js';
+import { readRegular } from '../files/safeio.js';
 
 function readText(root, rel) {
-  try {
-    const abs = path.join(root, rel);
-    // lstat + realpath of the parent: neither a symlinked file nor a symlinked directory may lead outside the project
-    const st = fs.lstatSync(abs);
-    if (!st.isFile() || st.size > 2 * 1024 * 1024) return null;
-    const rr = fs.realpathSync(root), rd = fs.realpathSync(path.dirname(abs));
-    if (rd !== rr && !rd.startsWith(rr + path.sep)) return null;
-    return fs.readFileSync(abs, 'utf8');
-  } catch {
-    return null;
-  }
+  // no symlinked file, and the real location (through any symlinked directory) must stay inside the project
+  const r = readRegular(path.join(root, rel), { maxBytes: 2 * 1024 * 1024, confine: root });
+  return r ? r.buf.toString('utf8') : null;
 }
 
 function readJson(root, rel) {

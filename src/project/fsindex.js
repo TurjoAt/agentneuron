@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { isIgnored } from '../core/classify.js';
+import { readRegularAsync } from '../files/safeio.js';
 
 export const WALK_CAP = 50000;
 const EXTRA_SKIP = new Set(['.venv', 'venv', '__pycache__', 'target', '.cache', 'coverage', '.nuxt', '.svelte-kit', '.turbo', '.gradle', '.idea', '.output', '.parcel-cache', '.pytest_cache', '.mypy_cache', '.tox', 'obj']);
@@ -45,12 +46,8 @@ export async function buildIndex(root, { cap = WALK_CAP } = {}) {
     /** direct children files of dir ('' = root) */
     ls: (dir = '') => files.filter((f) => { const d = f.path.lastIndexOf('/'); return (d < 0 ? '' : f.path.slice(0, d)) === dir; }).map((f) => f.path),
     async read(p, max = 2 * 1024 * 1024) {
-      try {
-        const abs = path.join(root, p);
-        const st = await fsp.stat(abs);
-        if (!st.isFile() || st.size > max) return null;
-        return await fsp.readFile(abs, 'utf8');
-      } catch { return null; }
+      const r = await readRegularAsync(path.join(root, p), { maxBytes: max, follow: true });
+      return r ? r.buf.toString('utf8') : null;
     },
     async readJson(p) {
       const t = await idx.read(p);

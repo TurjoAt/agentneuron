@@ -17,12 +17,22 @@ const TABLE_SEP_RE = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
 
 const lead = (s) => s.match(/^\s*/)[0].replace(/\t/g, '    ').length;
 
+/** Drop everything between < and > (and the brackets), character by character. */
+function stripTags(s) {
+  let out = '', inTag = false;
+  for (const ch of s) {
+    if (ch === '<') inTag = true;
+    else if (ch === '>') inTag = false;
+    else if (!inTag) out += ch;
+  }
+  return out;
+}
+
 export function slugify(text) {
   return (
     'h-' +
-    String(text)
+    stripTags(String(text))
       .toLowerCase()
-      .replace(/<[^>]*>/g, '')
       .replace(/[^\p{L}\p{N}\s-]/gu, '')
       .trim()
       .replace(/\s+/g, '-')

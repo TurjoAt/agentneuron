@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Security
+
+- Project files are checked and read through one file descriptor, so a file swapped for a symlink between the check and the read can no longer lead outside the project.
+- Unexpected server errors return their message only (or `internal error`), never a raw thrown value.
+- Cookie parsing ignores keys such as `__proto__`.
+- The Composer package-name check no longer backtracks exponentially on long input.
+- The UI's CSP script hashing also matches `</script >` end tags; heading slugs strip tags without regexes; report table cells escape backslashes.
+
 ## [0.2.0] - 2026-10-23
 
 From monitor to control center. Everything that changes anything is opt-in and off by default.

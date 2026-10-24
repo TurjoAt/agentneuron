@@ -100,10 +100,13 @@ function cmdInit(root) {
   ensureAgentneuronDir(root);
   const dir = path.join(root, '.agentneuron');
   const cfg = path.join(dir, 'config.json');
-  if (!fs.existsSync(cfg)) {
-    fs.writeFileSync(cfg, JSON.stringify({ port: 4747, ignore: [], extraPatterns: [], includeAllMarkdown: true }, null, 2) + '\n');
+  try {
+    fs.writeFileSync(cfg, JSON.stringify({ port: 4747, ignore: [], extraPatterns: [], includeAllMarkdown: true }, null, 2) + '\n', { flag: 'wx' });
     console.log(`created ${path.relative(process.cwd(), cfg) || cfg}`);
-  } else console.log('config.json already exists');
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+    console.log('config.json already exists');
+  }
   const self = fileURLToPath(import.meta.url);
   if (globalThis.__AGENTNEURON_UI__ !== undefined && self.endsWith('.mjs')) {
     const dest = path.join(dir, 'agentneuron.mjs');

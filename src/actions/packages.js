@@ -7,7 +7,7 @@ export const MANAGERS = ['npm', 'pnpm', 'yarn', 'bun', 'composer', 'pip', 'poetr
 export const ARTISAN_ALLOW = ['about', 'route:list', 'migrate:status', 'cache:clear', 'config:clear', 'view:clear', 'route:clear', 'optimize:clear', 'queue:failed', 'schedule:list'];
 
 const NPM_NAME = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/;
-const COMPOSER_NAME = /^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9]([_.-]?[a-z0-9]+)*$/;
+const COMPOSER_NAME = /^[a-z0-9]+(?:[_.-][a-z0-9]+)*\/[a-z0-9]+(?:[_.-][a-z0-9]+)*$/;
 const PY_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const VERSION = /^[\w.^~<>=*|-]+$/;
 const SCRIPT = /^[\w][\w:.@/-]*$/;

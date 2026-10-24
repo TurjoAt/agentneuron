@@ -222,7 +222,7 @@ const KPI_LABELS = [
 ];
 const iso = (t) => new Date(t).toISOString();
 const fmt = (v) => (v === null || v === undefined ? '-' : String(v));
-const mdCell = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+const mdCell = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 export function renderMd(rep) {
   const L = [`# agentneuron report`, '', `Range: ${iso(rep.range.from)} to ${iso(rep.range.to)} (previous: ${iso(rep.prevRange.from)} to ${iso(rep.prevRange.to)})`, '',

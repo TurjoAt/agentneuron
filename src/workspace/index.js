@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../git2/run.js';
 import * as instances from './instances.js';
+import { readRegular } from '../files/safeio.js';
 
 export { instances };
 
@@ -53,8 +54,9 @@ function branchOf(dir) {
   try {
     const g = path.join(dir, '.git');
     let head = path.join(g, 'HEAD');
-    if (fs.statSync(g).isFile()) { // worktree/submodule pointer
-      const m = /gitdir:\s*(.+)/.exec(fs.readFileSync(g, 'utf8'));
+    const ptr = readRegular(g, { follow: true, maxBytes: 4096 }); // worktree/submodule pointer file
+    if (ptr) {
+      const m = /gitdir:\s*(.+)/.exec(ptr.buf.toString('utf8'));
       if (!m) return null;
       head = path.join(path.resolve(dir, m[1].trim()), 'HEAD');
     }

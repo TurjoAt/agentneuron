@@ -49,7 +49,7 @@ export function hostnameOf(h) {
 /** CSP for the single-file UI: inline scripts are allow-listed by sha256 (no 'unsafe-inline' for scripts). */
 export function uiCsp(html) {
   const hashes = [];
-  for (const m of String(html).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  for (const m of String(html).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)) {
     if (/\bsrc\s*=/i.test(m[1])) continue;
     hashes.push(`'sha256-${crypto.createHash('sha256').update(m[2]).digest('base64')}'`);
   }
@@ -254,15 +254,15 @@ export async function startServer(config) {
     return eq(given, config.token) ? 'admin' : null;
   }
   function parseCookies(req) {
-    const out = {};
+    const out = new Map();
     for (const part of String(req.headers.cookie || '').split(';')) {
       const i = part.indexOf('='); if (i < 0) continue;
-      out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+      out.set(part.slice(0, i).trim(), part.slice(i + 1).trim());
     }
     return out;
   }
   function sessionRole(req) {
-    const sid = parseCookies(req)[SESSION_COOKIE];
+    const sid = parseCookies(req).get(SESSION_COOKIE);
     const s = sid && sessionsMap.get(sid);
     if (!s) return null;
     if (s.exp < Date.now()) { sessionsMap.delete(sid); return null; }
@@ -309,7 +309,7 @@ export async function startServer(config) {
       return res.end(JSON.stringify({ role, levels: levelsFor(role), tokenRequired: tokenRequired() }));
     }
     if (p === '/api/auth/logout' && req.method === 'POST') {
-      const sid = parseCookies(req)[SESSION_COOKIE];
+      const sid = parseCookies(req).get(SESSION_COOKIE);
       if (sid) sessionsMap.delete(sid);
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'set-cookie': cookieHeader('', 0, req) });
       return res.end('{"ok":true}');
@@ -457,7 +457,7 @@ export async function startServer(config) {
       if (audited) ctx.persist.audit.log({ role, ip, route: `${req.method} ${url.pathname}`, params: req.method === 'GET' ? Object.fromEntries(url.searchParams) : body, status });
       if (res.headersSent) { try { res.end(); } catch {} return true; }
       if (e instanceof HttpError) bad(res, e.status, e.message);
-      else { warn('route ' + url.pathname, e); bad(res, 500, String(e.message || e)); }
+      else { warn('route ' + url.pathname, e); bad(res, 500, (e instanceof Error && e.message) || 'internal error'); }
     }
     return true;
   }

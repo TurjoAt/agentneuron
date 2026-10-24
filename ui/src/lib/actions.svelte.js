@@ -62,7 +62,7 @@ export function actionEnabled(id) {
 
 function guessLevel(id) {
   if (/discard|delete|drop|purge|migrate|terminal|clear/.test(id)) return 'danger';
-  if (/^(packages|scripts|framework)\.|fetch|pull|push|mcp\.test|workspace\.open/.test(id)) return 'exec';
+  if (/^(packages|scripts|framework)\./.test(id) || /fetch|pull|push|mcp\.test|workspace\.open/.test(id)) return 'exec';
   if (/^agentneuron\.(rescan|snapshot)/.test(id)) return 'state';
   return 'edit';
 }

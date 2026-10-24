@@ -64,7 +64,8 @@ export function createPersist(ctx, opts = {}) {
     start() {
       try { // keep generated data out of git
         const gi = path.join(dir, '.gitignore');
-        const cur = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : null;
+        let cur = null;
+        try { cur = fs.readFileSync(gi, 'utf8'); } catch { /* no .gitignore: nothing to extend */ }
         if (cur !== null) {
           const add = ['trash/', '*.jsonl', '*.jsonl.*'].filter((l) => !cur.split('\n').includes(l));
           if (add.length) fs.appendFileSync(gi, (cur.endsWith('\n') ? '' : '\n') + add.join('\n') + '\n');

@@ -6,6 +6,7 @@ import { estimateTokens } from '../core/tokens.js';
 import { readAgentConfig } from '../health/configview.js';
 import { maskSecretsInText } from '../health/secrets.js';
 import { parseFrontmatter, toList } from './frontmatter.js';
+import { readRegular } from '../files/safeio.js';
 
 export const TOOL_NAMES = {
   claude: 'Claude Code', codex: 'OpenAI Codex', cursor: 'Cursor', copilot: 'GitHub Copilot', windsurf: 'Windsurf',
@@ -108,16 +109,8 @@ function walk(base, { maxDepth = 6, cap = 40000, skip = SKIP, only = null } = {}
 
 /** Read a small text file. With `confine` (a project root) symlinks that resolve outside it are refused. */
 function readText(abs, confine = null) {
-  try {
-    const st = fs.statSync(abs);
-    if (!st.isFile() || st.size > MAX_FILE) return null;
-    if (confine) {
-      const real = fs.realpathSync(abs);
-      const rootReal = fs.realpathSync(confine);
-      if (real !== rootReal && !real.startsWith(rootReal + path.sep)) return null;
-    }
-    return fs.readFileSync(abs, 'utf8');
-  } catch { return null; }
+  const r = readRegular(abs, { maxBytes: MAX_FILE, follow: true, confine });
+  return r ? r.buf.toString('utf8') : null;
 }
 
 function readJsonFile(abs, confine = null) {
