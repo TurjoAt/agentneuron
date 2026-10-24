@@ -1,6 +1,6 @@
 {
   "name": "agentneuron",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI context control center: monitor, understand and act on CLAUDE.md, AGENTS.md, Cursor/Copilot rules, skills and agent configs — live web UI, MCP server, git & project intelligence.",
   "keywords": [
     "claude",

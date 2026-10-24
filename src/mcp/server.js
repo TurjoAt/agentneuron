@@ -187,7 +187,7 @@ export async function runMcpServer(root, config = {}, io = {}) {
         return rpcResult(msg.id, {
           protocolVersion: SUPPORTED.has(want) ? want : PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'agentneuron', version: globalThis.__AGENTNEURON_VERSION__ || '0.2.0' },
+          serverInfo: { name: 'agentneuron', version: globalThis.__AGENTNEURON_VERSION__ || '0.2.1' },
           instructions: 'agentneuron exposes the AI-context markdown of this project (CLAUDE.md, AGENTS.md, rules, skills, docs). Read-only.',
         });
       }

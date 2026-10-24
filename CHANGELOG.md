@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-24
+
+First release on npm (0.2.0 was tagged on GitHub but not published to npm).
+
 ### Security
 
 - Project files are checked and read through one file descriptor, so a file swapped for a symlink between the check and the read can no longer lead outside the project.
@@ -63,6 +67,7 @@ Initial release, developed as `mdctl`: a live monitor for AI-context Markdown.
 - Agent session discovery and a concurrent-edit conflict radar.
 - Server-Sent Events live updates, text search, token authentication, `init` and `status` commands.
 
-[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/TurjoAt/agentneuron/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/TurjoAt/agentneuron/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/TurjoAt/agentneuron/releases/tag/v0.1.0

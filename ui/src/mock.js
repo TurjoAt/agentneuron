@@ -1037,7 +1037,7 @@ export function createMock() {
     '/api/state': () => {
       const h = health();
       return {
-        project: PROJECT, version: '0.2.0-mock', startedAt, allowWrite: can('edit'), actions: clone(config.actions), counts: counts(),
+        project: PROJECT, version: '0.2.1-mock', startedAt, allowWrite: can('edit'), actions: clone(config.actions), counts: counts(),
         health: { score: h.score, grade: h.grade, counts: h.counts },
         git: { available: true, branch: currentBranch, dirty: [...db.values()].filter((f) => f.gitStatus).length },
       };
@@ -1115,7 +1115,7 @@ export function createMock() {
       roles: { you: role, tokenRequired, adminToken: tokenRequired, viewerToken: tokenRequired },
       notifications: { browser: true, webhooks: [{ url: 'https://hooks.slack.com/services/T0***/B0***/***', events: ['secret', 'conflict', 'job-failed'] }, { url: 'https://discord.com/api/webhooks/12***/***', events: ['health-drop'] }] },
       paths: { root: PROJECT.root, data: '.agentneuron', config: '.agentneuron/config.json', audit: '.agentneuron/audit.jsonl', events: '.agentneuron/events.jsonl', metrics: '.agentneuron/metrics.jsonl' },
-      version: '0.2.0-mock',
+      version: '0.2.1-mock',
       howToEnable: 'Actions beyond read are OFF by default. Enable them in .agentneuron/config.json, e.g. {"actions":{"edit":true,"exec":true}}, or start agentneuron with --enable edit,exec[,danger,terminal]. Use --admin-token to separate admin from read-only viewers.',
     }),
 
