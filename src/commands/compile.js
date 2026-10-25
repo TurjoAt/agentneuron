@@ -95,9 +95,11 @@ export async function cmdGenerate(root, flags, log = console) {
   const g = await generateContext(root, { tool });
   if (!flags.out) { process.stdout.write(g.content); return 0; }
   const dest = flags.out === true ? path.join(root, g.path) : path.resolve(String(flags.out));
-  if (fs.existsSync(dest) && !flags.force) { log.error(`agentneuron: ${dest} exists; pass --force to overwrite (or omit --out to print)`); return 1; }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, g.content, { flag: flags.force ? 'w' : 'wx' });
+  try { fs.writeFileSync(dest, g.content, { flag: flags.force ? 'w' : 'wx' }); } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+    log.error(`agentneuron: ${dest} exists; pass --force to overwrite (or omit --out to print)`); return 1;
+  }
   log.error(`wrote ${dest} (${g.items.length} cited line(s))`);
   return 0;
 }

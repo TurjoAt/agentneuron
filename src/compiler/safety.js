@@ -48,7 +48,7 @@ export function globError(g) {
 
 /** Single-line, length-capped text safe for headings and quoted YAML. */
 export function cleanText(s, max = 200) {
-  return String(s ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').replace(/<!--|-->/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+  return String(s ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').replace(/<!--|--!?>/g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
 const realRoot = (root) => { try { return fs.realpathSync(root); } catch { return path.resolve(root); } };

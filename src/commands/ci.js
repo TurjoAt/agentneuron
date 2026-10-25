@@ -104,7 +104,7 @@ export function annotations(issues, prefix = '') {
   return lines;
 }
 
-const cell = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+const cell = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 
 export function markdown(res) {
   const { issues, failed, failOn, base } = res;
