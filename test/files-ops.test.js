@@ -282,3 +282,11 @@ test('isCaseAlias: only a same-dir, same-entry, case-only difference', async () 
   // on a case-sensitive FS the other casing doesn't exist; on a case-insensitive one it is the same entry
   assert.equal(isCaseAlias(a, path.join(r, 'docs', 'A.md')), fs.existsSync(path.join(r, 'docs', 'A.md')));
 });
+
+test('watcher treats an old-cased name the folder no longer lists as removed', async () => {
+  const { listedExactly } = await import('../src/core/watcher.js');
+  const ls = () => ['Notes.md', 'b.md'];
+  assert.equal(listedExactly('/p/Notes.md', ls), true);
+  assert.equal(listedExactly('/p/notes.md', ls), false);
+  assert.equal(listedExactly('/p/x.md', () => { throw new Error('EACCES'); }), true);
+});

@@ -1,8 +1,15 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import chokidar from 'chokidar';
 import { isCandidate, isIgnored } from './classify.js';
 
 const DEBOUNCE_MS = 150;
+const CASE_INSENSITIVE = process.platform === 'darwin' || process.platform === 'win32';
+
+/** On case-insensitive filesystems an old-cased name still stats after a case-only rename: it is gone if its parent no longer lists it. */
+export function listedExactly(abs, readdir = fs.readdirSync) {
+  try { return readdir(path.dirname(abs)).includes(path.basename(abs)); } catch { return true; }
+}
 
 /**
  * Watch the project for candidate files. onEvent({type:'add'|'change'|'unlink', path}) is
@@ -36,8 +43,9 @@ export function createWatcher(root, config, onEvent) {
     pending.set(rel, prev === 'add' && type === 'change' ? 'add' : type);
     clearTimeout(timers.get(rel));
     timers.set(rel, setTimeout(() => {
-      const t = pending.get(rel);
+      let t = pending.get(rel);
       pending.delete(rel);
+      if (CASE_INSENSITIVE && t !== 'unlink' && !listedExactly(abs)) t = 'unlink';
       timers.delete(rel);
       try { onEvent({ type: t, path: rel }); } catch { /* listener errors must not kill the watcher */ }
     }, debounceMs));
