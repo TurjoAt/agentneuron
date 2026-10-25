@@ -169,7 +169,8 @@ test('export: range parsing, formats, --out, bad input', () => {
   const now = 1e12;
   assert.deepEqual(parseRangeArg('7d', now), { from: now - 7 * 86400000, to: now });
   assert.deepEqual(parseRangeArg('24h', now), { from: now - 86400000, to: now });
-  assert.equal(parseRangeArg('all', now).from, 1);
+  assert.equal(parseRangeArg('all', now).from, null);
+  assert.equal(parseRangeArg('99999d', now), null);
   assert.equal(parseRangeArg('7x', now), null);
   assert.equal(parseRangeArg('0d', now), null);
 
@@ -194,6 +195,16 @@ test('export: range parsing, formats, --out, bad input', () => {
   assert.equal(run(['export', d, '--format', 'pdf']).status, 2);
   assert.equal(run(['export', d, '--range', 'yesterday']).status, 2);
   assert.deepEqual(fs.readdirSync(d), ['CLAUDE.md'], 'export writes nothing into the project');
+
+  // --range all starts at the oldest recorded event (not 1970)
+  fs.mkdirSync(path.join(d, '.agentneuron'));
+  const ts = Date.now() - 40 * 86400000;
+  fs.writeFileSync(path.join(d, '.agentneuron/events.jsonl'), JSON.stringify({ id: 1, type: 'change', path: 'CLAUDE.md', ts, stats: { added: 3, removed: 0 } }) + '\n');
+  const all = run(['export', d, '--range', 'all', '--format', 'csv']);
+  assert.equal(all.status, 0, all.stderr);
+  const rows = all.stdout.trim().split('\n');
+  assert.equal(rows[1], `${new Date(Math.floor(ts / 86400000) * 86400000).toISOString().slice(0, 10)},1,3,0,0`);
+  assert.ok(rows.length >= 41 && rows.length <= 43, String(rows.length));
 });
 
 test('help: grouped, per-command, backward compatible', () => {

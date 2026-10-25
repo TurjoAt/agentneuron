@@ -97,7 +97,7 @@ Write an activity and health report built from the same data as the Reports view
 | Flag | Description |
 |---|---|
 | `--format <f>` | `ai` (default; compact text for pasting into an AI chat), `json`, `md`, `csv`, `html`. Anything else exits with code 2. |
-| `--range <r>` | `24h`, `7d` (default), `2w`, `90d`, ... or `all`. Malformed values exit with code 2. |
+| `--range <r>` | `24h`, `7d` (default), `2w`, `90d`, ... (at most 2000 days) or `all` (from the oldest recorded event). Malformed values exit with code 2. |
 | `--out <file>` | Write to a file (relative to the current directory) instead of stdout. |
 
 ```sh
