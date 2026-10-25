@@ -6,7 +6,7 @@ Short, self-contained answers about AgentNeuron. For setup steps see [getting st
 
 ### What is AgentNeuron?
 
-AgentNeuron is an open-source (MIT) Node.js CLI, local web dashboard and read-only MCP server for the context files AI coding agents read: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, GitHub Copilot instructions, Windsurf and Cline rules, skills, subagents and MCP configs. It monitors them live, lints them, shows what each agent sees, and can act on them when you allow it.
+AgentNeuron is an open-source (MIT) Node.js CLI, local web dashboard and read-only MCP server for the context files AI coding agents read: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, GitHub Copilot instructions, Windsurf rules, skills, subagents and MCP configs. It monitors them live, lints them, shows what each agent sees, and can act on them when you allow it.
 
 ### Who is it for?
 

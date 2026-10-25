@@ -39,7 +39,7 @@ const exampleDir = path.join(repo, 'examples', example);
 const SHOTS = [
   { name: 'overview', hash: '#/overview', theme: 'dark', settle: 1200 },
   { name: 'overview-light', hash: '#/overview', theme: 'light', settle: 1200 },
-  { name: 'graph', hash: '#/graph', theme: 'dark', wait: 'svg, canvas', settle: 4000 },
+  { name: 'graph', hash: '#/graph', theme: 'dark', wait: 'svg, canvas', settle: 4000, click: 'button[title^="Zoom out"]' },
   { name: 'tasks', hash: '#/tasks', theme: 'dark', settle: 1200 },
   { name: 'reports', hash: '#/reports', theme: 'dark', settle: 1500 },
   { name: 'agents', hash: '#/agents', theme: 'dark', settle: 1200 },
@@ -80,7 +80,10 @@ function startServer(projectDir, home) {
       },
     );
     let out = '';
-    const timer = setTimeout(() => reject(new Error(`server not ready after 30s:\n${out}`)), 30000);
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error(`server not ready after 30s:\n${out}`));
+    }, 30000);
     const onData = (d) => {
       out += d;
       const m = out.match(/open\s*:\s*(http\S+)/);
@@ -138,6 +141,7 @@ async function main() {
   };
   process.on('SIGINT', () => {
     stop();
+    fs.rmSync(tmp, { recursive: true, force: true });
     process.exit(130);
   });
 
@@ -166,6 +170,10 @@ async function main() {
       await page.waitForSelector('main, #app > *', { timeout: 15000 });
       if (shot.wait) await page.waitForSelector(shot.wait, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(shot.settle);
+      if (shot.click) {
+        await page.click(shot.click, { timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(1000);
+      }
       const file = path.join(outDir, `${shot.name}.png`);
       await page.screenshot({ path: file });
       console.log(`saved ${path.relative(repo, file)}`);

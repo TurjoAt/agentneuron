@@ -1,6 +1,6 @@
 # AgentNeuron
 
-**AgentNeuron is an open-source, local control center for AI coding-agent context files.** It scans, lints and live-monitors `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, GitHub Copilot instructions, Windsurf and Cline rules, skills, subagents and MCP configs, and shows them in a web dashboard, a CLI and an MCP server.
+**AgentNeuron is an open-source, local control center for AI coding-agent context files.** It scans, lints and live-monitors `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, GitHub Copilot instructions, Windsurf rules, skills, subagents and MCP configs, and shows them in a web dashboard, a CLI and an MCP server.
 
 [![npm version](https://img.shields.io/npm/v/agentneuron)](https://www.npmjs.com/package/agentneuron)
 [![npm downloads](https://img.shields.io/npm/dm/agentneuron)](https://www.npmjs.com/package/agentneuron)

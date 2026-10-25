@@ -1,6 +1,6 @@
 # AgentNeuron
 
-> AgentNeuron (npm package `agentneuron`) is an open-source, MIT-licensed Node.js CLI, local web dashboard and read-only MCP server that monitors, lints and manages AI coding-agent context files: CLAUDE.md, AGENTS.md, GEMINI.md, Cursor rules, GitHub Copilot instructions, Windsurf and Cline rules, skills, subagents and MCP configs.
+> AgentNeuron (npm package `agentneuron`) is an open-source, MIT-licensed Node.js CLI, local web dashboard and read-only MCP server that monitors, lints and manages AI coding-agent context files: CLAUDE.md, AGENTS.md, GEMINI.md, Cursor rules, GitHub Copilot instructions, Windsurf rules, skills, subagents and MCP configs.
 
 Key facts:
 
