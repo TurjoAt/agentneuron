@@ -8,7 +8,8 @@ import project from './project.js';
 import agentcenter from './agentcenter.js';
 import workspace from './workspace.js';
 import live from './live.js';
+import verify from './verify.js';
 
 export async function registerAll(router, ctx) {
-  for (const reg of [system, files, tasks, git, reports, project, agentcenter, workspace, live]) await reg(router, ctx);
+  for (const reg of [system, files, tasks, git, reports, project, agentcenter, workspace, live, verify]) await reg(router, ctx);
 }

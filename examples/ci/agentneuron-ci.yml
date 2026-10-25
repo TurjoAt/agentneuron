@@ -1,0 +1,34 @@
+# Context CI on pull requests: lint + truth check + agent-config security audit + context budget.
+# Annotates the PR diff and writes a job summary. Only issues introduced by the PR are reported.
+# Copy to .github/workflows/agentneuron-ci.yml
+name: AgentNeuron context CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # --base needs the base branch history
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Pin the action to a release tag; it runs the matching agentneuron version.
+      - uses: TurjoAt/agentneuron@v0.4.0
+        with:
+          path: .
+          fail-on: error # or: warn, never
+          base: origin/${{ github.base_ref }}
+
+      # Without the action:
+      # - run: npx --yes agentneuron@0.4.0 ci . --format github --base "origin/$BASE_REF"
+      #   env:
+      #     BASE_REF: ${{ github.base_ref }}

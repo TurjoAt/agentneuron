@@ -1,5 +1,7 @@
 # CI example
 
+**New: [`agentneuron-ci.yml`](agentneuron-ci.yml)** runs `agentneuron ci` (lint + [truth check](../../docs/verify.md) + [security audit](../../docs/audit.md) + context budget) through the repository's GitHub Action, annotates the PR and reports only issues the PR introduced. See [context CI](../../docs/ci.md). The lint-only workflow below still works.
+
 `agentneuron-lint.yml` is a GitHub Actions workflow that fails a pull request when your AI-context files have **error**-level problems:
 
 - `broken-link`: a Markdown link, wiki link or `@import` points to a missing file

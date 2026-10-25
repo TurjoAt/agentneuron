@@ -20,6 +20,9 @@ Analysis:
   lint [dir]         list issues; exit 1 if any error-level issue (--json)
   status [dir]       short text summary
   export [dir]       write a report (--format ai|json|md|csv|html, --range 7d, --out file)
+  verify [dir]       truth check: are the commands/paths/versions in context files real? exit 1 if any false (--json, --fix-preview)
+  audit [dir]        security audit of agent config (MCP, permissions, hooks); exit 1 on high risk (--json)
+  ci [dir]           lint + verify + audit + budget for CI (--format github|markdown|json, --fail-on, --base <ref>)
 
 Setup & maintenance:
   init [dir]         create .agentneuron/ (config + copy of this bundle)
@@ -36,7 +39,7 @@ Common options:
                      Everything beyond read/state is OFF by default; or set "actions" in .agentneuron/config.json
   --write            alias for --enable edit
   --open             open the browser
-  --json             machine-readable output (lint, doctor)
+  --json             machine-readable output (lint, doctor, verify, audit)
   --version, -v      print the version
   --help, -h         this help; "agentneuron <command> --help" for one command
 
@@ -46,10 +49,33 @@ Examples:
   agentneuron lint --json > issues.json
   agentneuron export --format md --range 30d --out report.md
   agentneuron doctor
+  agentneuron verify --fix-preview
+  agentneuron ci --format github --base origin/main
   agentneuron update --check
 `;
 
 const CMD_HELP = {
+  verify: `Usage: agentneuron verify [dir] [--json] [--all] [--fix-preview]
+
+Extract checkable claims from context files (CLAUDE.md, AGENTS.md, rules, skills...): commands such as
+"npm run x", "pnpm x", "make x", "composer x", "php artisan x", script names, paths, runtime and framework
+versions, env var names and ports, and check each one against the repo. Exit 1 if any claim is false.
+  --all          also list claims that checked out
+  --fix-preview  show the line edit each suggested fix would make (nothing is written)`,
+  audit: `Usage: agentneuron audit [dir] [--json]
+
+Audit agent config for risky settings: unpinned or plain-http MCP servers, inline tokens, Bash(*) allow
+rules, permission bypass modes, hooks that pipe downloads into a shell, world-writable files and secrets
+in context files. Prints a 0-100 risk score; values are always masked. Exit 1 if any finding is high.`,
+  ci: `Usage: agentneuron ci [dir] [--format github|markdown|json] [--fail-on error|warn|never] [--base <ref>] [--budget <tokens>]
+
+Run lint, the truth check, the security audit and a context-size budget in one pass.
+  --format   github: ::error/::warning annotations + Markdown summary (appended to $GITHUB_STEP_SUMMARY
+             when set); markdown (default outside GitHub Actions); json
+  --fail-on  exit 1 on any error (default), on any warning too (warn), or never
+  --base     only report issues that are new since this git revision (e.g. origin/main); needs the ref
+             fetched (actions/checkout fetch-depth: 0)
+  --budget   max tokens of root context per tool before a warning (default 20000)`,
   start: `Usage: agentneuron [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--write] [--open]
 
 Start the server for one project and print the URL. Read-only unless levels are enabled.
@@ -100,7 +126,7 @@ Asks before replacing anything unless --yes. agentneuron never checks for update
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -243,7 +269,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -269,6 +295,9 @@ export async function main(argv = process.argv.slice(2)) {
     case 'mcp': return cmdMcp(root, flags);
     case 'export': return (await import('./commands/export.js')).cmdExport(root, flags);
     case 'doctor': return (await import('./commands/doctor.js')).cmdDoctor(root, flags);
+    case 'verify': return (await import('./commands/verify.js')).cmdVerify(root, flags);
+    case 'audit': return (await import('./commands/audit.js')).cmdAudit(root, flags);
+    case 'ci': return (await import('./commands/ci.js')).cmdCi(root, flags);
     case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }

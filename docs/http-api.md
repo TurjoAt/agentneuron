@@ -140,6 +140,14 @@ Writing to git is done through [actions](actions.md) (`git.commit`, `git.push`, 
 
 `GET /api/project` (`refresh=1`), `/api/project/stats`, `/api/project/deps` (`manager`), `/api/project/outdated`, `/api/project/routes`, `/api/project/migrations`, `/api/project/models` (Laravel), `/api/project/drift` (docs older than the code they mention). See [project intelligence](project-intelligence.md).
 
+## Truth check and security audit
+
+| Endpoint | Level | Notes |
+|---|---|---|
+| `GET /api/verify` | read | `status` (`ok`/`false`/`unknown`), `file`: `{ generatedAt, summary, claims }`. See [truth check](verify.md) |
+| `POST /api/verify/fix` | edit | `{ id }` of a fixable claim: the replacement is recomputed server-side and written with history; `404` if not fixable any more, `409` if the file changed on disk |
+| `GET /api/audit/config` | read | `{ generatedAt, score, level, counts, findings, scanned }`, values masked. See [security audit](audit.md). (`GET /api/audit` is the action audit log.) |
+
 ## Reports (read)
 
 All accept `from` and `to` as epoch milliseconds (default: the last 7 days).

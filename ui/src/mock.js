@@ -1324,6 +1324,56 @@ export function createMock() {
   for (const [k, fn] of Object.entries(insight)) if (!routes[k]) routes[k] = (q, _b, init) => fn(q, init);
   routes['/api/reports/export'] = (q) => reportExport(q || {});
 
+  // ---------------------------------------------------------------- truth & safety (feat/truth) >>>
+  // GET /api/verify, GET /api/audit/config, POST /api/verify/fix over the mock files.
+  const CLAIMS = [
+    ['CLAUDE.md', 'command', 'pnpm db:migrate', 'pnpm db:migrate', 'false', 'no "db:migrate" script in package.json (has: dev, build, test, lint, db:push, db:seed)', 'pnpm db:push'],
+    ['CLAUDE.md', 'command', 'pnpm test --filter api', 'pnpm test --filter api', 'ok', '"test" defined in apps/api/package.json'],
+    ['CLAUDE.md', 'command', 'pnpm dev', 'pnpm dev', 'ok', '"dev" is defined in package.json: turbo run dev'],
+    ['CLAUDE.md', 'command', 'pnpm lint --fix', 'pnpm lint --fix', 'ok', '"lint" is defined in package.json: turbo run lint'],
+    ['CLAUDE.md', 'path', 'scripts/seed.ts', 'scripts/seed.ts', 'false', 'scripts/seed.ts does not exist', 'scripts/seed.mjs'],
+    ['AGENTS.md', 'command', 'pnpm install', 'pnpm install', 'ok', 'pnpm install'],
+    ['AGENTS.md', 'command', 'pnpm test', 'pnpm test', 'ok', '"test" is defined in package.json: turbo run test'],
+    ['apps/api/AGENTS.md', 'command', 'pnpm --filter api test', 'pnpm --filter api test', 'ok', '"test" defined in apps/api/package.json'],
+    ['apps/api/CLAUDE.md', 'path', 'src/schemas', 'src/schemas', 'false', 'src/schemas does not exist', 'src/schema'],
+  ].map(([file, kind, needle, text, status, evidence, to], i) => {
+    const lines = (db.get(file)?.content || '').split('\n');
+    const at = lines.findIndex((l) => l.includes(needle.replace(/`/g, '')));
+    return { id: `${kind}:${file}:${at + 1 || 1}:${(0x1f2e3d4c5b + i).toString(16).slice(0, 10)}`, file, line: at + 1 || 1, kind, text, status, evidence,
+      suggestion: status === 'false' ? (to ? `replace \`${text}\` with \`${to}\`` : 'remove this instruction or add the missing target') : null, fixable: status === 'false' && !!to && at >= 0, to };
+  });
+  const verifySummary = () => {
+    const s = { files: new Set(CLAIMS.map((c) => c.file)).size, total: CLAIMS.length, ok: 0, false: 0, unknown: 0, byKind: {} };
+    for (const c of CLAIMS) { s[c.status]++; const k = (s.byKind[c.kind] ??= { ok: 0, false: 0, unknown: 0 }); k[c.status]++; }
+    return s;
+  };
+  routes['/api/verify'] = (q) => ({ generatedAt: Date.now(), summary: verifySummary(), claims: CLAIMS.filter((c) => (!q.status || c.status === q.status) && (!q.file || c.file === q.file)).map(({ to: _t, ...c }) => c) });
+  routes['/api/verify/fix'] = (_q, b) => {
+    if (!can('edit')) throw httpErr(403, 'action level "edit" is disabled');
+    const c = CLAIMS.find((x) => x.id === b.id);
+    if (!c || !c.fixable) throw httpErr(404, 'no automatic fix for this claim (already fixed, changed, or not fixable)');
+    const f = db.get(c.file);
+    const lines = f.content.split('\n');
+    lines[c.line - 1] = lines[c.line - 1].replace(c.text, c.to);
+    f.content = lines.join('\n');
+    emit('change', c.file, null);
+    const from = c.text;
+    Object.assign(c, { status: 'ok', evidence: 'fixed', suggestion: null, fixable: false, text: c.to });
+    return { applied: true, path: c.file, line: c.line, from, to: c.to };
+  };
+  routes['/api/audit/config'] = () => {
+    const F = [
+      ['high', 'inline-secret', '.mcp.json', 3, 'MCP server "github" has an inline env value for GITHUB_TOKEN (ghp_****)', 'The credential is committed with the config and visible to every agent and collaborator.', 'Use a reference instead, e.g. "GITHUB_TOKEN": "${env:GITHUB_TOKEN}".'],
+      ['medium', 'unpinned-mcp', '.mcp.json', 3, 'MCP server "github" runs unpinned @modelcontextprotocol/server-github', 'Every start downloads whatever version is newest: a compromised release runs with your permissions.', 'Pin an exact version, e.g. "@modelcontextprotocol/server-github@1.2.3".'],
+      ['medium', 'unpinned-mcp', '.mcp.json', 4, 'MCP server "postgres" runs unpinned @modelcontextprotocol/server-postgres', 'Every start downloads whatever version is newest.', 'Pin an exact version.'],
+      ['low', 'broad-allow', '.claude/settings.json', 3, '"Read(**)" is a blanket allow rule', 'Broad allow rules remove the review step for a whole tool.', 'Scope it to the directories agents need.'],
+    ].map(([severity, rule, file, line, title, why, fix], i) => ({ id: `${rule}:${file}:${line}:${i}`, severity, rule, file, line, title, why, fix }));
+    const counts = { high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of F) counts[f.severity]++;
+    return { generatedAt: Date.now(), score: 42, level: 'high', counts, findings: F, scanned: ['.mcp.json', '.claude/settings.json'] };
+  };
+  // ---------------------------------------------------------------- <<< truth & safety (feat/truth)
+
   // reports export: csv/md/html from the insight stub; json (agentneuron.report/v1) and ai context pack here
   function reportExport(q) {
     const fmt = q.format === 'llm' ? 'ai' : q.format || 'md';

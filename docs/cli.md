@@ -143,6 +143,18 @@ Updates are only ever checked when you run this command; `start` never contacts 
   - **npx or anything else**: prints the `npx agentneuron@latest ...` / `npm install -g` command to run.
 - Asks for confirmation before replacing anything; `--yes` skips the prompt. Without a terminal and without `--yes` nothing is changed.
 
+### `verify [dir]`
+
+Truth check: extract commands, scripts, paths, versions, env vars and ports from context files and verify them against the repo. Exit `1` if any claim is false. `--all` also lists claims that are ok, `--fix-preview` prints the line edit of each suggested fix (nothing is written), `--json` prints `{ root, summary, claims, fixes? }`. See [truth check](verify.md).
+
+### `audit [dir]`
+
+Security audit of the project's agent config (MCP servers, permissions, bypass modes, hooks, file modes, secrets). Prints findings and a 0-100 risk score; exit `1` if any finding is high. `--json` prints `{ root, score, level, counts, findings, scanned }`. See [security audit](audit.md).
+
+### `ci [dir]`
+
+Lint + truth check + audit + context budget for CI. `--format github|markdown|json` (default `github` inside GitHub Actions, else `markdown`), `--fail-on error|warn|never` (default `error`), `--base <ref>` (only issues introduced since that revision), `--budget <tokens>` (default 20000). See [context CI](ci.md).
+
 ### `--version`, `--help`
 
 Print the version or the usage text.
@@ -152,8 +164,8 @@ Print the version or the usage text.
 | Code | Meaning |
 |---|---|
 | `0` | Success |
-| `1` | `lint` found errors, `doctor` found a failure, `update` failed or was declined; or an unexpected runtime error |
-| `2` | Bad usage: not a directory, invalid `--enable` level, bad `export` format or range |
+| `1` | `lint` found errors, `verify` found a false claim, `audit` found a high-severity issue, `ci` failed its `--fail-on` threshold, `doctor` found a failure, `update` failed or was declined; or an unexpected runtime error |
+| `2` | Bad usage: not a directory, invalid `--enable` level, bad `export` format or range, bad `ci` flags or unusable `--base` |
 
 ## Environment
 

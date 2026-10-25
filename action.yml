@@ -1,0 +1,54 @@
+name: AgentNeuron context CI
+description: Lint, truth-check and security-audit AI agent context (CLAUDE.md, AGENTS.md, rules, skills, MCP and agent config) and annotate pull requests.
+author: Rezaul Hoque Turjo
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  path:
+    description: Project directory to check (relative to the workspace).
+    required: false
+    default: "."
+  fail-on:
+    description: "Fail the step on: error (default), warn, or never."
+    required: false
+    default: error
+  base:
+    description: Only report issues introduced since this git ref, e.g. origin/main or the PR base SHA. Needs the ref fetched (actions/checkout with fetch-depth 0).
+    required: false
+    default: ""
+  budget:
+    description: Max tokens of root context per tool before a warning (default 20000).
+    required: false
+    default: ""
+  version:
+    description: agentneuron version to run. Defaults to the version this action was released with.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Run agentneuron ci
+      shell: bash
+      env:
+        # inputs reach the script only through the environment (no expression expansion inside run:)
+        AN_PATH: ${{ inputs.path }}
+        AN_FAIL_ON: ${{ inputs.fail-on }}
+        AN_BASE: ${{ inputs.base }}
+        AN_BUDGET: ${{ inputs.budget }}
+        AN_VERSION: ${{ inputs.version }}
+        # bumped together with package.json at release (a test enforces it)
+        AN_PINNED: "0.3.0"
+      run: |
+        set -euo pipefail
+        version="${AN_VERSION:-$AN_PINNED}"
+        if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+          echo "::error title=agentneuron::invalid version input: use an exact version like 1.2.3"
+          exit 2
+        fi
+        args=(ci "$AN_PATH" --format github --fail-on "$AN_FAIL_ON")
+        if [ -n "$AN_BASE" ]; then args+=(--base "$AN_BASE"); fi
+        if [ -n "$AN_BUDGET" ]; then args+=(--budget "$AN_BUDGET"); fi
+        npx --yes "agentneuron@${version}" "${args[@]}"
