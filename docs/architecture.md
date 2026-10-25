@@ -44,6 +44,7 @@ AgentNeuron is a Node.js program (ESM, Node 18+) with a Svelte UI. There is no d
 | `src/board/` | Task board: Markdown task parsing and write-back, native tasks, `board.json` |
 | `src/agentcenter/` | Tool setup scanner, templates, sync, transcripts, costs, time travel, MCP test |
 | `src/agents/` | Session discovery and conflict radar |
+| `src/insights/` | Lessons from sessions, rule effectiveness, replay, cost by feature ([insights](insights.md)) |
 | `src/git2/` | Git read APIs and changelog generator |
 | `src/project/` | Project intelligence: detectors, env, dotfolders, stats, drift, Laravel parsers |
 | `src/reports/` | Report data and export |

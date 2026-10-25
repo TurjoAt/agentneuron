@@ -28,6 +28,7 @@ agentneuron mcp [dir]
 | `get_tasks` | `status?` (`open`, `done`, `all`), `limit?` | Checkbox and TODO/FIXME tasks |
 | `get_links` | `path` | Incoming and outgoing links, with broken ones flagged |
 | `report_export` | `range?` (`24h`, `7d`, `30d`, `2w`...; default `7d`), `format?` (`ai` default, `json`), `includeContent?` | Report for the period ending now. `ai` returns the Markdown context pack as plain text; `json` returns the `agentneuron.report/v1` object (see [HTTP API](http-api.md#exports)) |
+| `suggest_rules` | `limit?` (default 20, max 100), `includeCovered?` | Lessons mined from this project's Claude Code / Codex sessions as proposed rules: `{ id, rule, kinds, target, targets, evidence[{session, tool, ts, quote}], count, sessions, confidence, alreadyCovered }`. Quotes are secret-masked. Read-only: it reads but never writes `.agentneuron/insights.json`. See [Insights](insights.md) |
 
 ## Claude Code
 

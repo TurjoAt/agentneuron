@@ -9,6 +9,7 @@ agentneuron status [dir]
 agentneuron init [dir]
 agentneuron export [dir] [--format ai|json|md|csv|html] [--range 7d] [--out file]
 agentneuron doctor [dir] [--json] [--port n] [--host h]
+agentneuron lessons [dir] [--json] [--covered] [--all]
 agentneuron update [--check] [--yes] [--allow-unverified]
 agentneuron help [command] | <command> --help
 agentneuron --version | --help
@@ -103,6 +104,27 @@ Write an activity and health report built from the same data as the Reports view
 ```sh
 agentneuron export > context-report.txt
 agentneuron export --format md --range 30d --out report.md
+```
+
+### `lessons [dir]`
+
+Mine this project's Claude Code and Codex sessions for lessons and print them as proposed rules. Lessons come from user corrections, reverted edits, commands that keep failing, and instructions repeated across sessions. Each one shows its confidence, the context file to add it to, and one evidence quote (secrets masked). The command is read-only. To accept or dismiss a lesson, use the Insights view. See [Insights](insights.md).
+
+| Flag | Description |
+|---|---|
+| `--json` | Print `{ root, sessions, lessons: [...] }`. |
+| `--covered` | Also list lessons that an existing rule already covers. |
+| `--all` | Also list dismissed and accepted lessons. |
+
+```
+4 lesson(s) from 4 agent session(s):
+
+  [0.62] Run the linter before you push changes.
+         repeated · 2x in 2 session(s) · add to CLAUDE.md
+         "Remember to run the linter before you push changes please" (claude sess-d)
+  [0.60] Don't edit src/b.js.
+         correction · 1x in 1 session(s) · add to AGENTS.md
+         "stop, don't edit src/b.js" (codex codex-c)
 ```
 
 ### `doctor [dir]`
