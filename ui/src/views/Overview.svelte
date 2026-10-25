@@ -30,6 +30,8 @@
   const project = resource(() => api('/api/project'), { live: false });
   const gitInfo = resource(() => api('/api/git'));
   const healthFull = resource(() => api('/api/health'));
+  const lessons = resource(() => api('/api/insights/lessons').catch(() => null), { live: false });
+  const newLessons = $derived((lessons.data?.lessons || []).filter((l) => !l.alreadyCovered).length);
   const trends = resource(async () => {
     const to = Date.now();
     const from = to - 14 * DAY;
@@ -158,6 +160,10 @@
     <Kpi label="Uncommitted" value={git?.available ? git.dirty || 0 : 0} href="#/git" sub={git?.available ? `on ${git.branch}` : 'git unavailable'} />
     <Kpi label="Changes · 24h" value={changes24h} href="#/reports" spark={trends.data?.changes} color="var(--tool-claude)" sub="14-day activity" />
   </section>
+
+  {#if newLessons}
+    <a class="card tease" href="#/insights?tab=lessons"><Icon name="sparkles" size={15} /> <b class="tnum">{newLessons}</b> {newLessons === 1 ? 'lesson' : 'lessons'} to learn from your agent sessions<span class="spacer"></span><span class="faint">Insights →</span></a>
+  {/if}
 
   <div class="grid">
     <div class="side stagger">
@@ -321,6 +327,8 @@
 </div>
 
 <style>
+  .tease { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-bottom: 16px; color: inherit; text-decoration: none; }
+  .tease:hover { border-color: var(--border-strong); text-decoration: none; }
   .qa { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
   .sec { margin-bottom: 22px; }

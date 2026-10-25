@@ -35,8 +35,9 @@
   import Settings from './views/Settings.svelte';
   import Live from './views/Live.svelte';
   import Verify from './views/Verify.svelte';
+  import Insights from './views/Insights.svelte';
 
-  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify };
+  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights };
   const MODALS = { confirm: ConfirmDialog, 'new-file': NewFileDialog, rename: RenameDialog, replace: ReplaceDialog, task: TaskModal, shortcuts: ShortcutsDialog };
   const View = $derived(COMPONENTS[app.route.view] || Overview);
   const ModalC = $derived(app.modal ? MODALS[app.modal.kind] : null);

@@ -5,6 +5,7 @@
 
 import { SEED, PROJECT, sessions as seedSessions, gitInfo, AGENT_CONFIG, EDIT_LINES, GIT_SEED, NATIVE_TASKS, MOCK_ACTIONS } from './mock-data.js';
 import { insightRoutes } from './mock-insight.js';
+import { insightsRoutes } from './mock-insights.js';
 
 const MIN = 60_000;
 const rand = (n) => Math.floor(Math.random() * n);
@@ -1318,6 +1319,10 @@ export function createMock() {
     '/api/git/blame': ({ path }) => blame(path),
     '/api/changelog': () => ({ markdown: '## Unreleased\n\n### Features\n- PaymentIntent state machine notes\n\n### Docs\n- update checkout v2 plan\n- webhook retries with jitter\n', groups: [{ type: 'feat', items: [commits[7]?.subject] }, { type: 'docs', items: [commits[0].subject, commits[4].subject] }] }),
   };
+
+  // ---- insights (feat/lessons): lessons, rule effectiveness, replay, cost by feature ----
+  for (const [k, fn] of Object.entries(insightsRoutes({ need, sessions: () => sessions }))) routes[k] = fn;
+  // ---- end insights ----
 
   // UI-B insight routes (reports, project, agents, workspace, git stats…) — called as fn(q, init)
   const insight = insightRoutes({ graph, files: filesList, sessions: () => sessions, health });

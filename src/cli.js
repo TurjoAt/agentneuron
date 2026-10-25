@@ -23,6 +23,7 @@ Analysis:
   verify [dir]       truth check: are the commands/paths/versions in context files real? exit 1 if any false (--json, --fix-preview)
   audit [dir]        security audit of agent config (MCP, permissions, hooks); exit 1 on high risk (--json)
   ci [dir]           lint + verify + audit + budget for CI (--format github|markdown|json, --fail-on, --base <ref>)
+  lessons [dir]      rules to learn from agent sessions (corrections, reverts, failing commands) (--json)
 
 Setup & maintenance:
   init [dir]         create .agentneuron/ (config + copy of this bundle)
@@ -108,6 +109,13 @@ Write an activity/health report. Default format "ai" (compact, for pasting into 
 
   agentneuron export > context-report.txt
   agentneuron export --format html --range 30d --out report.html`,
+  lessons: `Usage: agentneuron lessons [dir] [--json] [--covered] [--all]
+
+Mine Claude Code and Codex sessions of this project for user corrections, reverted edits, commands
+that keep failing and instructions repeated across sessions; print them as proposed rules with
+confidence, evidence (secrets masked) and the context file to add them to. Read-only.
+--covered  also list lessons an existing rule already covers
+--all      also list dismissed / accepted lessons`,
   doctor: `Usage: agentneuron doctor [dir] [--json] [--port n] [--host h]
 
 Check the environment: Node version, git, port availability, config validity, enabled
@@ -269,7 +277,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -298,6 +306,7 @@ export async function main(argv = process.argv.slice(2)) {
     case 'verify': return (await import('./commands/verify.js')).cmdVerify(root, flags);
     case 'audit': return (await import('./commands/audit.js')).cmdAudit(root, flags);
     case 'ci': return (await import('./commands/ci.js')).cmdCi(root, flags);
+    case 'lessons': return (await import('./commands/lessons.js')).cmdLessons(root, flags);
     case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }

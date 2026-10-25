@@ -136,6 +136,21 @@ Writing to git is done through [actions](actions.md) (`git.commit`, `git.push`, 
 | `GET /api/agents/session` | `id` : timeline of one session |
 | `GET /api/agents/costs` | `from`, `to` (ms epoch or date) : estimated cost |
 
+## Insights
+
+See [Insights](insights.md). Every response is passed through the secret masker.
+
+| Path | Level | Parameters |
+|---|---|---|
+| `GET /api/insights/lessons` | read | `all=1` includes dismissed/accepted lessons. Returns `{ lessons, sessions, hidden, canAccept }`. |
+| `POST /api/insights/lessons/accept` | edit | `{ id, target?, rule? }`: appends the rule to `target` (default: the suggested file; must be one of `targets` or a tracked CLAUDE.md / AGENTS.md / GEMINI.md / Copilot / `.cursor/rules/*.mdc` file). `rule` is an optional edited single line of at most 300 characters. |
+| `POST /api/insights/lessons/dismiss` | state | `{ id }`: hides the lesson for good (`.agentneuron/insights.json`). |
+| `GET /api/insights/rules` | read | Rule effectiveness: `{ sessions, rules, neverRelevant, ignored, diet }`. |
+| `GET /api/insights/replay` | read | `path` and/or `session`, `ts` (ms or date), `tool?`. Without `path`/`session`: `{ changes }` (recent agent changes). |
+| `GET /api/insights/costs-by-feature` | read | `{ features, total, currency, note }`. |
+
+The lesson id is passed in the body (the router has no path parameters), so the routes are `.../lessons/accept` and `.../lessons/dismiss` rather than `.../lessons/:id/accept`.
+
 ## Project intelligence (read)
 
 `GET /api/project` (`refresh=1`), `/api/project/stats`, `/api/project/deps` (`manager`), `/api/project/outdated`, `/api/project/routes`, `/api/project/migrations`, `/api/project/models` (Laravel), `/api/project/drift` (docs older than the code they mention). See [project intelligence](project-intelligence.md).

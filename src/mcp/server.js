@@ -21,6 +21,9 @@ import { createHandoffs } from '../live/handoffs.js';
 import { claimTask } from '../live/coord.js';
 import { verifyContext } from '../verify/index.js';
 import { auditAgentConfig } from '../audit/index.js';
+import { createSessions } from '../agents/sessions.js';
+import { projectSessions } from '../insights/transcripts.js';
+import { lessonsFrom, readState, hiddenOf } from '../insights/index.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -49,6 +52,8 @@ const TOOLS = [
     inputSchema: obj({ status: { type: 'string', enum: ['false', 'unknown', 'ok', 'all'], description: 'Which claims to return (default "false")' }, file: { type: 'string', description: 'Only claims from this project-relative file' }, limit: { type: 'number' } }) },
   { name: 'audit_agent_config', description: 'Security audit of the agent configuration (MCP servers, permissions, bypass modes, hooks, world-writable files, secrets in context files): 0-100 risk score and findings with severity, location, why and fix. Values are masked.',
     inputSchema: obj({ minSeverity: { type: 'string', enum: ['high', 'medium', 'low', 'info'], description: 'Lowest severity to include (default "low")' } }) },
+  { name: 'suggest_rules', description: 'Lessons mined from Claude Code / Codex sessions of this project (user corrections, reverted edits, repeatedly failing commands, repeated instructions) as proposed rules with evidence quotes (secrets masked), confidence, target file and whether an existing rule already covers them. Read-only.',
+    inputSchema: obj({ limit: { type: 'number', description: 'Max lessons (default 20)' }, includeCovered: { type: 'boolean', description: 'Include lessons an existing rule already covers (default false)' } }) },
 ];
 
 // ---- multi-agent coordination (claims are advisory; write tools need `agentneuron mcp --level state`) ----
@@ -113,6 +118,7 @@ export async function runMcpServer(root, config = {}, io = {}) {
     try { watcher = createWatcher(absRoot, cfg, (e) => { store.handleFsEvent(e).catch(() => {}); }); } catch { /* optional */ }
   }
 
+  let sessionsApi = null;
   let cache = null;
   store.on('changed', () => { cache = null; });
   function analysis() {
@@ -244,6 +250,12 @@ export async function runMcpServer(root, config = {}, io = {}) {
       const out = await exportReport(reportCtx, rangeFromSpec(range), format, { includeContent: includeContent === true });
       // ai: raw Markdown (not JSON-encoded) so the model reads it directly; json: the v1 object
       return format === 'json' ? JSON.parse(out.body) : { [RAW_TEXT]: out.body };
+    },
+    async suggest_rules({ limit, includeCovered = false } = {}) {
+      const sctx = { root: absRoot, home: io.home, store, sessions: (sessionsApi ||= createSessions(absRoot, io.home ? { home: io.home } : {})) };
+      const list = lessonsFrom(await projectSessions(sctx), { files: [...store.files.values()], contents: store.contents, hidden: hiddenOf(readState(absRoot)) })
+        .filter((l) => includeCovered === true || !l.alreadyCovered).slice(0, cap(limit, 20, 100));
+      return { lessons: list.map(({ lastAt, ...l }) => l), note: 'Accept or dismiss in the AgentNeuron UI (Insights > Lessons) or append the rule to the target file yourself.' };
     },
   };
 

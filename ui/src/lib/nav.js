@@ -13,6 +13,7 @@ export const VIEWS = [
   { id: 'project', label: 'Project', icon: 'layers' },
   { id: 'reports', label: 'Reports', icon: 'activity' },
   { id: 'verify', label: 'Truth & safety', icon: 'shield' },
+  { id: 'insights', label: 'Insights', icon: 'sparkles' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
