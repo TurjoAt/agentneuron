@@ -9,7 +9,7 @@ agentneuron status [dir]
 agentneuron init [dir]
 agentneuron export [dir] [--format ai|json|md|csv|html] [--range 7d] [--out file]
 agentneuron doctor [dir] [--json] [--port n] [--host h]
-agentneuron update [--check] [--yes]
+agentneuron update [--check] [--yes] [--allow-unverified]
 agentneuron help [command] | <command> --help
 agentneuron --version | --help
 ```
@@ -131,7 +131,15 @@ Updates are only ever checked when you run this command; `start` never contacts 
 - `--check`: compare the running version with `https://registry.npmjs.org/agentneuron/latest` (5 s timeout) and exit. Offline prints a short message and exits `1`.
 - Without `--check`, the update depends on how this copy is installed:
   - **global npm install**: runs `npm install -g agentneuron@latest`.
-  - **`init` copy** (`<project>/.agentneuron/agentneuron.mjs`): downloads `agentneuron.mjs` and `agentneuron.mjs.sha256` from the GitHub release `v<version>`, verifies the checksum, writes a temp file next to the copy and renames it over; the previous copy is kept as `agentneuron.mjs.bak`. A checksum mismatch changes nothing.
+  - **`init` copy** (`<project>/.agentneuron/agentneuron.mjs`): verifies the new bundle against two independent origins before touching anything:
+    1. downloads `agentneuron.mjs` and `agentneuron.mjs.sha256` from the GitHub release `v<version>` and checks the sha256;
+    2. fetches `https://registry.npmjs.org/agentneuron/<version>`, downloads `dist.tarball` (only accepted from `https://registry.npmjs.org`), checks it against the registry's `dist.integrity` (sha512), unpacks it in memory and requires `package/dist/agentneuron.mjs` to have exactly the same sha256 as the GitHub asset.
+
+    Only then is a temp file written next to the copy and renamed over it; the previous copy is kept as `agentneuron.mjs.bak`. Any mismatch, malformed tarball or network/HTTP error changes nothing. Downloads are size-capped (50 MB bundle and tarball, 200 MB unpacked, 1 MB metadata) and time out after 60 s.
+  - If npm does not have that version yet (HTTP 404, e.g. right after a release), the update is refused. `--allow-unverified` accepts the GitHub checksum alone in that one case and prints a warning; it never overrides a mismatch or any other error.
+  - What this protects against: a tampered or corrupted file at one origin (a replaced GitHub release asset and checksum, a compromised CDN or mirror, a truncated download). An attacker has to change both the GitHub release and the npm publish consistently.
+  - What it does not protect against: a compromise of the source repository or the release workflow (one CI job produces both artifacts), or someone holding both the GitHub and npm credentials. npm provenance/registry signatures are not checked. With `--allow-unverified` the check is single-origin.
+  - Global npm installs are unchanged: they rely on npm's own integrity checks.
   - **npx or anything else**: prints the `npx agentneuron@latest ...` / `npm install -g` command to run.
 - Asks for confirmation before replacing anything; `--yes` skips the prompt. Without a terminal and without `--yes` nothing is changed.
 

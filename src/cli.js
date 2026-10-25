@@ -24,7 +24,7 @@ Analysis:
 Setup & maintenance:
   init [dir]         create .agentneuron/ (config + copy of this bundle)
   doctor [dir]       check Node, git, port, config, permissions, AI tools (--json)
-  update             update agentneuron (--check: only compare with npm; --yes: no prompt)
+  update             update agentneuron (--check: only compare with npm; --yes: no prompt; --allow-unverified)
   help [command]     show help for a command
 
 Common options:
@@ -84,13 +84,15 @@ Write an activity/health report. Default format "ai" (compact, for pasting into 
 
 Check the environment: Node version, git, port availability, config validity, enabled
 permission levels, write access to .agentneuron/ and detected AI tools. Exit 1 on a failure.`,
-  update: `Usage: agentneuron update [--check] [--yes]
+  update: `Usage: agentneuron update [--check] [--yes] [--allow-unverified]
 
 --check  compare this version with the latest on npm (5 s timeout) and exit.
 Without --check, update the way this copy was installed:
   global npm install   runs "npm install -g agentneuron@latest"
-  .agentneuron copy    downloads the GitHub release bundle, verifies its sha256, keeps a .bak
+  .agentneuron copy    downloads the GitHub release bundle, verifies its sha256 and requires it to
+                       match the bundle in the npm tarball (sha512-verified); keeps a .bak
   npx / other          prints the command to run instead
+--allow-unverified  if npm does not have that version yet, accept the GitHub checksum alone.
 Asks before replacing anything unless --yes. agentneuron never checks for updates on its own.`,
 };
 
