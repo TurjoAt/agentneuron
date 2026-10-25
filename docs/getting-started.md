@@ -1,5 +1,9 @@
 # Getting started
 
+This guide takes you from zero to a running AgentNeuron dashboard for your project in about a minute, then tours each page. AgentNeuron is read-only until you enable more, so it is safe to try on any repository.
+
+**In short:** `npx agentneuron` in your project folder, then open `http://127.0.0.1:4747`.
+
 ## Requirements
 
 Node.js 18 or newer. Git is optional but unlocks the Git page, doc drift and the changelog generator.
@@ -42,6 +46,16 @@ node .agentneuron/agentneuron.mjs
 
 No install, no npm: take `dist/agentneuron.mjs` from a release or a build, and run `node agentneuron.mjs /path/to/project`.
 
+With Docker (binds `0.0.0.0` inside the container, so a token is generated and printed in the log):
+
+```sh
+docker run --rm -it --user "$(id -u):$(id -g)" \
+  -v "$PWD":/project -p 127.0.0.1:4747:4747 \
+  ghcr.io/turjoat/agentneuron
+```
+
+See [examples/deploy/docker.md](../examples/deploy/docker.md) for read-only mounts, Compose and session data.
+
 ## What it scans
 
 AgentNeuron walks the project and tracks every file matching a known AI-tool pattern ([supported tools](supported-tools.md)) plus all other Markdown (`includeAllMarkdown`, default on). It skips `.git`, `node_modules`, `vendor`, `dist`, `build`, `.next`, `storage`, `.agentneuron` and similar. Use `ignore` and `extraPatterns` in [configuration](configuration.md) to adjust.
@@ -64,7 +78,7 @@ Keys `1` to `9` jump to the first nine pages; `/` focuses search; `?` lists shor
 | Git | Overview, changes, history, branches, tags, stash, remotes, blame, stats, generated changelog |
 | Agents | Matrix of tools vs capabilities, per-tool setup, rules that apply to a file, templates, sync and drift between instruction files, MCP servers, sessions and cost, conflict radar, time travel |
 | Project | Detected stacks, dependencies and outdated packages, scripts, CI, Docker, env keys, Laravel routes/models/migrations, doc drift, code statistics |
-| Reports | KPIs, time series, heatmap, top tables, export to CSV, Markdown or HTML |
+| Reports | KPIs, time series, heatmap, top tables, export to CSV, Markdown or HTML; an AI context pack and JSON export with a "Copy for AI" button <!-- verify-0.3.0 --> |
 | Settings | Permissions (what is on and how to enable it), role and auth, audit log, notifications, trash, jobs, appearance, about |
 
 Sessions and cost read Claude Code and Codex transcripts from `~/.claude/projects` and `~/.codex/sessions`. Cost is an estimate from token counts; override prices with the `pricing` key.
@@ -87,7 +101,7 @@ Every action previews the exact command (when it runs one) before you confirm, s
 ## Using it with CI and AI tools
 
 - CI: `npx agentneuron lint --json` exits 1 on any error-level issue. See [examples/ci](../examples/ci/).
-- AI tools: `agentneuron mcp` gives Claude Code, Cursor and others read-only access to the same data. See [MCP](mcp.md).
+- AI tools: `agentneuron mcp` gives Claude Code, Cursor, VS Code and others read-only access to the same data. Quickest setup for Claude Code: `claude mcp add agentneuron -- npx -y agentneuron mcp`. See [MCP](mcp.md).
 
 ## Next
 

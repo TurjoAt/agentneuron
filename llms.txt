@@ -1,0 +1,33 @@
+# AgentNeuron
+
+> AgentNeuron (npm package `agentneuron`) is an open-source, MIT-licensed Node.js CLI, local web dashboard and read-only MCP server that monitors, lints and manages AI coding-agent context files: CLAUDE.md, AGENTS.md, GEMINI.md, Cursor rules, GitHub Copilot instructions, Windsurf and Cline rules, skills, subagents and MCP configs.
+
+Key facts:
+
+- Run: `npx agentneuron [dir]`, then open http://127.0.0.1:4747. Requires Node.js 18+. Also available as a global install (`npm i -g agentneuron`), a single-file bundle (`node agentneuron.mjs`) and a Docker image (`ghcr.io/turjoat/agentneuron`).
+- Local only: binds to 127.0.0.1, no telemetry, no account, does not call any AI model. Token counts are local estimates.
+- Read-only by default; writes only inside `<project>/.agentneuron/`. Editing files and running commands require explicit permission levels (`edit`, `exec`, `danger`, `terminal`) via `--enable` or `.agentneuron/config.json`.
+- Features: live change feed and per-file history, health score from 8 lint rules (broken links and @imports, missing paths, secrets, large context, duplicate rules, stale plans, orphans, empty files), link graph, effective context per folder for Claude/Codex/Cursor, Agents center covering 13 AI tools with sync and drift between instruction files, tasks from Markdown checkboxes, git views, project intelligence, reports with CSV/Markdown/HTML export, workspace mode for many projects.
+- CI: `npx agentneuron lint --json` exits 1 on error-level issues.
+- MCP: `npx -y agentneuron mcp [dir]` on stdio; read-only tools `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`.
+- Author: Rezaul Hoque Turjo (https://turjo.me). Repository: https://github.com/TurjoAt/agentneuron
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/README.md): overview, quick start, supported tools, MCP setup, security model, FAQ
+- [Getting started](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/getting-started.md): install options, first run, tour of every page, enabling actions safely
+- [CLI reference](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/cli.md): commands, flags, exit codes
+- [MCP server](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/mcp.md): tools and client configuration for Claude Code, Cursor and others
+- [Supported tools](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/supported-tools.md): file patterns detected per AI tool, sync targets, templates
+- [Permissions and security](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/permissions-and-security.md): levels, roles, tokens, remote access, audit log
+- [FAQ](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/faq.md): short answers to common questions
+
+## Optional
+
+- [Configuration](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/configuration.md): every `.agentneuron/config.json` key
+- [HTTP API](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/http-api.md): REST and Server-Sent Events endpoints
+- [Actions](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/actions.md): action ids, levels and parameters
+- [Project intelligence](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/project-intelligence.md): stack detection and lint rules
+- [Comparison](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/comparison.md): how AgentNeuron relates to other approaches
+- [Troubleshooting](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/troubleshooting.md): ports, permissions, file watching
+- [Changelog](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/CHANGELOG.md): release history
