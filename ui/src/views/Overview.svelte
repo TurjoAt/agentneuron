@@ -152,39 +152,9 @@
     <Kpi label="Tracked files" value={files.length} href="#/files" sub="{detected.length || '–'} tools · {byKind.length} kinds" />
     <Kpi label="Context tokens" value={totalTokens} href="#/reports" spark={trends.data?.tokens} color="var(--accent)" now={tokensDelta[0]} prev={tokensDelta[1]} sub="14-day trend" />
     <Kpi label="Health" value={health?.score ?? 0} suffix={health?.grade ? ` ${health.grade}` : ''} href="#/health" spark={trends.data?.health} color="var(--ok)" now={healthDelta[0]} prev={healthDelta[1]} sub="{health?.counts?.error ?? 0} errors · {health?.counts?.warn ?? 0} warnings" />
-    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : ''} />
+    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.error ? 'board unavailable' : board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : ''} />
     <Kpi label="Uncommitted" value={git?.available ? git.dirty || 0 : 0} href="#/git" sub={git?.available ? `on ${git.branch}` : 'git unavailable'} />
     <Kpi label="Changes · 24h" value={changes24h} href="#/reports" spark={trends.data?.changes} color="var(--tool-claude)" sub="14-day activity" />
-  </section>
-
-  <section class="sec">
-    <div class="sec-h">
-      <h2>AI tools</h2>
-      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_TOKEN_BUDGET)} budget</span>
-      <span class="spacer"></span>
-      <a class="btn sm ghost" href="#/agents?tab=matrix">Capability matrix <Icon name="chevron" size={13} /></a>
-    </div>
-    {#if setup.error}
-      <div class="card pad faint small">Could not load the agent setup: {setup.error.message}</div>
-    {:else if !setup.data}
-      <div class="tgrid stagger">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
-    {:else}
-      <div class="tgrid stagger">
-        {#each detected as t (t.id)}
-          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_TOKEN_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
-        {:else}
-          <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
-        {/each}
-      </div>
-      {#if missing.length}
-        <div class="miss">
-          <span class="faint small">Not set up:</span>
-          {#each missing as t (t.id)}
-            <a class="chip" href="#/agents?tab=templates&tool={t.id}"><Icon name="plus" size={11} /> {t.name}</a>
-          {/each}
-        </div>
-      {/if}
-    {/if}
   </section>
 
   <div class="grid">
@@ -235,7 +205,9 @@
               {#if t.due}<span class="faint tiny">{t.due}</span>{/if}
             </button>
           {:else}
-            {#if board.data}
+            {#if board.error}
+              <div class="faint small">Could not load tasks: {board.error.message}</div>
+            {:else if board.data}
               <Empty compact icon="check" title="All clear">No open tasks.</Empty>
             {:else}
               <div class="skel-rows" aria-label="Loading tasks">{#each [0, 1, 2] as i (i)}<span class="skel"></span>{/each}</div>
@@ -264,6 +236,36 @@
     </div>
   </div>
 
+  <section class="sec">
+    <div class="sec-h">
+      <h2>AI tools</h2>
+      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_TOKEN_BUDGET)} budget</span>
+      <span class="spacer"></span>
+      <a class="btn sm ghost" href="#/agents?tab=matrix">Capability matrix <Icon name="chevron" size={13} /></a>
+    </div>
+    {#if setup.error}
+      <div class="card pad faint small">Could not load the agent setup: {setup.error.message}</div>
+    {:else if !setup.data}
+      <div class="tgrid stagger">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
+    {:else}
+      <div class="tgrid stagger">
+        {#each detected as t (t.id)}
+          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_TOKEN_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
+        {:else}
+          <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
+        {/each}
+      </div>
+      {#if missing.length}
+        <div class="miss">
+          <span class="faint small">Not set up:</span>
+          {#each missing as t (t.id)}
+            <a class="chip" href="#/agents?tab=templates&tool={t.id}"><Icon name="plus" size={11} /> {t.name}</a>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+
   <div class="grid2 stagger">
     <section class="card">
       <div class="card-h"><Icon name="layers" size={14} /> Project stack <span class="spacer"></span><a class="btn sm ghost" href="#/project">Details</a></div>
@@ -271,7 +273,9 @@
         {#each stacks as s (s.id)}
           <a class="chip" href="#/project" title={s.source}>{s.name}{#if s.version}<span class="n">{s.version}</span>{/if}</a>
         {:else}
-          {#if project.data}
+          {#if project.error}
+            <span class="faint small">Could not detect the stack.</span>
+          {:else if project.data}
             <span class="faint small">No stack detected.</span>
           {:else}
             {#each [64, 88, 52, 76, 60] as w, i (i)}<span class="skel chip-sk" style="width:{w}px"></span>{/each}
@@ -324,7 +328,7 @@
   .pad { padding: 16px; }
   .small { font-size: 12px; }
   .tiny { font-size: 11px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 22px; align-items: start; }
   .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .activity { display: flex; flex-direction: column; }

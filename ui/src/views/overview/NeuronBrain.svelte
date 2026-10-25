@@ -296,7 +296,9 @@
     raf = 0;
     if (!shouldRun()) return;
     raf = requestAnimationFrame(frame);
-    if (t - lastFrame < FRAME_MS) return;
+    // ~30fps while something is happening (hover, fresh pulse), ~15fps for the idle drift
+    const busy = hovered || Date.now() - coreFlash < PULSE_MS;
+    if (t - lastFrame < (busy ? FRAME_MS : FRAME_MS * 2)) return;
     const dt = lastT ? Math.min(0.1, (t - lastT) / 1000) : 0;
     lastT = t;
     lastFrame = t;
