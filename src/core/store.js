@@ -1,12 +1,13 @@
 import { EventEmitter } from 'node:events';
-import { scan, readEntry } from './scanner.js';
+import { scanFiles, readEntry } from './scanner.js';
 import { isCandidate } from './classify.js';
 import { createHistory } from './history.js';
 import { lineDiff } from './diff.js';
 
 const RING = 500;
 
-export function createStore(root, config) {
+/** opts.record=false: read-only use (lint, status, export) - no history snapshots written. */
+export function createStore(root, config, { record = true } = {}) {
   const emitter = new EventEmitter();
   const files = new Map();
   const contents = new Map();
@@ -27,13 +28,10 @@ export function createStore(root, config) {
   async function init() {
     files.clear();
     contents.clear();
-    const entries = await scan(root, config);
-    for (const e of entries) {
-      const r = await readEntry(root, e.path, maxSize, extra);
-      if (!r) continue;
+    for (const r of await scanFiles(root, config)) {
       files.set(r.entry.path, r.entry);
       contents.set(r.entry.path, r.content);
-      try { history.record(r.entry.path, r.content); } catch { /* history is best-effort */ }
+      if (record) try { history.record(r.entry.path, r.content); } catch { /* history is best-effort */ }
     }
   }
 
@@ -59,7 +57,7 @@ export function createStore(root, config) {
     files.set(p, r.entry);
     contents.set(p, r.content);
     let historyId;
-    try { historyId = history.record(p, r.content)?.id; } catch { /* best-effort */ }
+    if (record) try { historyId = history.record(p, r.content)?.id; } catch { /* best-effort */ }
     const ev = {
       id: nextId++, type: known ? 'change' : 'add', path: p, ts: Date.now(),
       file: r.entry, stats: { added, removed }, agent: null,

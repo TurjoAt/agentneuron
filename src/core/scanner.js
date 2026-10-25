@@ -63,8 +63,8 @@ export async function readEntry(root, relPath, maxSize = DEFAULT_MAX, extraPatte
   }
 }
 
-/** Walk the project and return FileEntry[] (sorted by path). */
-export async function scan(root, config = {}) {
+/** Walk the project and return [{ entry, content }] (sorted by path). Each file is read once. */
+export async function scanFiles(root, config = {}) {
   const maxSize = config.maxFileSize ?? DEFAULT_MAX;
   const extra = config.extraPatterns || [];
   const out = [];
@@ -78,10 +78,15 @@ export async function scan(root, config = {}) {
         if (!isIgnored(childRel, config)) await walk(childRel);
       } else if (d.isFile() && isCandidate(childRel, config)) {
         const r = await readEntry(root, childRel, maxSize, extra);
-        if (r) out.push(r.entry);
+        if (r) out.push(r);
       }
     }
   }
   await walk('');
-  return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return out.sort((a, b) => (a.entry.path < b.entry.path ? -1 : a.entry.path > b.entry.path ? 1 : 0));
+}
+
+/** Walk the project and return FileEntry[] (sorted by path). */
+export async function scan(root, config = {}) {
+  return (await scanFiles(root, config)).map((r) => r.entry);
 }

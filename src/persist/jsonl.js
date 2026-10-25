@@ -25,22 +25,33 @@ export function createJsonl(file, { maxBytes = MAX_BYTES, keep = KEEP } = {}) {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       const line = JSON.stringify(obj) + '\n';
-      if (curSize() + line.length > maxBytes) rotate();
+      if (curSize() + Buffer.byteLength(line) > maxBytes) rotate();
       fs.appendFileSync(file, line);
       size = curSize() + Buffer.byteLength(line);
       return true;
     } catch { return false; }
   }
-  /** All parsed rows, oldest first (rotated files included). */
+  // Parsed rows per file part, reused while its size and mtime are unchanged: report
+  // exports query events.jsonl several times per request (up to keep x maxBytes of JSON).
+  const parsed = new Map(); // part -> { size, mtimeMs, rows }
+  /** All parsed rows, oldest first (rotated files included). Treat the row objects as read-only. */
   function readAll() {
     const rows = [];
     for (let i = keep; i >= 0; i--) {
       const f = i === 0 ? file : `${file}.${i}`;
-      let txt; try { txt = fs.readFileSync(f, 'utf8'); } catch { continue; }
-      for (const l of txt.split('\n')) {
-        if (!l) continue;
-        try { rows.push(JSON.parse(l)); } catch { /* skip torn line */ }
+      let st; try { st = fs.statSync(f); } catch { parsed.delete(f); continue; }
+      let c = parsed.get(f);
+      if (!c || c.size !== st.size || c.mtimeMs !== st.mtimeMs || c.ino !== st.ino) {
+        let txt; try { txt = fs.readFileSync(f, 'utf8'); } catch { continue; }
+        const list = [];
+        for (const l of txt.split('\n')) {
+          if (!l) continue;
+          try { list.push(JSON.parse(l)); } catch { /* skip torn line */ }
+        }
+        c = { size: st.size, mtimeMs: st.mtimeMs, ino: st.ino, rows: list };
+        parsed.set(f, c);
       }
+      for (const r of c.rows) rows.push(r);
     }
     return rows;
   }
