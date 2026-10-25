@@ -60,3 +60,16 @@ export function snapshotFor(snap, role, access) {
     notes: p ? snap.notes : [],
   };
 }
+
+/** Strip prompt text, session titles and quoted evidence from an API payload for a role that may not see prompts. */
+export function redactPrompts(v) {
+  if (Array.isArray(v)) return v.filter((x) => !(x && typeof x === 'object' && (x.kind === 'prompt' || x.type === 'prompt'))).map(redactPrompts);
+  if (!v || typeof v !== 'object') return v;
+  const out = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (k === 'prompts' && Array.isArray(x)) out[k] = [];
+    else if (k === 'title' || k === 'lastPrompt' || k === 'prompt' || k === 'quote') out[k] = typeof x === 'string' ? '' : x;
+    else out[k] = redactPrompts(x);
+  }
+  return out;
+}

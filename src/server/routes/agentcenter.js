@@ -9,6 +9,7 @@ import { syncStatus, syncPlan } from '../../agentcenter/sync.js';
 import { sessionTimeline, locateTranscript, listCodexTranscripts, readTranscriptUsageCached } from '../../agentcenter/transcript.js';
 import { estimateCosts } from '../../agentcenter/costs.js';
 import { contextAt, contextDiff } from '../../agentcenter/timetravel.js';
+import { liveAccess, redactPrompts } from '../../live/coord.js';
 
 const TOOLS = new Set(['claude', 'codex', 'cursor']);
 
@@ -59,11 +60,12 @@ export default async function register(router, ctx) {
     } catch (e) { throw new HttpError(e instanceof FileError ? e.status : 400, e.message); }
   });
 
-  router.get('/api/agents/session', async ({ q }) => {
+  router.get('/api/agents/session', async ({ q, role }) => {
     const id = q.get('id');
     if (!id) throw new HttpError(400, 'id required');
     if (!/^[\w.-]{1,200}$/.test(id)) throw new HttpError(400, 'invalid id');
-    return maskDeep(await sessionTimeline(ctx.sessions, id, { root: ctx.root, home }));
+    const out = maskDeep(await sessionTimeline(ctx.sessions, id, { root: ctx.root, home }));
+    return liveAccess(ctx.config).prompts(role) ? out : redactPrompts(out);
   });
 
   router.get('/api/agents/costs', async ({ q }) => {

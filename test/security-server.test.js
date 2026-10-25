@@ -219,3 +219,20 @@ test('file events show the agent prompt and session title to admins only', async
   assert.equal(v.agent.lastPrompt, undefined);
   assert.equal(v.agent.title, undefined);
 });
+
+test('insights replay hides session titles from viewers', async () => {
+  const { srv, port } = await boot({ adminToken: 'adm-tok-9012', token: 'view-tok-9012' });
+  srv.store.events.push({ id: 999998, type: 'change', path: 'CLAUDE.md', ts: Date.now(), agent: { tool: 'claude', sessionId: 's2', title: 'fix billing secret', ts: 1 } });
+  const get = async (tok) => JSON.parse((await raw(port, { p: '/api/insights/replay', headers: { host: `127.0.0.1:${port}`, authorization: `Bearer ${tok}` } })).body);
+  const a = (await get('adm-tok-9012')).changes.find((c) => c.path === 'CLAUDE.md');
+  const v = (await get('view-tok-9012')).changes.find((c) => c.path === 'CLAUDE.md');
+  assert.ok(JSON.stringify(a).includes('fix billing secret'));
+  assert.ok(v, 'viewers still see the change');
+  assert.ok(!JSON.stringify(v).includes('fix billing secret'));
+});
+
+test('redactPrompts drops prompt rows and blanks titles and quotes', async () => {
+  const { redactPrompts } = await import('../src/live/coord.js');
+  const out = redactPrompts({ session: { title: 't' }, prompts: [{ text: 'p' }], timeline: [{ kind: 'prompt', text: 'p' }, { kind: 'edit', path: 'a' }, { type: 'prompt', text: 'p' }], lessons: [{ evidence: [{ quote: 'q', ts: 1 }] }] });
+  assert.deepEqual(out, { session: { title: '' }, prompts: [], timeline: [{ kind: 'edit', path: 'a' }], lessons: [{ evidence: [{ quote: '', ts: 1 }] }] });
+});

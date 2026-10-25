@@ -3,6 +3,7 @@ import { HttpError } from '../router.js';
 import { maskDeep } from '../mask.js';
 import { guard } from './files.js';
 import { getInsights } from '../../insights/index.js';
+import { liveAccess, redactPrompts } from '../../live/coord.js';
 
 const num = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : Number.isNaN(Date.parse(v)) ? null : Date.parse(v); };
 function cleanPath(p) {
@@ -15,7 +16,11 @@ function cleanPath(p) {
 
 export default async function register(router, ctx) {
   const ins = () => getInsights(ctx);
-  const R = (m, p, fn, level = 'read') => router[m](p, guard(async (a) => maskDeep(await fn(a))), { level });
+  // Prompts, session titles and quoted evidence follow the same policy as the live view (config.live).
+  const R = (m, p, fn, level = 'read') => router[m](p, guard(async (a) => {
+    const v = maskDeep(await fn(a));
+    return liveAccess(ctx.config).prompts(a.role) ? v : redactPrompts(v);
+  }), { level });
 
   R('get', '/api/insights/lessons', ({ q, role }) => ins().lessons({ all: q.get('all') === '1' }).then((v) => ({ ...v, canAccept: ctx.can('edit', role) })));
   R('post', '/api/insights/lessons/accept', ({ body }) => ins().accept(body || {}), 'edit');

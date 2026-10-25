@@ -12,7 +12,7 @@ The MCP server is read-only by default. The writing tools need the `state` level
 agentneuron mcp --level state
 ```
 
-You can also set `"mcp": { "level": "state" }` in `.agentneuron/config.json`. The writes stay inside `.agentneuron/`: `claims.json`, `handoffs.jsonl`, and the board overlay in `board.json`. Markdown task files are never rewritten by `claim_task`. Because a cloned repository can carry that config file, check `.agentneuron/config.json` in projects you did not create.
+You can also set `"mcp": { "level": "state" }` in `.agentneuron/config.json`. The writes stay inside `.agentneuron/`: `claims.json`, `handoffs.jsonl`, and the board overlay in `board.json`. Markdown task files are never rewritten by the MCP `claim_task` tool. The dashboard's claim button (`POST /api/live/claim-task`) is different: when the server runs with `--enable edit`, assigning a task that lives in a Markdown file updates that task line, the same way the Tasks board does. Because a cloned repository can carry that config file, check `.agentneuron/config.json` in projects you did not create.
 
 At the `read` level, `claim_task`, `claim_files`, `release_files` and `handoff_note` are missing from `tools/list` and are refused if called anyway. `list_claims` and `get_handoffs` are always available.
 

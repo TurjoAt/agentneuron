@@ -148,6 +148,7 @@ export async function cmdCi(root, flags, log = console) {
   if (!CI_FORMATS.includes(format)) { log.error(`agentneuron: --format must be one of ${CI_FORMATS.join(', ')}`); return 2; }
   const failOn = flags['fail-on'] === undefined ? 'error' : String(flags['fail-on']).toLowerCase();
   if (!FAIL_ON.includes(failOn)) { log.error(`agentneuron: --fail-on must be one of ${FAIL_ON.join(', ')}`); return 2; }
+  if (flags.budget === true) { log.error('agentneuron: --budget needs a number of tokens, e.g. --budget 8000'); return 2; }
   const budget = flags.budget === undefined ? DEFAULT_BUDGET : Number(flags.budget);
   if (!Number.isFinite(budget) || budget <= 0) { log.error('agentneuron: --budget must be a positive number of tokens'); return 2; }
   if (flags.base === true) { log.error('agentneuron: --base needs a git ref, e.g. --base origin/main'); return 2; }

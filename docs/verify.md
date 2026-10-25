@@ -69,7 +69,7 @@ A false positive teaches people to ignore the tool, so anything uncertain is `un
 
 ## In the health score
 
-False claims (except paths, which the `missing-path` rule already reports) appear as the warn-level lint rule **`false-claim`** and count toward the health score, in `agentneuron lint`, the Health page and `get_health`. Repo facts are cached for 15 seconds (or until a root manifest changes); renaming a script updates `/api/verify` immediately and the health score at the next analysis.
+False claims (except paths, which the `missing-path` rule already reports) appear as the warn-level lint rule **`false-claim`** and count toward the health score, in `agentneuron lint`, the Health page and `get_health`. Repo facts are cached for 60 seconds (or until a root manifest changes); renaming a script updates `/api/verify` immediately and the health score at the next analysis.
 
 ## Fixing
 

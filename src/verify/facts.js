@@ -7,7 +7,7 @@ import { readRegular } from '../files/safeio.js';
 import { parseToml, envKeys, cleanVersion } from '../project/util.js';
 import { pmFromIndex } from '../project/detectors/node.js';
 
-const TTL = 15000;
+const TTL = 60000; // the repo walk is synchronous and lint calls this on every health pass
 const MAX_ENTRIES = 50000;
 const SKIP = new Set(['.venv', 'venv', '__pycache__', 'target', '.cache', 'coverage', '.nuxt', '.svelte-kit', '.turbo', '.gradle', '.idea', '.output', '.pytest_cache', '.mypy_cache', '.tox']);
 const SIG = ['package.json', 'pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'bun.lockb', 'bun.lock', 'Makefile', 'composer.json', 'composer.lock', 'pyproject.toml',
@@ -27,7 +27,7 @@ function signature(root) {
 
 export function clearFactsCache(root) { if (root) cache.delete(path.resolve(root)); else cache.clear(); }
 
-/** Facts for `root`, cached for 15 s or until a root manifest changes. */
+/** Facts for `root`, cached for 60 s or until a root manifest changes. */
 export function loadFacts(root) {
   const key = path.resolve(root);
   const sig = signature(key);
@@ -42,8 +42,8 @@ function walk(root) {
   const files = []; const dirs = new Set(['']);
   let n = 0; let truncated = false;
   const queue = [''];
-  while (queue.length) {
-    const rel = queue.shift();
+  for (let qi = 0; qi < queue.length; qi++) {
+    const rel = queue[qi];
     let ents;
     try { ents = fs.readdirSync(path.join(root, rel), { withFileTypes: true }); } catch { continue; }
     for (const e of ents) {
