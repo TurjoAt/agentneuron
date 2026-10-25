@@ -3,6 +3,7 @@
   import { app, openFile, isPulsing, navigate } from '../lib/store.svelte.js';
   import { resource } from '../lib/resource.svelte.js';
   import { KINDS } from '../lib/tools.js';
+  import { TOOL_TOKEN_BUDGET } from '../lib/budget.js';
   import { fmtNum, timeAgo, basename, dirname, toMs } from '../lib/format.js';
   import { openTask, newFile } from '../lib/fileActions.js';
   import HealthRing from '../lib/HealthRing.svelte';
@@ -11,14 +12,15 @@
   import ToolBadge from '../lib/ToolBadge.svelte';
   import GitStatus from '../lib/GitStatus.svelte';
   import Icon from '../lib/Icon.svelte';
+  import Empty from '../lib/Empty.svelte';
   import Kpi from './overview/Kpi.svelte';
   import ToolCard from './overview/ToolCard.svelte';
   import ActionBtn from './overview/ActionBtn.svelte';
+  import NeuronBrain from './overview/NeuronBrain.svelte';
 
   let { params: _params } = $props();
 
   const DAY = 86_400_000;
-  const TOOL_BUDGET = 12_000; // suggested instruction-token budget per tool
 
   // ------------------------------------------------------------ data
   const setup = resource(() => api('/api/agents/setup'));
@@ -146,55 +148,28 @@
     </div>
   </div>
 
-  <section class="kpis" aria-label="Key metrics">
+  <section class="kpis stagger" aria-label="Key metrics">
     <Kpi label="Tracked files" value={files.length} href="#/files" sub="{detected.length || '–'} tools · {byKind.length} kinds" />
     <Kpi label="Context tokens" value={totalTokens} href="#/reports" spark={trends.data?.tokens} color="var(--accent)" now={tokensDelta[0]} prev={tokensDelta[1]} sub="14-day trend" />
     <Kpi label="Health" value={health?.score ?? 0} suffix={health?.grade ? ` ${health.grade}` : ''} href="#/health" spark={trends.data?.health} color="var(--ok)" now={healthDelta[0]} prev={healthDelta[1]} sub="{health?.counts?.error ?? 0} errors · {health?.counts?.warn ?? 0} warnings" />
-    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : '…'} />
+    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.error ? 'board unavailable' : board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : ''} />
     <Kpi label="Uncommitted" value={git?.available ? git.dirty || 0 : 0} href="#/git" sub={git?.available ? `on ${git.branch}` : 'git unavailable'} />
     <Kpi label="Changes · 24h" value={changes24h} href="#/reports" spark={trends.data?.changes} color="var(--tool-claude)" sub="14-day activity" />
   </section>
 
-  <section class="sec">
-    <div class="sec-h">
-      <h2>AI tools</h2>
-      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_BUDGET)} budget</span>
-      <span class="spacer"></span>
-      <a class="btn sm ghost" href="#/agents?tab=matrix">Capability matrix <Icon name="chevron" size={13} /></a>
-    </div>
-    {#if setup.error}
-      <div class="card pad faint small">Could not load the agent setup: {setup.error.message}</div>
-    {:else if !setup.data}
-      <div class="tgrid">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
-    {:else}
-      <div class="tgrid">
-        {#each detected as t (t.id)}
-          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
-        {:else}
-          <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
-        {/each}
-      </div>
-      {#if missing.length}
-        <div class="miss">
-          <span class="faint small">Not set up:</span>
-          {#each missing as t (t.id)}
-            <a class="chip" href="#/agents?tab=templates&tool={t.id}"><Icon name="plus" size={11} /> {t.name}</a>
-          {/each}
-        </div>
-      {/if}
-    {/if}
-  </section>
-
   <div class="grid">
-    <section class="card activity">
-      <div class="card-h">
-        <span class="live-dot"></span> Live activity
-        <span class="sub">{app.events.length} events</span>
-      </div>
-      <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
-    </section>
+    <div class="side stagger">
+      <NeuronBrain />
+      <section class="card activity">
+        <div class="card-h">
+          <span class="live-dot"></span> Live activity
+          <span class="sub">{app.events.length} events</span>
+        </div>
+        <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
+      </section>
+    </div>
 
-    <div class="side">
+    <div class="side stagger">
       <section class="card">
         <div class="card-h">Context health <span class="sub">lint + secret scan</span></div>
         <div class="hb">
@@ -211,7 +186,7 @@
       </section>
 
       <section class="card">
-        <div class="card-h">Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks">Board</a></div>
+        <div class="card-h">Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks?tab=board">Board</a></div>
         <div class="card-b col" style="gap:10px">
           {#if colCounts.length}
             <div class="stk" aria-label="Tasks per column">
@@ -230,7 +205,13 @@
               {#if t.due}<span class="faint tiny">{t.due}</span>{/if}
             </button>
           {:else}
-            <div class="faint small">{board.data ? 'No open tasks.' : 'Loading…'}</div>
+            {#if board.error}
+              <div class="faint small">Could not load tasks: {board.error.message}</div>
+            {:else if board.data}
+              <Empty compact icon="check" title="All clear">No open tasks.</Empty>
+            {:else}
+              <div class="skel-rows" aria-label="Loading tasks">{#each [0, 1, 2] as i (i)}<span class="skel"></span>{/each}</div>
+            {/if}
           {/each}
         </div>
       </section>
@@ -255,14 +236,50 @@
     </div>
   </div>
 
-  <div class="grid2">
+  <section class="sec">
+    <div class="sec-h">
+      <h2>AI tools</h2>
+      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_TOKEN_BUDGET)} budget</span>
+      <span class="spacer"></span>
+      <a class="btn sm ghost" href="#/agents?tab=matrix">Capability matrix <Icon name="chevron" size={13} /></a>
+    </div>
+    {#if setup.error}
+      <div class="card pad faint small">Could not load the agent setup: {setup.error.message}</div>
+    {:else if !setup.data}
+      <div class="tgrid stagger">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
+    {:else}
+      <div class="tgrid stagger">
+        {#each detected as t (t.id)}
+          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_TOKEN_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
+        {:else}
+          <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
+        {/each}
+      </div>
+      {#if missing.length}
+        <div class="miss">
+          <span class="faint small">Not set up:</span>
+          {#each missing as t (t.id)}
+            <a class="chip" href="#/agents?tab=templates&tool={t.id}"><Icon name="plus" size={11} /> {t.name}</a>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+
+  <div class="grid2 stagger">
     <section class="card">
       <div class="card-h"><Icon name="layers" size={14} /> Project stack <span class="spacer"></span><a class="btn sm ghost" href="#/project">Details</a></div>
       <div class="card-b stacks">
         {#each stacks as s (s.id)}
           <a class="chip" href="#/project" title={s.source}>{s.name}{#if s.version}<span class="n">{s.version}</span>{/if}</a>
         {:else}
-          <span class="faint small">{project.data ? 'No stack detected.' : 'Detecting…'}</span>
+          {#if project.error}
+            <span class="faint small">Could not detect the stack.</span>
+          {:else if project.data}
+            <span class="faint small">No stack detected.</span>
+          {:else}
+            {#each [64, 88, 52, 76, 60] as w, i (i)}<span class="skel chip-sk" style="width:{w}px"></span>{/each}
+          {/if}
         {/each}
       </div>
       <div class="card-b kinds">
@@ -292,7 +309,7 @@
             </span>
           </button>
         {:else}
-          <div class="faint small" style="padding:12px 4px">No changes recorded yet.</div>
+          <Empty compact icon="flame" title="Nothing hot yet">Files that change most often will rise here.</Empty>
         {/each}
       </div>
     </section>
@@ -311,11 +328,11 @@
   .pad { padding: 16px; }
   .small { font-size: 12px; }
   .tiny { font-size: 11px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 22px; align-items: start; }
   .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .activity { display: flex; flex-direction: column; }
-  .feed-wrap { overflow: auto; max-height: 640px; }
+  .feed-wrap { overflow: auto; max-height: 460px; }
   .hb { display: flex; align-items: center; gap: 20px; padding: 4px 18px 18px; flex-wrap: wrap; }
   .sev { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 2px; }
   .sev-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px; color: var(--text-2); font-size: 13px; text-decoration: none; }
@@ -337,6 +354,7 @@
   .gline:hover { text-decoration: none; color: var(--accent); }
   .stacks { display: flex; flex-wrap: wrap; gap: 6px; }
   .stacks .chip, .kinds .chip { text-decoration: none; }
+  .chip-sk { height: 24px; border-radius: 99px; }
   .kinds { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
   .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: live 2s infinite; }
   @keyframes live {

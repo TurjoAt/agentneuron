@@ -26,11 +26,8 @@
     { id: 'about', label: 'About' },
   ];
   const VALID = new Set(TABS.map((t) => t.id));
-  let tab = $state(VALID.has(params.tab) ? params.tab : 'permissions');
-  $effect(() => {
-    const t = VALID.has(params.tab) ? params.tab : 'permissions';
-    if (t !== tab) tab = t;
-  });
+  // The URL is the single source of truth for the active tab.
+  const tab = $derived(VALID.has(params.tab) ? params.tab : 'permissions');
   const go = (id) => navigate('settings', { tab: id });
 </script>
 
@@ -41,7 +38,7 @@
       <p>Permissions, access, audit trail and housekeeping. Changes to what agentneuron may do are made on the server.</p>
     </div>
   </div>
-  <div class="tabs"><Tabs tabs={TABS} bind:active={tab} onchange={go} /></div>
+  <div class="tabs"><Tabs tabs={TABS} active={tab} onchange={go} /></div>
   <div class="body">
     {#if tab === 'permissions'}<Permissions settings={settings.data} />
     {:else if tab === 'role'}<Role settings={settings.data} />

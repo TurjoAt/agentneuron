@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { api } from '../../lib/api.js';
   import { app, openFile } from '../../lib/store.svelte.js';
   import { fmtNum } from '../../lib/format.js';
@@ -7,7 +8,7 @@
   import { toolKey } from './shared.js';
 
   let { initial = '' } = $props();
-  let path = $state(initial || '');
+  let path = $state(untrack(() => initial || ''));
   let res = $state(null);
   let err = $state('');
   let busy = $state(false);
@@ -43,7 +44,11 @@
       if (my === seq) busy = false;
     }
   }
-  $effect(() => { if (initial) run(); });
+  // Re-run only when the URL-provided path changes (not on every keystroke).
+  $effect(() => {
+    const i = initial;
+    if (i) untrack(() => { path = i; run(); });
+  });
 </script>
 
 <section class="card">

@@ -1,5 +1,4 @@
 <script>
-  import { untrack } from 'svelte';
   import { api, post } from '../lib/api.js';
   import { app, openFile, navigate, onStream, toast, saveLocal } from '../lib/store.svelte.js';
   import { resource } from '../lib/resource.svelte.js';
@@ -19,11 +18,12 @@
   let { params = {} } = $props();
 
   const VIEWS = ['board', 'list', 'table', 'calendar', 'timeline', 'decisions'];
-  const initTab = untrack(() => params.tab || params.view);
-  let tab = $state(VIEWS.includes(initTab) ? initTab : 'board');
-  $effect(() => {
+  // Table is the default view: `#/tasks` ↔ table, `#/tasks?tab=board` ↔ board.
+  // `?tab=table` (and legacy `?view=`) still resolve. The URL is the source of truth.
+  const DEFAULT_TAB = 'table';
+  const tab = $derived.by(() => {
     const t = params.tab || params.view;
-    if (t && VIEWS.includes(t) && t !== tab) tab = t;
+    return VIEWS.includes(t) ? t : DEFAULT_TAB;
   });
 
   const board = resource(() => api('/api/board'));
@@ -47,7 +47,7 @@
   const overdue = $derived(all.filter(isOverdue).length);
 
   function setTab(t) {
-    navigate('tasks', t === 'board' ? {} : { tab: t });
+    navigate('tasks', t === DEFAULT_TAB ? {} : { tab: t });
   }
 
   async function move(id, status, order) {
@@ -104,7 +104,7 @@
         { id: 'calendar', label: 'Calendar' }, { id: 'timeline', label: 'Timeline' },
         { id: 'decisions', label: 'Decisions', count: decs.length || undefined },
       ]}
-      bind:active={tab}
+      active={tab}
       onchange={setTab}
     />
   </div>
@@ -134,7 +134,10 @@
     {#if board.error}
       <Empty icon="alert" title="Could not load the board">{board.error.message}</Empty>
     {:else if !board.data}
-      <div class="skel" style="height:300px"></div>
+      <div class="tskel" aria-label="Loading tasks">
+        <span class="skel hd"></span>
+        {#each [0, 1, 2, 3, 4, 5, 6] as i (i)}<span class="skel"></span>{/each}
+      </div>
     {:else if !all.length}
       <Empty icon="tasks" title="No tasks yet">Add <code>- [ ] something</code> to any markdown file, or create a native card with “New task”.</Empty>
     {:else if tab === 'board'}
@@ -206,4 +209,7 @@
     .searchbox, .searchbox .input { width: 100%; }
     .filters select.input { flex: 1; min-width: 120px; }
   }
+  .tskel { display: flex; flex-direction: column; gap: 10px; padding: 6px 0; }
+  .tskel .skel { height: 34px; border-radius: 9px; }
+  .tskel .hd { height: 28px; opacity: 0.7; }
 </style>

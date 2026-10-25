@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { api } from '../../lib/api.js';
   import { resource } from '../../lib/resource.svelte.js';
   import { runAction, actionEnabled } from '../../lib/actions.js';
@@ -9,7 +10,9 @@
   let { initialTool = '' } = $props();
   const tpl = resource(() => api('/api/agents/templates'), { live: false });
   let cat = $state('all');
-  let toolFilter = $state(initialTool || '');
+  // Seeded from the URL (?tool=), user-editable, re-synced when the URL changes.
+  let toolFilter = $state(untrack(() => initialTool || ''));
+  $effect(() => { const t = initialTool; untrack(() => (toolFilter = t || '')); });
   let sel = $state(null);
   let vars = $state({});
   let pathOverride = $state('');

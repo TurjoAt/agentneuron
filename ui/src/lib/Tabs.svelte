@@ -1,8 +1,37 @@
 <script>
+  // Segmented tabs with a sliding active indicator. The indicator is measured
+  // only when `active`/`tabs` change or the strip resizes; `.on` styling stays
+  // as a fallback before the first measurement.
+  import { tick } from 'svelte';
   let { tabs = [], active = $bindable(), onchange } = $props();
+
+  let strip = $state();
+  let ind = $state(null); // { x, w }
+  let ready = $state(false); // enable the slide transition after first placement
+
+  function measure() {
+    const el = strip?.querySelector('.tab.on');
+    if (!el) return (ind = null);
+    ind = { x: el.offsetLeft, w: el.offsetWidth };
+  }
+  $effect(() => {
+    void active;
+    void tabs;
+    tick().then(() => {
+      measure();
+      if (!ready) requestAnimationFrame(() => (ready = true));
+    });
+  });
+  $effect(() => {
+    if (!strip) return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(strip);
+    return () => ro.disconnect();
+  });
 </script>
 
-<div class="tabs" role="tablist">
+<div class="tabs" class:slide={!!ind} class:ready role="tablist" bind:this={strip}>
+  {#if ind}<span class="ind" aria-hidden="true" style="transform:translateX({ind.x}px);width:{ind.w}px"></span>{/if}
   {#each tabs as t (t.id)}
     <button
       role="tab"
@@ -22,6 +51,7 @@
 
 <style>
   .tabs {
+    position: relative;
     display: inline-flex;
     gap: 2px;
     padding: 3px;
@@ -54,6 +84,19 @@
     background: var(--panel-solid);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--border);
   }
+  .ind {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    border-radius: 8px;
+    background: var(--panel-solid);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--border);
+    pointer-events: none;
+  }
+  .ready .ind { transition: transform 0.32s var(--ease), width 0.32s var(--ease); }
+  .tab { position: relative; z-index: 1; }
+  .slide .tab.on { background: transparent; box-shadow: none; }
   .n {
     font-size: 11px;
     color: var(--text-3);

@@ -1,6 +1,7 @@
 <script>
   // Find & replace across tracked files: live preview (GET /api/replace/preview),
   // per-file include/exclude, apply (POST /api/replace/apply).
+  import { untrack } from 'svelte';
   import { api, post } from '../api.js';
   import { app, toast, openFile } from '../store.svelte.js';
   import { canRun, levelReason } from '../actions.svelte.js';
@@ -10,12 +11,13 @@
 
   let { q: q0 = '', paths: paths0 = null, onclose } = $props();
 
-  let q = $state(q0 || '');
+  // q0/paths0 only seed the editable form (dialog is mounted fresh per open).
+  let q = $state(untrack(() => q0 || ''));
   let rep = $state('');
   let regex = $state(false);
   let cs = $state(false);
   let word = $state(false);
-  let scope = $state(paths0?.length ? paths0.join(',') : '');
+  let scope = $state(untrack(() => (paths0?.length ? paths0.join(',') : '')));
   let rows = $state([]);
   let loading = $state(false);
   let err = $state('');

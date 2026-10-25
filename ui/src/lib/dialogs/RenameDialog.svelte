@@ -1,5 +1,6 @@
 <script>
   // Rename / move with link-rewrite preview (POST /api/file/rename dryRun → apply).
+  import { untrack } from 'svelte';
   import { post } from '../api.js';
   import { app, toast, loadFiles, fileIndex, openFile } from '../store.svelte.js';
   import { canRun, levelReason } from '../actions.svelte.js';
@@ -7,7 +8,8 @@
   import Icon from '../Icon.svelte';
 
   let { path, onclose } = $props();
-  let to = $state(path);
+  // `path` seeds the editable target; comparisons below stay reactive.
+  let to = $state(untrack(() => path));
   let rewrite = $state(true);
   let plan = $state(null);
   let loading = $state(false);

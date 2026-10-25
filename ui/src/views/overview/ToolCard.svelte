@@ -1,11 +1,12 @@
 <script>
   import { navigate, openFile } from '../../lib/store.svelte.js';
   import { fmtNum } from '../../lib/format.js';
+  import { TOOL_TOKEN_BUDGET } from '../../lib/budget.js';
   import Meter from '../../lib/viz/Meter.svelte';
   import Icon from '../../lib/Icon.svelte';
   import { CAPS, toolKey, itemPath } from '../agents/shared.js';
 
-  let { tool, tokens = 0, budget = 12000, issues = { error: 0, warn: 0 } } = $props();
+  let { tool, tokens = 0, budget = TOOL_TOKEN_BUDGET, issues = { error: 0, warn: 0 } } = $props();
   const c = $derived(`var(--tool-${toolKey(tool.id)})`);
   const have = $derived(CAPS.filter((k) => tool.capabilities?.[k.id]?.count > 0));
   const state = $derived(issues.error ? 'err' : issues.warn ? 'warn' : 'ok');
@@ -48,8 +49,8 @@
 </div>
 
 <style>
-  .tc { padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; cursor: pointer; min-width: 0; transition: border-color 0.2s, transform 0.2s var(--ease); }
-  .tc:hover { border-color: color-mix(in srgb, var(--c) 45%, var(--border)); transform: translateY(-1px); }
+  .tc { padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; cursor: pointer; min-width: 0; transition: border-color 0.2s, transform 0.25s var(--ease), box-shadow 0.25s var(--ease); }
+  .tc:hover { border-color: color-mix(in srgb, var(--c) 45%, var(--border)); transform: translateY(-2px); box-shadow: var(--shadow), 0 14px 30px -20px color-mix(in srgb, var(--c) 70%, transparent); }
   .tc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .h { display: flex; align-items: center; gap: 8px; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent); }
