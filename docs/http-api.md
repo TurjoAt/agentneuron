@@ -235,7 +235,7 @@ At most 100 streams are served at once (`503` beyond that). Reconnects replay mi
 | `joblog` | `{ id, stream, text }` live output (`stdout`, `stderr`, `info`) |
 | `notify` | `{ type, title, body, level, ts, path? }` |
 | `ping` | `{ ts }` |
-| `agent.session` | `{ tool, sessionId, state: start|active|idle|end, title, model, cwd, startedAt, lastAt, edits, commands, lastPrompt?, lastThinking?, ts }` |
+| `agent.session` | `{ tool, sessionId, state: start|active|idle|end, title, model, cwd, startedAt, lastAt, edits, commands, promptTitle?, lastPrompt?, lastThinking?, ts }`. `title` comes only from a transcript summary; `promptTitle` (first prompt) and the prompt fields are role-gated like prompts |
 | `agent.edit` | `{ id, tool, sessionId, path, op: edit|write|create|delete|patch, linesAdded, linesRemoved, hunk: [{ type: add|del|ctx, text }], truncated, status: pending|confirmed|failed|unverified, ts, source: transcript|watcher, from?, historyId?, hunkHidden? }`. Sent again with the same `id` when its status or op changes |
 | `agent.command` | `{ id, tool, sessionId, cmd, ts, exitCode?, ok? }`. Sent again with the exit code |
 | `agent.prompt`, `agent.thinking` | `{ type, tool, sessionId, text, ts }`, only to clients allowed to see prompts |
