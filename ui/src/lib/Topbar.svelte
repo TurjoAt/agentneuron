@@ -3,7 +3,7 @@
   import { VIEWS, href } from './nav.js';
   import { jobs } from './actions.svelte.js';
   import Icon from './Icon.svelte';
-  import ConnPulse from './ConnPulse.svelte';
+  import RadarScan from './RadarScan.svelte';
   import Bell from './Bell.svelte';
   import WorkspaceSwitcher from './insight/WorkspaceSwitcher.svelte';
 
@@ -63,7 +63,7 @@
     </button>
   {/if}
 
-  <span class="mobile-conn"><ConnPulse showLabel={false} /></span>
+  <RadarScan />
 
   <Bell />
 
@@ -128,7 +128,6 @@
   .runpill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px; cursor: pointer; }
   .spin { width: 11px; height: 11px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .mobile-conn { display: none; }
   @media (max-width: 1100px) {
     .hide-md { display: none; }
     .search { min-width: 0; }
@@ -138,7 +137,6 @@
     .search { width: 36px; padding: 0; justify-content: center; }
     .search .kbd { display: none; }
     .proj, .proj + .slash { display: none; }
-    .mobile-conn { display: inline-flex; }
     .hide-sm { display: none; }
     .navbtns { display: none; }
   }
