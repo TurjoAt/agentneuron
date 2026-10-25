@@ -264,7 +264,21 @@ test('case-only rename: plain rename on case-sensitive FS, two-step on case-inse
   // two entries that differ only by case (hard links on a case-sensitive FS) are distinct: 409
   const r3 = tmp();
   put(r3, 'a.md', 'x\n');
-  fs.linkSync(path.join(r3, 'a.md'), path.join(r3, 'A.md'));
-  const m3 = await makeApi(r3);
-  assert.equal((await m3.api('POST', '/api/file/rename', { from: 'a.md', to: 'A.md' })).status, 409);
+  if (!fs.existsSync(path.join(r3, 'A.MD'))) { // only possible on a case-sensitive FS
+    fs.linkSync(path.join(r3, 'a.md'), path.join(r3, 'A.md'));
+    const m3 = await makeApi(r3);
+    assert.equal((await m3.api('POST', '/api/file/rename', { from: 'a.md', to: 'A.md' })).status, 409);
+  }
+});
+
+test('isCaseAlias: only a same-dir, same-entry, case-only difference', async () => {
+  const { isCaseAlias } = await import('../src/files/ops.js');
+  const r = tmp();
+  put(r, 'docs/a.md', 'x');
+  const a = path.join(r, 'docs', 'a.md');
+  assert.equal(isCaseAlias(a, a), false);
+  assert.equal(isCaseAlias(a, path.join(r, 'docs', 'b.md')), false);
+  assert.equal(isCaseAlias(a, path.join(r, 'DOCS', 'A.md')), false); // parent dir differs
+  // on a case-sensitive FS the other casing doesn't exist; on a case-insensitive one it is the same entry
+  assert.equal(isCaseAlias(a, path.join(r, 'docs', 'A.md')), fs.existsSync(path.join(r, 'docs', 'A.md')));
 });

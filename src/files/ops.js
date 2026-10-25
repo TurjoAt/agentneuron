@@ -386,7 +386,7 @@ export function createFileOps(ctx) {
  * (readdir lists the target name) and stay a 409.
  */
 export function isCaseAlias(from, to, fromStat = fs.lstatSync(from)) {
-  if (from === to || from.toLowerCase() !== to.toLowerCase()) return false;
+  if (from === to || path.dirname(from) !== path.dirname(to) || from.toLowerCase() !== to.toLowerCase()) return false;
   let ts;
   try { ts = fs.lstatSync(to); } catch { return false; }
   if (ts.ino !== fromStat.ino || ts.dev !== fromStat.dev) return false;

@@ -164,7 +164,7 @@ test('codex: patch paths resolve against the session cwd (turn_context too), not
     patchLine(T0 + 2000, 'AGENTS.md'),
     { timestamp: iso(T0 + 3000), type: 'turn_context', payload: { cwd: path.join(root, 'pkg', 'web') } },
     patchLine(T0 + 4000, 'README.md'),
-    patchLine(T0 + 5000, path.join(root, 'abs.md')),
+    patchLine(T0 + 5000, root.split(path.sep).join('/') + '/abs.md'), // the patch regex stops at backslashes
   ]));
   const s = createSessions(root, { home });
   const [l] = await s.list();
