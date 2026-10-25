@@ -12,6 +12,7 @@
   import ToolBadge from '../lib/ToolBadge.svelte';
   import GitStatus from '../lib/GitStatus.svelte';
   import Icon from '../lib/Icon.svelte';
+  import Empty from '../lib/Empty.svelte';
   import Kpi from './overview/Kpi.svelte';
   import ToolCard from './overview/ToolCard.svelte';
   import ActionBtn from './overview/ActionBtn.svelte';
@@ -147,11 +148,11 @@
     </div>
   </div>
 
-  <section class="kpis" aria-label="Key metrics">
+  <section class="kpis stagger" aria-label="Key metrics">
     <Kpi label="Tracked files" value={files.length} href="#/files" sub="{detected.length || '–'} tools · {byKind.length} kinds" />
     <Kpi label="Context tokens" value={totalTokens} href="#/reports" spark={trends.data?.tokens} color="var(--accent)" now={tokensDelta[0]} prev={tokensDelta[1]} sub="14-day trend" />
     <Kpi label="Health" value={health?.score ?? 0} suffix={health?.grade ? ` ${health.grade}` : ''} href="#/health" spark={trends.data?.health} color="var(--ok)" now={healthDelta[0]} prev={healthDelta[1]} sub="{health?.counts?.error ?? 0} errors · {health?.counts?.warn ?? 0} warnings" />
-    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : '…'} />
+    <Kpi label="Open tasks" value={openTasks.length} href="#/tasks" sub={board.data ? `${overdue} overdue · ${tasks.length - openTasks.length} done` : ''} />
     <Kpi label="Uncommitted" value={git?.available ? git.dirty || 0 : 0} href="#/git" sub={git?.available ? `on ${git.branch}` : 'git unavailable'} />
     <Kpi label="Changes · 24h" value={changes24h} href="#/reports" spark={trends.data?.changes} color="var(--tool-claude)" sub="14-day activity" />
   </section>
@@ -166,9 +167,9 @@
     {#if setup.error}
       <div class="card pad faint small">Could not load the agent setup: {setup.error.message}</div>
     {:else if !setup.data}
-      <div class="tgrid">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
+      <div class="tgrid stagger">{#each [0, 1, 2] as i (i)}<div class="skel" style="height:128px"></div>{/each}</div>
     {:else}
-      <div class="tgrid">
+      <div class="tgrid stagger">
         {#each detected as t (t.id)}
           <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_TOKEN_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
         {:else}
@@ -187,7 +188,7 @@
   </section>
 
   <div class="grid">
-    <div class="side">
+    <div class="side stagger">
       <NeuronBrain />
       <section class="card activity">
         <div class="card-h">
@@ -198,7 +199,7 @@
       </section>
     </div>
 
-    <div class="side">
+    <div class="side stagger">
       <section class="card">
         <div class="card-h">Context health <span class="sub">lint + secret scan</span></div>
         <div class="hb">
@@ -234,7 +235,11 @@
               {#if t.due}<span class="faint tiny">{t.due}</span>{/if}
             </button>
           {:else}
-            <div class="faint small">{board.data ? 'No open tasks.' : 'Loading…'}</div>
+            {#if board.data}
+              <Empty compact icon="check" title="All clear">No open tasks.</Empty>
+            {:else}
+              <div class="skel-rows" aria-label="Loading tasks">{#each [0, 1, 2] as i (i)}<span class="skel"></span>{/each}</div>
+            {/if}
           {/each}
         </div>
       </section>
@@ -259,14 +264,18 @@
     </div>
   </div>
 
-  <div class="grid2">
+  <div class="grid2 stagger">
     <section class="card">
       <div class="card-h"><Icon name="layers" size={14} /> Project stack <span class="spacer"></span><a class="btn sm ghost" href="#/project">Details</a></div>
       <div class="card-b stacks">
         {#each stacks as s (s.id)}
           <a class="chip" href="#/project" title={s.source}>{s.name}{#if s.version}<span class="n">{s.version}</span>{/if}</a>
         {:else}
-          <span class="faint small">{project.data ? 'No stack detected.' : 'Detecting…'}</span>
+          {#if project.data}
+            <span class="faint small">No stack detected.</span>
+          {:else}
+            {#each [64, 88, 52, 76, 60] as w, i (i)}<span class="skel chip-sk" style="width:{w}px"></span>{/each}
+          {/if}
         {/each}
       </div>
       <div class="card-b kinds">
@@ -296,7 +305,7 @@
             </span>
           </button>
         {:else}
-          <div class="faint small" style="padding:12px 4px">No changes recorded yet.</div>
+          <Empty compact icon="flame" title="Nothing hot yet">Files that change most often will rise here.</Empty>
         {/each}
       </div>
     </section>
@@ -341,6 +350,7 @@
   .gline:hover { text-decoration: none; color: var(--accent); }
   .stacks { display: flex; flex-wrap: wrap; gap: 6px; }
   .stacks .chip, .kinds .chip { text-decoration: none; }
+  .chip-sk { height: 24px; border-radius: 99px; }
   .kinds { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
   .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: live 2s infinite; }
   @keyframes live {

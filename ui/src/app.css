@@ -401,6 +401,23 @@ select.input option { background: var(--panel-solid); color: var(--text); }
   to { opacity: 1; transform: none; }
 }
 .fade-up { animation: fade-up 0.45s var(--ease) both; }
+/* staggered entrance for card grids; `backwards` fill releases transform so hover lifts still work */
+.stagger > * { animation: fade-up 0.5s var(--ease) backwards; }
+.stagger > :nth-child(2) { animation-delay: 0.04s; }
+.stagger > :nth-child(3) { animation-delay: 0.08s; }
+.stagger > :nth-child(4) { animation-delay: 0.12s; }
+.stagger > :nth-child(5) { animation-delay: 0.16s; }
+.stagger > :nth-child(6) { animation-delay: 0.2s; }
+.stagger > :nth-child(n + 7) { animation-delay: 0.24s; }
+/* hover lift for clickable cards */
+.lift { transition: transform 0.25s var(--ease), border-color 0.2s, box-shadow 0.25s var(--ease); }
+.lift:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--shadow), 0 14px 30px -20px rgba(0, 0, 0, 0.45); }
+/* skeleton list rows */
+.skel-rows { display: flex; flex-direction: column; gap: 10px; }
+.skel-rows .skel { height: 14px; }
+.skel-rows .skel:nth-child(2n) { width: 82%; }
+.skel-rows .skel:nth-child(3n) { width: 64%; }
+.empty.compact { padding: 18px 12px; }
 
 .page {
   padding: 22px clamp(14px, 2.6vw, 30px) 40px;

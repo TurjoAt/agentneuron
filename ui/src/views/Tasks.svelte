@@ -134,7 +134,10 @@
     {#if board.error}
       <Empty icon="alert" title="Could not load the board">{board.error.message}</Empty>
     {:else if !board.data}
-      <div class="skel" style="height:300px"></div>
+      <div class="tskel" aria-label="Loading tasks">
+        <span class="skel hd"></span>
+        {#each [0, 1, 2, 3, 4, 5, 6] as i (i)}<span class="skel"></span>{/each}
+      </div>
     {:else if !all.length}
       <Empty icon="tasks" title="No tasks yet">Add <code>- [ ] something</code> to any markdown file, or create a native card with “New task”.</Empty>
     {:else if tab === 'board'}
@@ -206,4 +209,7 @@
     .searchbox, .searchbox .input { width: 100%; }
     .filters select.input { flex: 1; min-width: 120px; }
   }
+  .tskel { display: flex; flex-direction: column; gap: 10px; padding: 6px 0; }
+  .tskel .skel { height: 34px; border-radius: 9px; }
+  .tskel .hd { height: 28px; opacity: 0.7; }
 </style>
