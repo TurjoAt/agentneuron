@@ -150,7 +150,8 @@ export async function cmdCi(root, flags, log = console) {
   if (!FAIL_ON.includes(failOn)) { log.error(`agentneuron: --fail-on must be one of ${FAIL_ON.join(', ')}`); return 2; }
   const budget = flags.budget === undefined ? DEFAULT_BUDGET : Number(flags.budget);
   if (!Number.isFinite(budget) || budget <= 0) { log.error('agentneuron: --budget must be a positive number of tokens'); return 2; }
-  const base = flags.base === undefined || flags.base === true || flags.base === '' ? null : String(flags.base);
+  if (flags.base === true) { log.error('agentneuron: --base needs a git ref, e.g. --base origin/main'); return 2; }
+  const base = flags.base === undefined || flags.base === '' ? null : String(flags.base);
   let res;
   try { res = await runCi(root, { format, failOn, base, budget }); } catch (e) { log.error(`agentneuron ci: ${e.message}`); return 2; }
   if (format === 'json') {

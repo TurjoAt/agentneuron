@@ -24,6 +24,7 @@ import { auditAgentConfig } from '../audit/index.js';
 import { createSessions } from '../agents/sessions.js';
 import { projectSessions } from '../insights/transcripts.js';
 import { lessonsFrom, readState, hiddenOf } from '../insights/index.js';
+import { planCompile, summarize } from '../compiler/index.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -54,6 +55,8 @@ const TOOLS = [
     inputSchema: obj({ minSeverity: { type: 'string', enum: ['high', 'medium', 'low', 'info'], description: 'Lowest severity to include (default "low")' } }) },
   { name: 'suggest_rules', description: 'Lessons mined from Claude Code / Codex sessions of this project (user corrections, reverted edits, repeatedly failing commands, repeated instructions) as proposed rules with evidence quotes (secrets masked), confidence, target file and whether an existing rule already covers them. Read-only.',
     inputSchema: obj({ limit: { type: 'number', description: 'Max lessons (default 20)' }, includeCovered: { type: 'boolean', description: 'Include lessons an existing rule already covers (default false)' } }) },
+  { name: 'compile_preview', description: 'Preview compiling the source rules (.agentneuron/rules/*.md) into each tool\'s files: which outputs are stale, which generated regions were edited by hand, what merge-back would pull in. Read-only.',
+    inputSchema: obj({ tools: { type: 'string', description: 'Comma list: claude, codex, gemini, cursor, copilot, windsurf (default all)' }, diff: { type: 'boolean', description: 'Include per-file diffs' } }) },
 ];
 
 // ---- multi-agent coordination (claims are advisory; write tools need `agentneuron mcp --level state`) ----
@@ -272,6 +275,10 @@ export async function runMcpServer(root, config = {}, io = {}) {
     if (!order.includes(minSeverity)) throw new Error('invalid minSeverity');
     const r = auditAgentConfig({ root: absRoot, files: [...store.files.values()], contents: store.contents });
     return { ...r, findings: r.findings.filter((f) => order.indexOf(f.severity) <= order.indexOf(minSeverity)) };
+  };
+  tools.compile_preview = ({ tools: only, diff = false } = {}) => {
+    if (only !== undefined && typeof only !== 'string') throw new Error('tools must be a comma separated string');
+    return summarize(planCompile({ root: absRoot, config: cfg, store }, { tools: only }), { content: diff === true });
   };
 
   const rpcResult = (id, result) => ({ jsonrpc: '2.0', id, result });

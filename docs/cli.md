@@ -126,6 +126,26 @@ Mine this project's Claude Code and Codex sessions for lessons and print them as
          correction · 1x in 1 session(s) · add to AGENTS.md
          "stop, don't edit src/b.js" (codex codex-c)
 ```
+### `compile [dir]`
+
+Compile the source rules in `.agentneuron/rules/*.md` into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, Copilot instructions and Windsurf rules. Only the `agentneuron:begin/end` regions are rewritten. See [rules compiler](compiler.md).
+
+| Flag | Description |
+|---|---|
+| `--dry-run` | Print each file that would change, with a diff; write nothing. |
+| `--check` | Exit `1` if any output is stale, edited by hand, missing, or a rule is invalid. Never writes (for CI). |
+| `--tools <list>` | Limit the run to `claude`, `codex`, `gemini`, `cursor`, `copilot`, `windsurf` (comma separated). |
+| `--merge-back` | Pull edits made inside generated regions back into the source rules, then compile. |
+| `--force` | Overwrite regions that were edited by hand. |
+| `--json` | With `--check` or `--dry-run`: machine-readable plan. |
+
+### `rules import|list [dir]`
+
+`rules import` creates source rules from the existing context files. It writes one rule per `##` section or rule file, merges identical rules found in several tools, and never overwrites a rule file. `--dry-run` only prints what would be created. `rules list` prints the rules with their scope and tools (`--json` for machine-readable output).
+
+### `generate [dir]`
+
+Print a starter context file built from the code: commands, stack, layout and conventions, each line citing its source. `--tool agents|claude|gemini|copilot|cursor|windsurf` picks the format. `--out` alone writes the tool's default path, and `--out <file>` writes that file. An existing file is only replaced with `--force`. See [generate](generate.md).
 
 ### `doctor [dir]`
 

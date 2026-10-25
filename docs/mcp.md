@@ -29,6 +29,7 @@ agentneuron mcp [dir] [--level state]
 | `get_links` | `path` | Incoming and outgoing links, with broken ones flagged |
 | `verify_context` | `status?` (`false` default, `unknown`, `ok`, `all`), `file?`, `limit?` | [Truth check](verify.md): claims from context files with status, evidence and suggested fix, plus a summary |
 | `audit_agent_config` | `minSeverity?` (`high`, `medium`, `low` default, `info`) | [Security audit](audit.md) of the agent config: risk score, counts, findings (values masked) |
+| `compile_preview` | `tools?` (comma list), `diff?` | Read-only plan for compiling `.agentneuron/rules/` into each tool's files: stale outputs, hand-edited regions, merge-back candidates. See [rules compiler](compiler.md) |
 | `report_export` | `range?` (`24h`, `7d`, `30d`, `2w`...; default `7d`), `format?` (`ai` default, `json`), `includeContent?` | Report for the period ending now. `ai` returns the Markdown context pack as plain text; `json` returns the `agentneuron.report/v1` object (see [HTTP API](http-api.md#exports)) |
 | `list_claims` | `path?` | Active advisory file claims of every agent session (only those covering `path` when given) |
 | `get_handoffs` | `taskId?`, `sessionId?`, `agent?`, `limit?` | Handoff notes, newest first |

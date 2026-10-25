@@ -25,6 +25,12 @@ Analysis:
   ci [dir]           lint + verify + audit + budget for CI (--format github|markdown|json, --fail-on, --base <ref>)
   lessons [dir]      rules to learn from agent sessions (corrections, reverts, failing commands) (--json)
 
+Rules:
+  compile [dir]      compile .agentneuron/rules/*.md into every tool's files (--dry-run, --check, --tools, --merge-back)
+  rules import [dir] create source rules from existing CLAUDE.md / AGENTS.md / Cursor / Copilot files (--dry-run)
+  rules list [dir]   list source rules
+  generate [dir]     starter AGENTS.md from the code, every line cited (--tool agents|claude|..., --out [file])
+
 Setup & maintenance:
   init [dir]         create .agentneuron/ (config + copy of this bundle)
   doctor [dir]       check Node, git, port, config, permissions, AI tools (--json)
@@ -116,6 +122,26 @@ that keep failing and instructions repeated across sessions; print them as propo
 confidence, evidence (secrets masked) and the context file to add them to. Read-only.
 --covered  also list lessons an existing rule already covers
 --all      also list dismissed / accepted lessons`,
+  compile: `Usage: agentneuron compile [dir] [--dry-run] [--check] [--tools claude,cursor,...] [--merge-back] [--force] [--json]
+
+Compile the source rules in .agentneuron/rules/*.md (config: compiler.rulesDir) into CLAUDE.md, AGENTS.md,
+GEMINI.md, .cursor/rules/*.mdc, .github/copilot-instructions.md + .github/instructions/*.instructions.md
+and .windsurf/rules/*.md. Only the agentneuron:begin/end regions are rewritten; your text around them is kept.
+  --dry-run     print what would change, with a diff; write nothing
+  --check       exit 1 if any output is stale or was edited by hand (CI)
+  --tools       limit to some tools: claude, codex (AGENTS.md), gemini, cursor, copilot, windsurf
+  --merge-back  pull edits made inside generated regions back into the source rules, then compile
+  --force       overwrite regions that were edited by hand`,
+  rules: `Usage: agentneuron rules import [dir] [--dry-run]
+       agentneuron rules list [dir] [--json]
+
+import: split the existing context files into source rules (one per ## section, one per Cursor/Copilot/Windsurf
+rule file), merging identical rules found in several tools. Never overwrites a rule file.`,
+  generate: `Usage: agentneuron generate [dir] [--tool agents|claude|gemini|copilot|cursor|windsurf] [--out [file]] [--force]
+
+Build a starter context file from what the code shows: install/build/test/lint commands, stack and versions,
+top-level folders and detected conventions. Each line cites its source. Prints to stdout unless --out is given
+(--out alone writes the tool's default path); an existing file is only replaced with --force.`,
   doctor: `Usage: agentneuron doctor [dir] [--json] [--port n] [--host h]
 
 Check the environment: Node version, git, port availability, config validity, enabled
@@ -134,12 +160,12 @@ Asks before replacing anything unless --yes. agentneuron never checks for update
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget', 'tools', 'tool']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
       let [k, v] = a.replace(/^-+/, '').split('=');
-      if (v === undefined && valued.has(k)) v = argv[++i];
+      if (v === undefined && valued.has(k) && i + 1 < argv.length && !argv[i + 1].startsWith('--')) v = argv[++i];
       o.flags[k] = v === undefined ? true : v;
     } else o._.push(a);
   }
@@ -277,7 +303,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons', 'compile', 'rules', 'generate']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -292,6 +318,7 @@ export async function main(argv = process.argv.slice(2)) {
     const { cmdUpdate } = await import('./commands/update.js');
     return cmdUpdate(flags);
   }
+  const sub = cmd === 'rules' ? _.shift() : null;
   const root = resolveRoot(_[0]);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     console.error(`agentneuron: not a directory: ${root}`); return 2;
@@ -307,6 +334,9 @@ export async function main(argv = process.argv.slice(2)) {
     case 'audit': return (await import('./commands/audit.js')).cmdAudit(root, flags);
     case 'ci': return (await import('./commands/ci.js')).cmdCi(root, flags);
     case 'lessons': return (await import('./commands/lessons.js')).cmdLessons(root, flags);
+    case 'compile': return (await import('./commands/compile.js')).cmdCompile(root, flags);
+    case 'rules': return (await import('./commands/compile.js')).cmdRules(root, sub, flags);
+    case 'generate': return (await import('./commands/compile.js')).cmdGenerate(root, flags);
     case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }

@@ -52,10 +52,11 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - Edit files in the browser, rename with link rewriting, find and replace, soft delete to trash, one-click fixes for lint issues.
 - Create files from templates (CLAUDE.md, AGENTS.md, GEMINI.md, skills, subagents, Cursor rules, Copilot instructions, ADRs and more).
 - Sync instruction files between tools and see drift between them; edit Claude permissions, hooks and `.mcp.json`.
+- [Rules compiler](docs/compiler.md): write each rule once in `.agentneuron/rules/` and compile it into CLAUDE.md, AGENTS.md, GEMINI.md, Cursor `.mdc`, Copilot and Windsurf rules (`agentneuron compile --check` for CI, merge-back of hand edits). [Generate](docs/generate.md) a cited starter AGENTS.md from the code.
 - Git stage/commit/branch, package and script runner. Commands are spawned without a shell, stream live output and are written to an audit log.
 
 **Integrate**
-- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 10 read-only tools, so your AI agents can query the same data.
+- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 11 read-only tools, so your AI agents can query the same data.
 - HTTP + Server-Sent Events [API](docs/http-api.md).
 - `agentneuron lint --json` for CI ([example workflow](examples/ci/)).
 - Slack/Discord-compatible webhooks for secrets, conflicts, health drops and job results.

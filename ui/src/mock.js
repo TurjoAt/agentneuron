@@ -1378,6 +1378,189 @@ export function createMock() {
     return { generatedAt: Date.now(), score: 42, level: 'high', counts, findings: F, scanned: ['.mcp.json', '.claude/settings.json'] };
   };
   // ---------------------------------------------------------------- <<< truth & safety (feat/truth)
+  // ================================================================ Rules studio mock (feat/compiler) BEGIN
+  // In-memory source rules + compiled regions. Seeded with one stale rule and one hand-edited region.
+  const rulesMock = (() => {
+    const TOOLS = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'windsurf'];
+    const sha = (s) => hashOf(s).slice(0, 12);
+    const ser = (r) => ['---', `title: ${JSON.stringify(r.title)}`, ...(r.description ? [`description: ${JSON.stringify(r.description)}`] : []),
+      `tools: ${r.tools.length === TOOLS.length ? 'all' : `[${r.tools.join(', ')}]`}`, ...(r.scope.length ? [`scope: [${r.scope.map((g) => JSON.stringify(g)).join(', ')}]`] : []),
+      ...(r.priority ? [`priority: ${r.priority}`] : []), '---', '', r.body, ''].join('\n');
+    const rule = (slug, title, body, o = {}) => ({ slug, title, body, scope: o.scope || [], tools: o.tools || [...TOOLS], priority: o.priority || 0, description: o.description || '', errors: [], warnings: [] });
+    const rules = [
+      rule('conventions', 'Conventions', '- Use TypeScript strict mode everywhere.\n- Never commit secrets; read them from `.env.local`.\n- All money values are integers in minor units (cents).', { priority: 20, description: 'Repository-wide conventions' }),
+      rule('commands', 'Commands', '- `pnpm dev` starts all apps with turbo\n- `pnpm test --filter api` runs the API tests (vitest)\n- `pnpm lint --fix` runs eslint + prettier', { priority: 10 }),
+      rule('api', 'API handlers', '- Validate every request body with zod.\n- Return errors as `{ error: { code, message } }`.', { scope: ['apps/api/**'], tools: ['claude', 'codex', 'cursor', 'copilot'] }),
+      rule('testing', 'Testing', '- Write tests next to the code: `foo.ts` -> `foo.test.ts`.\n- Use vitest; no snapshot tests for API responses.', { scope: ['**/*.test.ts'] }),
+    ];
+    const rulesFile = (r) => `.agentneuron/rules/${r.slug}.md`;
+    const section = (r, applies) => [`## ${r.title}`, '', ...(applies && r.scope.length ? [`_Applies to: ${r.scope.map((g) => '`' + g + '`').join(', ')}_`, ''] : []), r.body].join('\n');
+    const fileBody = (r) => `# ${r.title}\n\n${r.body}`;
+    const nested = (r) => (r.scope.length === 1 && /^[\w-]+(\/[\w-]+)*\/\*\*$/.test(r.scope[0]) ? r.scope[0].slice(0, -3) : null);
+    function place(r, t) {
+      const root = { claude: 'CLAUDE.md', codex: 'AGENTS.md', gemini: 'GEMINI.md' }[t];
+      if (root) { const d = nested(r); return { path: d ? `${d}/${root}` : root, kind: 'section', content: section(r, !d) }; }
+      if (t === 'cursor') return { path: `.cursor/rules/${r.slug}.mdc`, kind: 'file', content: fileBody(r) };
+      if (t === 'copilot') return r.scope.length ? { path: `.github/instructions/${r.slug}.instructions.md`, kind: 'file', content: fileBody(r) } : { path: '.github/copilot-instructions.md', kind: 'section', content: section(r, false) };
+      return { path: `.windsurf/rules/${r.slug}.md`, kind: 'file', content: fileBody(r) };
+    }
+    const regions = new Map(); // `${path}|${slug}` -> { content, edited }
+    const desired = (only) => {
+      const m = new Map();
+      for (const r of [...rules].sort((a, b) => b.priority - a.priority || (a.slug < b.slug ? -1 : 1))) {
+        for (const t of r.tools.filter((x) => !only || only.includes(x))) {
+          const p = place(r, t);
+          if (!m.has(p.path)) m.set(p.path, { tool: t, kind: p.kind, entries: [] });
+          m.get(p.path).entries.push({ slug: r.slug, content: p.content });
+        }
+      }
+      return m;
+    };
+    const block = (slug, content) => `<!-- agentneuron:begin source=rules/${slug}.md hash=${sha(content)} -->\n${content}\n<!-- agentneuron:end source=rules/${slug}.md -->`;
+    const doc = (list) => list.map((e) => block(e.slug, e.content)).join('\n\n') + '\n';
+    const toolsOf = (v) => (v ? String(v).split(',').filter((t) => TOOLS.includes(t)) : null);
+    function plan(only, withContent = true) {
+      const want = desired(only);
+      const paths = new Set(want.keys());
+      for (const k of regions.keys()) { const p = k.split('|')[0]; if (!only || only.includes(want.get(p)?.tool || toolOfOut(p))) paths.add(p); }
+      const outputs = [];
+      for (const p of [...paths].sort()) {
+        const w = want.get(p) || { tool: toolOfOut(p), kind: 'section', entries: [] };
+        const regs = [], before = [], after = [];
+        for (const e of w.entries) {
+          const cur = regions.get(`${p}|${e.slug}`);
+          const status = !cur ? 'new' : cur.edited ? 'edited' : cur.content === e.content ? 'ok' : 'stale';
+          regs.push({ source: `rules/${e.slug}.md`, slug: e.slug, status, ...(status === 'edited' ? { content: cur.content } : {}) });
+          if (cur) before.push({ slug: e.slug, content: cur.content });
+          after.push({ slug: e.slug, content: status === 'edited' ? cur.content : e.content });
+        }
+        for (const [k, v] of regions) { const [kp, slug] = k.split('|'); if (kp === p && !w.entries.some((e) => e.slug === slug)) { regs.push({ source: `rules/${slug}.md`, slug, status: 'orphan' }); before.push({ slug, content: v.content }); } }
+        const exists = before.length > 0;
+        const a = exists ? doc(before) : '', b = after.length ? doc(after) : '';
+        const action = !exists ? (after.length ? 'create' : 'none') : !after.length && w.kind === 'file' ? 'delete' : a === b ? 'none' : 'update';
+        const d = action === 'none' ? null : lineDiff(a, b);
+        outputs.push({ path: p, tool: w.tool, kind: w.kind, action, regions: regs, conflicts: [], error: null, ...(d ? { added: d.added, removed: d.removed } : {}), ...(withContent ? { content: action === 'delete' ? null : b, diff: d } : {}) });
+      }
+      const edited = outputs.flatMap((o) => o.regions.filter((r) => r.status === 'edited').map(({ content: _c, ...r }) => ({ path: o.path, ...r })));
+      const mergeBack = [];
+      for (const o of outputs) for (const r of o.regions.filter((x) => x.status === 'edited')) {
+        const src = rules.find((x) => x.slug === r.slug);
+        const body = r.content.split('\n').slice(o.kind === 'file' ? 2 : 2).join('\n').replace(/^_Applies to: .*_\n\n/, '');
+        mergeBack.push({ slug: r.slug, file: rulesFile(src), paths: [o.path], conflict: false, diff: lineDiff(src.body, body), copies: [{ path: o.path, title: src.title, body }] });
+      }
+      const stale = outputs.filter((o) => o.action !== 'none').length;
+      return { rulesDir: '.agentneuron/rules', tools: only || TOOLS, ok: !stale && !edited.length, stale, invalid: [], rules: rules.map(({ body: _b, ...r }) => r), outputs: outputs.map((o) => ({ ...o, regions: o.regions.map(({ content: _c, ...r }) => r) })), edited, mergeBack };
+    }
+    const toolOfOut = (p) => (/CLAUDE\.md$/.test(p) ? 'claude' : /AGENTS\.md$/.test(p) ? 'codex' : /GEMINI\.md$/.test(p) ? 'gemini' : p.startsWith('.cursor/') ? 'cursor' : p.startsWith('.github/') ? 'copilot' : 'windsurf');
+    function compile(only, force) {
+      const want = desired(only);
+      const written = new Set(), deleted = [];
+      for (const [p, w] of want) for (const e of w.entries) {
+        const k = `${p}|${e.slug}`, cur = regions.get(k);
+        if (cur?.edited && !force) continue;
+        if (!cur || cur.edited || cur.content !== e.content) { regions.set(k, { content: e.content, edited: false }); written.add(p); }
+      }
+      for (const k of [...regions.keys()]) { const [p, slug] = k.split('|'); if ((!only || only.includes(toolOfOut(p))) && !want.get(p)?.entries.some((e) => e.slug === slug)) { regions.delete(k); if (want.has(p)) written.add(p); else deleted.push(p); } }
+      return { written: [...written].sort(), deleted, errors: [] };
+    }
+    // seed: compile everything, then make "testing" stale and hand-edit "api" in AGENTS.md
+    compile(null, true);
+    rules.find((r) => r.slug === 'testing').body += '\n- Mock time with `vi.useFakeTimers()`, never real sleeps.';
+    const k = 'apps/api/AGENTS.md|api';
+    regions.set(k, { content: regions.get(k).content + '\n- Log every 5xx with the request id.', edited: true });
+
+    function parseRule(slug, text) {
+      const fm = /^---\n([\s\S]*?)\n---\n?/.exec(text.replace(/\r\n/g, '\n'));
+      const get = (key) => (fm ? (new RegExp(`^${key}:\\s*(.*)$`, 'm').exec(fm[1]) || [])[1] : undefined);
+      const list = (v) => (v == null || v === '' ? [] : v.replace(/^\[|\]$/g, '').split(',').map((x) => x.trim().replace(/^["']|["']$/g, '')).filter(Boolean));
+      const unq = (v) => (v || '').trim().replace(/^"(.*)"$/, '$1');
+      const tools = list(get('tools'));
+      const r = rule(slug, unq(get('title')) || slug, (fm ? text.slice(fm[0].length) : text).trim(), {
+        scope: list(get('scope')), tools: !tools.length || tools.includes('all') ? [...TOOLS] : tools.filter((t) => TOOLS.includes(t)), priority: Number(get('priority')) || 0, description: unq(get('description')),
+      });
+      if (r.scope.some((g) => g.includes('..') || g.startsWith('/'))) r.errors.push('scope: glob must be project-relative');
+      if (/<!--\s*agentneuron:/.test(text)) r.errors.push('rule text must not contain agentneuron markers');
+      return r;
+    }
+    return {
+      '/api/compiler/rules': () => ({ dir: '.agentneuron/rules', invalid: [], rules: rules.map((r) => ({ ...r, file: rulesFile(r), text: ser(r), hash: hashOf(ser(r)) })) }),
+      '/api/compiler/preview': (q) => plan(toolsOf(q.tools)),
+      '/api/compiler/compile': (_q, b) => { need('edit'); const p = plan(b.tools || null, false); return { ...compile(b.tools || null, b.force === true), plan: p }; },
+      '/api/compiler/merge-back': (_q, b) => {
+        need('edit');
+        const p = plan(b.tools || null);
+        for (const m of p.mergeBack) { rules.find((r) => r.slug === m.slug).body = m.copies[0].body; for (const path of m.paths) regions.get(`${path}|${m.slug}`).edited = false; }
+        return { merged: p.mergeBack.map((m) => ({ slug: m.slug, file: m.file, from: m.paths })), skipped: [], compiled: compile(b.tools || null, false) };
+      },
+      '/api/compiler/rule': (_q, b) => {
+        need('edit');
+        if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(b.slug || '')) throw httpErr(400, 'slug must be lowercase letters, digits and dashes');
+        const r = parseRule(b.slug, String(b.content || ''));
+        if (r.errors.length) throw httpErr(400, r.errors.join('; '));
+        const i = rules.findIndex((x) => x.slug === b.slug);
+        if (i >= 0 && b.baseHash !== hashOf(ser(rules[i]))) throw httpErr(409, 'rule changed on disk', { conflict: true });
+        if (i < 0 && b.baseHash) throw httpErr(409, 'rule was deleted on disk', { conflict: true });
+        if (i >= 0) rules[i] = r; else rules.push(r);
+        return { slug: r.slug, hash: hashOf(ser(r)), created: i < 0, warnings: r.body ? [] : ['empty body'] };
+      },
+      '/api/compiler/import/preview': () => {
+        const have = new Set(rules.map((r) => r.body.trim()));
+        const out = [], dups = [];
+        for (const [path, tool] of [['CLAUDE.md', 'claude'], ['AGENTS.md', 'codex'], ['GEMINI.md', 'gemini']]) {
+          const text = db.get(path)?.content;
+          if (!text) continue;
+          text.replace(/\r\n/g, '\n').split(/\n(?=## )/).slice(1).forEach((sec) => {
+            const title = sec.split('\n')[0].replace(/^##\s+/, '').trim();
+            const body = sec.split('\n').slice(1).join('\n').trim();
+            if (!body || have.has(body)) return;
+            const hit = out.find((o) => o._body === body);
+            if (hit) { if (!hit.tools.includes(tool)) hit.tools.push(tool); dups.push({ title, from: { path, line: 1 }, into: hit.from[0], identical: true }); return; }
+            let slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'rule';
+            while (rules.some((r) => r.slug === slug) || out.some((o) => o.slug === slug)) slug += '-2';
+            out.push({ slug, title, tools: [tool], scope: [], from: [{ path, line: text.split('\n').findIndex((l) => l === `## ${title}`) + 1 }], _body: body });
+          });
+        }
+        return { dir: '.agentneuron/rules', duplicates: dups, skipped: [], rules: out.map(({ _body, ...o }) => ({ ...o, content: ser(rule(o.slug, o.title, _body, { tools: o.tools })) })) };
+      },
+      '/api/compiler/import': (_q, b) => {
+        need('edit');
+        const p = routesRules['/api/compiler/import/preview']();
+        const created = [];
+        for (const r of p.rules) if (!b.slugs || b.slugs.includes(r.slug)) { rules.push(parseRule(r.slug, r.content)); created.push(r.slug); }
+        return { dir: p.dir, created, errors: [] };
+      },
+      '/api/compiler/generate': (q) => {
+        const tool = q.tool || 'agents';
+        const path = { agents: 'AGENTS.md', claude: 'CLAUDE.md', gemini: 'GEMINI.md', copilot: '.github/copilot-instructions.md', cursor: '.cursor/rules/project.mdc', windsurf: '.windsurf/rules/project.md' }[tool];
+        if (!path) throw httpErr(400, 'unknown tool');
+        const items = [
+          ['Commands', 'Install dependencies: `pnpm install`', 'pnpm-lock.yaml'], ['Commands', 'Dev: `pnpm dev` (runs `turbo dev`)', 'package.json#scripts.dev'],
+          ['Commands', 'Test: `pnpm test` (runs `turbo test`)', 'package.json#scripts.test'], ['Commands', 'Lint: `pnpm lint` (runs `turbo lint`)', 'package.json#scripts.lint'],
+          ['Stack', 'Next.js 15.1.0', 'apps/web/package.json#dependencies'], ['Stack', 'Fastify 5.2.0', 'apps/api/package.json#dependencies'], ['Stack', 'Vitest 2.1.8', 'package.json#devDependencies'],
+          ['Project layout', '`apps/`: workspace applications (214 files)', 'directory name apps/'], ['Project layout', '`packages/`: Shared UI kit and config (88 files)', 'packages/README.md'],
+          ['Project layout', '`docs/`: documentation (12 files)', 'directory name docs/'], ['Project layout', '`scripts/`: build and maintenance scripts (4 files)', 'directory name scripts/'],
+          ['Conventions', 'TypeScript strict mode is on: keep code type-safe, avoid `any`', 'tsconfig.json#compilerOptions.strict'], ['Conventions', 'Lint with ESLint (config: `eslint.config.mjs`)', 'eslint.config.mjs'],
+          ['Conventions', 'Monorepo workspaces: `apps/*`, `packages/*`', 'pnpm-workspace.yaml'], ['Conventions', 'CI runs `.github/workflows/ci.yml` on GitHub Actions', '.github/workflows/ci.yml'],
+        ].map(([section, text, source]) => ({ section, text, source }));
+        const secs = [...new Set(items.map((i) => i.section))];
+        const content = [`# ${PROJECT.name}`, '', ...secs.flatMap((s) => [`## ${s}`, '', ...items.filter((i) => i.section === s).map((i) => `- ${i.text} <!-- from ${i.source} -->`), '']),
+          '<!-- Generated by agentneuron generate: every line cites the file it came from. Review, trim and add what only humans know. -->', ''].join('\n');
+        const cur = db.get(path);
+        return { tool, path, content, items, exists: !!cur, currentHash: cur ? hashOf(cur.content) : null };
+      },
+      '/api/compiler/generate/write': (_q, b) => {
+        need('edit');
+        const g = routesRules['/api/compiler/generate']({ tool: b.tool });
+        if (g.exists && b.overwrite !== true) throw httpErr(409, `${g.path} already exists`);
+        if (g.exists && b.baseHash !== g.currentHash) throw httpErr(409, 'file changed on disk', { conflict: true });
+        writeFile(g.path, g.content);
+        return { path: g.path, hash: hashOf(g.content), created: !g.exists };
+      },
+    };
+  })();
+  const routesRules = rulesMock;
+  for (const [k, fn] of Object.entries(rulesMock)) if (!routes[k]) routes[k] = fn;
+  // ================================================================ Rules studio mock (feat/compiler) END
 
   // reports export: csv/md/html from the insight stub; json (agentneuron.report/v1) and ai context pack here
   function reportExport(q) {

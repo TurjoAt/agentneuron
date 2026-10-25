@@ -10,6 +10,7 @@ export const VIEWS = [
   { id: 'tasks', label: 'Tasks', icon: 'tasks' },
   { id: 'git', label: 'Git', icon: 'git' },
   { id: 'agents', label: 'Agents', icon: 'agents' },
+  { id: 'rules', label: 'Rules', icon: 'flag' },
   { id: 'project', label: 'Project', icon: 'layers' },
   { id: 'reports', label: 'Reports', icon: 'activity' },
   { id: 'verify', label: 'Truth & safety', icon: 'shield' },
