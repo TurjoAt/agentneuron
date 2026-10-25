@@ -189,6 +189,7 @@ export function createLive({
         try { o = JSON.parse(line); } catch { continue; }
         try { handle(T, o, hist); } catch { /* one bad line must not stop the tail */ }
       }
+      if (!hist) for (const S of sessions.values()) if (S.dirty) { S.dirty = false; emitSession(S); }
     } catch { /* unreadable right now: retry next poll */ } finally {
       if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
     }
@@ -206,8 +207,9 @@ export function createLive({
       sessions.set(key, S);
       if (sessions.size > 300) for (const [k, v] of sessions) if (v.state === 'end') { sessions.delete(k); if (sessions.size <= 200) break; }
       if (hist) S.state = now() - S.lastAt > idleMs ? 'idle' : 'active';
-      else emitSession(S);
-    } else if (!hist && (S.state === 'idle' || S.state === 'end')) { S.state = 'active'; S.lastAt = Math.max(S.lastAt, ts || now()); emitSession(S); }
+      else S.dirty = true;
+    } else if (!hist && (S.state === 'idle' || S.state === 'end')) { S.state = 'active'; S.lastAt = Math.max(S.lastAt, ts || now()); }
+    if (!hist) S.dirty = true; // announced once per read batch (title, counts, model, state)
     if (ts) S.lastAt = Math.max(S.lastAt, ts);
     else if (!hist) S.lastAt = now();
     return S;

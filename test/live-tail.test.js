@@ -69,10 +69,10 @@ test('Claude transcript: incremental tailing emits session/prompt/edit/command o
     const f = path.join(s.cdir, 'sess-1.jsonl');
     fs.writeFileSync(f, claudeUser('sess-1', 'Please fix the parser'));
     live.discover(); live.poll();
-    assert.deepEqual(s.events.map((e) => e.name), ['agent.session', 'agent.prompt']);
-    assert.equal(s.events[0].data.state, 'start');
-    assert.equal(s.events[0].kind, 'session');
-    assert.equal(s.events[1].kind, 'prompt');
+    assert.deepEqual(s.events.map((e) => e.name).sort(), ['agent.prompt', 'agent.session']);
+    const se = s.events.find((e) => e.name === 'agent.session');
+    assert.equal(se.data.state, 'start'); assert.equal(se.kind, 'session'); assert.equal(se.data.title, 'Please fix the parser');
+    assert.equal(s.events.find((e) => e.name === 'agent.prompt').kind, 'prompt');
     s.events.length = 0;
 
     fs.appendFileSync(f, claudeTool('sess-1', 'Edit', { file_path: path.join(s.root, 'src/a.js'), old_string: 'two', new_string: `two\nconst k = "${KEY}"` }, 'tu1'));
