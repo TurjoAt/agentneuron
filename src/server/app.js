@@ -124,6 +124,17 @@ export async function startServer(config) {
   function warn(what, e) { if (process.env.AGENTNEURON_DEBUG) console.error(`[agentneuron] ${what}:`, e); }
 
   /** allow(role): optional per-client filter (live prompts / diffs are role-gated). */
+  // file events carry the attributed agent session; its prompt text and title are for admins only
+  const forRole = (role, ev) => {
+    if (role === 'admin' || !ev?.agent || (ev.agent.lastPrompt == null && ev.agent.title == null && ev.agent.prompt == null)) return ev;
+    const { lastPrompt: _p, title: _t, prompt: _q, ...agent } = ev.agent;
+    return { ...ev, agent };
+  };
+  function broadcastEvent(ev) {
+    broadcast('event', ev, (r) => r === 'admin');
+    broadcast('event', forRole('viewer', ev), (r) => r !== 'admin');
+  }
+
   function broadcast(name, data, allow) {
     const msg = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const res of clients) {
@@ -150,7 +161,7 @@ export async function startServer(config) {
   store.on('event', (ev) => {
     scheduleRecompute();
     repo.ts = 0;
-    if (ev.type === 'unlink') { ctx.persist.events.append(ev); broadcast('event', ev); return; }
+    if (ev.type === 'unlink') { ctx.persist.events.append(ev); broadcastEvent(ev); return; }
     // attribute best-effort, short timeout, then broadcast
     withTimeout(sessions.attribute(ev.path, ev.ts), 400, null).then((agent) => {
       if (agent) {
@@ -161,7 +172,7 @@ export async function startServer(config) {
         } catch (e) { warn('radar', e); }
       }
       ctx.persist.events.append(ev);
-      broadcast('event', ev);
+      broadcastEvent(ev);
     }).catch((e) => warn('event pipeline', e)); // never an unhandled rejection
   });
 
@@ -472,7 +483,7 @@ export async function startServer(config) {
       }
       case '/api/events': {
         const since = Number(q.get('since') || 0);
-        return json(res, 200, store.events.filter((e) => e.id > since));
+        return json(res, 200, store.events.filter((e) => e.id > since).map((e) => forRole(role, e)));
       }
       case '/api/graph': return json(res, 200, (await A()).graph);
       case '/api/context': {
@@ -519,7 +530,7 @@ export async function startServer(config) {
         });
         res.write(`retry: 2000\n\n`);
         const lastId = Number(req.headers['last-event-id'] || q.get('since') || 0);
-        if (lastId) for (const e of store.events) if (e.id > lastId) res.write(`event: event\ndata: ${JSON.stringify(e)}\n\n`);
+        if (lastId) for (const e of store.events) if (e.id > lastId) res.write(`event: event\ndata: ${JSON.stringify(forRole(role, e))}\n\n`);
         res.agentRole = role;
         clients.add(res);
         req.on('close', () => clients.delete(res));

@@ -207,3 +207,15 @@ test('job command output is admin-only (HTTP and SSE)', async () => {
   assert.ok(JSON.parse((await raw(port, { p: `/api/job?id=${id}`, headers: { ...A } })).body).log.length > 0);
   assert.deepEqual(JSON.parse((await raw(port, { p: `/api/job?id=${id}`, headers: V })).body).log, []);
 });
+
+test('file events show the agent prompt and session title to admins only', async () => {
+  const { srv, port } = await boot({ adminToken: 'adm-tok-5678', token: 'view-tok-5678' });
+  srv.store.events.push({ id: 999999, type: 'change', path: 'CLAUDE.md', ts: Date.now(), agent: { tool: 'claude', sessionId: 's1', title: 'fix billing secret', lastPrompt: 'use key sk-live-xyz', ts: 1 } });
+  const get = async (tok) => JSON.parse((await raw(port, { p: '/api/events?since=999998', headers: { host: `127.0.0.1:${port}`, authorization: `Bearer ${tok}` } })).body);
+  const [a] = await get('adm-tok-5678');
+  const [v] = await get('view-tok-5678');
+  assert.equal(a.agent.lastPrompt, 'use key sk-live-xyz');
+  assert.equal(v.agent.tool, 'claude');
+  assert.equal(v.agent.lastPrompt, undefined);
+  assert.equal(v.agent.title, undefined);
+});
