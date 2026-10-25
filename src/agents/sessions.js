@@ -4,6 +4,9 @@ import path from 'node:path';
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const TOLERANCE_MS = 120000;
+/** Only the last MAX_TRANSCRIPT_BYTES of a transcript are parsed (shared with agentcenter/transcript.js). */
+export const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
+const WALK_TTL_MS = 60000;
 
 /** Claude Code project dir name: every non-alphanumeric char becomes "-". */
 export function projectDirName(root) {
@@ -97,6 +100,11 @@ function applyClaude(st, o) {
   }
 }
 
+/** Codex patch paths are relative to the session's working directory, not the project root. */
+export function codexPath(cwd, p) {
+  return typeof cwd === 'string' && path.isAbsolute(cwd) && !path.isAbsolute(p) ? path.join(cwd, p) : p;
+}
+
 function applyCodex(st, o) {
   if (!o || typeof o !== 'object') return;
   const ts = toMs(o.timestamp);
@@ -104,10 +112,13 @@ function applyCodex(st, o) {
   const p = o.payload || {};
   if (o.type === 'session_meta') {
     if (p.id) st.sessionId = p.id;
-    if (p.cwd) st.cwd = p.cwd;
+    if (p.cwd) st.cwd = st.curCwd = p.cwd;
     return;
   }
-  if (o.type === 'turn_context' && p.cwd && !st.cwd) st.cwd = p.cwd;
+  if (o.type === 'turn_context' && typeof p.cwd === 'string' && p.cwd) {
+    if (!st.cwd) st.cwd = p.cwd;
+    st.curCwd = p.cwd;
+  }
   if (o.type === 'event_msg') {
     if (p.type === 'user_message') {
       st.messages++;
@@ -124,7 +135,7 @@ function applyCodex(st, o) {
     const args = typeof p.arguments === 'string' ? p.arguments : typeof p.input === 'string' ? p.input : '';
     const re = /\*\*\* (?:Update|Add|Delete) File: ([^\\\n"]+)/g;
     let m;
-    while ((m = re.exec(args.replace(/\\n/g, '\n')))) st.touches.push({ file: m[1].trim(), ts, prompt: st.lastPrompt || null });
+    while ((m = re.exec(args.replace(/\\n/g, '\n')))) st.touches.push({ file: codexPath(st.curCwd || st.cwd, m[1].trim()), ts, prompt: st.lastPrompt || null });
   }
 }
 
@@ -142,7 +153,7 @@ function feed(st, buf, apply) {
 // file -> { mtimeMs, size, offset, state }
 const cache = new Map();
 
-function parseFile(file, kind) {
+function parseFile(file, kind, max = MAX_TRANSCRIPT_BYTES) {
   let fd, stat;
   try { fd = fs.openSync(file, 'r'); stat = fs.fstatSync(fd); } catch {
     if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
@@ -156,11 +167,28 @@ function parseFile(file, kind) {
     if (kind === 'codex') c.state.tool = 'codex';
   }
   try {
+    let skip = false;
+    if (stat.size - c.offset > max) { // huge transcript / backlog: parse only the tail
+      if (!c.offset) { // session_meta is in the head
+        const m = headMeta(file);
+        if (m.cwd) c.state.cwd = c.state.curCwd = m.cwd;
+        if (m.id && kind === 'codex') c.state.sessionId = m.id;
+      }
+      c.offset = stat.size - max;
+      skip = true;
+    }
     const len = stat.size - c.offset;
     if (len > 0) {
       const buf = Buffer.alloc(len);
       const n = fs.readSync(fd, buf, 0, len, c.offset);
-      c.offset += feed(c.state, buf.subarray(0, n), apply);
+      let b = buf.subarray(0, n);
+      if (skip) { // drop the partial first line
+        const nl = b.indexOf(0x0a);
+        const cut = nl < 0 ? 0 : nl + 1;
+        c.offset += cut;
+        b = b.subarray(cut);
+      }
+      c.offset += feed(c.state, b, apply);
     }
   } catch { /* unreadable: keep what we have */ } finally {
     if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
@@ -189,26 +217,37 @@ function walkJsonl(dir, depth = 0, out = []) {
   return out;
 }
 
-function firstCwd(file) {
+function head(file) {
   try {
     const fd = fs.openSync(file, 'r');
     try {
       const buf = Buffer.alloc(65536);
       const n = fs.readSync(fd, buf, 0, buf.length, 0);
-      for (const line of buf.subarray(0, n).toString('utf8').split('\n')) {
-        const m = /"cwd":"((?:[^"\\]|\\.)*)"/.exec(line);
-        if (m) { try { return JSON.parse(`"${m[1]}"`); } catch { return m[1]; } }
-      }
+      return buf.subarray(0, n).toString('utf8');
     } finally { fs.closeSync(fd); }
-  } catch { /* ignore */ }
+  } catch { return ''; }
+}
+
+export function firstCwd(file, text = head(file)) {
+  for (const line of text.split('\n')) {
+    const m = /"cwd":"((?:[^"\\]|\\.)*)"/.exec(line);
+    if (m) { try { return JSON.parse(`"${m[1]}"`); } catch { return m[1]; } }
+  }
   return null;
+}
+
+/** cwd + codex session id from a transcript's head (for tail-only parses that never see session_meta). */
+function headMeta(file) {
+  const text = head(file);
+  const id = /^[^\n]*"type":"session_meta"[^\n]*?"payload":\{"id":"([\w.-]{1,200})"/.exec(text);
+  return { cwd: firstCwd(file, text), id: id ? id[1] : null };
 }
 
 /**
  * @param {string} root absolute project root
- * @param {{home?:string}} [opts]
+ * @param {{home?:string, maxBytes?:number}} [opts]
  */
-export function createSessions(root, { home = os.homedir() } = {}) {
+export function createSessions(root, { home = os.homedir(), maxBytes = MAX_TRANSCRIPT_BYTES } = {}) {
   const absRoot = path.resolve(root);
   const projectsDir = path.join(home, '.claude', 'projects');
   const codexDir = path.join(home, '.codex', 'sessions');
@@ -247,17 +286,42 @@ export function createSessions(root, { home = os.homedir() } = {}) {
     return r === '' || (!r.startsWith('..') && !path.isAbsolute(r));
   }
 
+  // The codex tree holds every session of every project, so it is not re-walked per file change.
+  // New rollouts land in the newest sessions/YYYY/MM/DD dir: the mtimes of that dir chain (a few stats)
+  // tell when a file appeared; a slow TTL catches anything else.
+  let walk = { at: 0, sig: '', files: [] };
+  function walkSig() {
+    const sig = [];
+    let d = codexDir;
+    for (let i = 0; i < 4; i++) {
+      let st, ents;
+      try { st = fs.statSync(d); ents = fs.readdirSync(d, { withFileTypes: true }); } catch { break; }
+      sig.push(`${st.mtimeMs}:${ents.length}`); // entry count too: coarse mtimes (1s on HFS+) can hide a new file
+      const last = ents.filter((e) => e.isDirectory()).map((e) => e.name).sort().pop();
+      if (!last) break;
+      d = path.join(d, last);
+    }
+    return sig.join(',');
+  }
+  function codexFiles() {
+    const now = Date.now();
+    const sig = walkSig();
+    if (now - walk.at < WALK_TTL_MS && sig === walk.sig) return walk.files;
+    walk = { at: now, sig, files: sig ? walkJsonl(codexDir) : [] };
+    return walk.files;
+  }
+
+  const files = new Map(); // sessionId -> { file, tool }, for timelines/costs of cwd-matched sessions
+
   function collect() {
     const states = [];
     for (const f of claudeFiles()) {
-      const st = parseFile(f, 'claude');
-      if (st) states.push(st);
+      const st = parseFile(f, 'claude', maxBytes);
+      if (st) { states.push(st); files.set(st.sessionId, { file: f, tool: 'claude' }); }
     }
-    if (fs.existsSync(codexDir)) {
-      for (const f of walkJsonl(codexDir)) {
-        const st = parseFile(f, 'codex');
-        if (st && inRoot(st.cwd)) states.push(st);
-      }
+    for (const f of codexFiles()) {
+      const st = parseFile(f, 'codex', maxBytes);
+      if (st && inRoot(st.cwd)) { states.push(st); files.set(st.sessionId, { file: f, tool: 'codex' }); }
     }
     return states.filter((s) => s.messages > 0 || s.touches.length > 0);
   }
@@ -311,6 +375,12 @@ export function createSessions(root, { home = os.homedir() } = {}) {
       if (lp) ref.lastPrompt = lp;
       if (!ref.title) delete ref.title;
       return ref;
+    },
+
+    /** { file, tool } of a session matched to this root (incl. claude cwd fallback, codex by cwd), or null. */
+    fileOf(id) {
+      if (!files.has(id)) collect();
+      return files.get(id) || null;
     },
   };
 }

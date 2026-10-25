@@ -3,11 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { maskSecretsInText } from '../health/secrets.js';
-import { projectDirName } from '../agents/sessions.js';
+import { projectDirName, MAX_TRANSCRIPT_BYTES, codexPath, firstCwd } from '../agents/sessions.js';
 import { readRegular } from '../files/safeio.js';
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
-const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_TIMELINE = 3000;
 
 // always a finite, Date-representable epoch ms (or 0): hostile timestamps must not make toISOString() throw
@@ -64,7 +63,7 @@ export function locateTranscript(id, { root, home = os.homedir(), codexFiles = n
 }
 
 function readLines(file) {
-  const r = readRegular(file, { follow: true, tail: MAX_BYTES });
+  const r = readRegular(file, { follow: true, tail: MAX_TRANSCRIPT_BYTES });
   if (!r) return [];
   const buf = r.buf;
   const out = [];
@@ -125,18 +124,19 @@ function claudeTimeline(lines, root) {
   return tl;
 }
 
-function codexTimeline(lines, root) {
+function codexTimeline(lines, root, cwd = null) {
   const tl = [];
   for (const o of lines) {
     if (!o || typeof o !== 'object') continue;
     const ts = toMs(o.timestamp);
     const p = o.payload || {};
+    if ((o.type === 'session_meta' || o.type === 'turn_context') && typeof p.cwd === 'string' && p.cwd) cwd = p.cwd;
     if (o.type === 'event_msg' && p.type === 'user_message' && typeof p.message === 'string' && !injected(p.message.trim())) {
       tl.push({ ts, type: 'prompt', text: clip(p.message) });
     } else if (o.type === 'response_item' && (p.type === 'function_call' || p.type === 'custom_tool_call')) {
       const args = typeof p.arguments === 'string' ? p.arguments : typeof p.input === 'string' ? p.input : '';
       const patch = /\*\*\* (Update|Add|Delete) File: ([^\\\n"]+)/.exec(args.replace(/\\n/g, '\n'));
-      if (patch) tl.push({ ts, type: 'edit', tool: p.name || 'apply_patch', path: relPath(root, patch[2].trim()), text: clip(patch[2]) });
+      if (patch) tl.push({ ts, type: 'edit', tool: p.name || 'apply_patch', path: relPath(root, codexPath(cwd, patch[2].trim())), text: clip(patch[2]) });
       else tl.push({ ts, type: 'tool', tool: p.name || 'tool', text: clip(args) });
     }
     if (tl.length >= MAX_TIMELINE) break;
@@ -151,10 +151,13 @@ function codexTimeline(lines, root) {
 export async function sessionTimeline(sessionsApi, id, { root, home } = {}) {
   let session = null;
   try { session = (await sessionsApi?.list?.())?.find((s) => s.sessionId === id) || null; } catch { /* metadata is optional */ }
-  const loc = locateTranscript(id, { root, home });
+  // the sessions API knows files matched by recorded cwd (foreign claude dir names, codex) that locateTranscript can't find
+  let loc = null;
+  try { loc = sessionsApi?.fileOf?.(id) || null; } catch { /* fall back */ }
+  loc = loc || locateTranscript(id, { root, home });
   if (!loc) return { session, timeline: [] };
   const lines = readLines(loc.file);
-  const timeline = (loc.tool === 'codex' ? codexTimeline(lines, root) : claudeTimeline(lines, root)).filter((e) => e.ts || e.type === 'summary');
+  const timeline = (loc.tool === 'codex' ? codexTimeline(lines, root, firstCwd(loc.file)) : claudeTimeline(lines, root)).filter((e) => e.ts || e.type === 'summary');
   timeline.sort((a, b) => a.ts - b.ts);
   if (session) session = { ...session, title: maskSecretsInText(session.title || '') };
   return { session, timeline };

@@ -71,9 +71,9 @@ export default async function register(router, ctx) {
     const to = num(q.get('to')) || Date.now() + 86400000;
     const list = (await ctx.sessions.list()).filter((s) => !s.lastAt || (s.lastAt >= from && (s.startedAt || s.lastAt) <= to)).slice(0, 300);
     const transcripts = new Map();
-    const codexFiles = list.length ? listCodexTranscripts(home) : []; // walked once per request, not once per session
+    let codexFiles = null; // walked at most once per request, and only for sessions the sessions API can't place
     for (const s of list) {
-      const loc = locateTranscript(s.sessionId, { root: ctx.root, home, codexFiles });
+      const loc = ctx.sessions.fileOf?.(s.sessionId) || locateTranscript(s.sessionId, { root: ctx.root, home, codexFiles: codexFiles ||= listCodexTranscripts(home) });
       const u = loc ? readTranscriptUsageCached(loc.file, loc.tool) : null;
       if (u) transcripts.set(s.sessionId, u);
     }

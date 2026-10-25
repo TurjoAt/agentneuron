@@ -7,7 +7,7 @@ import { createStore } from '../src/core/store.js';
 import { loadConfig } from '../src/core/config.js';
 import { contextAt, contextDiff } from '../src/agentcenter/timetravel.js';
 import { sessionTimeline, readTranscriptUsage, locateTranscript } from '../src/agentcenter/transcript.js';
-import { projectDirName } from '../src/agents/sessions.js';
+import { projectDirName, createSessions } from '../src/agents/sessions.js';
 
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 
@@ -69,4 +69,28 @@ test('sessionTimeline reads claude transcript, masks secrets, truncates', async 
   assert.deepEqual(u.models['claude-sonnet-4-5'], { input: 10, output: 9, cacheRead: 100, cacheWrite: 20 }); // dedup by message id
   assert.equal(locateTranscript('../etc', { root, home }), null);
   assert.deepEqual((await sessionTimeline(fake, 'missing', { root, home })).timeline, []);
+});
+
+test('sessionTimeline: cwd-matched claude session (foreign dir name) and codex paths vs session cwd', async () => {
+  const home = tmp('agentneuron-home-');
+  const root = tmp('agentneuron-proj-');
+  const L = (o) => JSON.stringify(o);
+  const odd = path.join(home, '.claude', 'projects', 'renamed-dir');
+  fs.mkdirSync(odd, { recursive: true });
+  fs.writeFileSync(path.join(odd, 'c1.jsonl'), [
+    L({ type: 'user', sessionId: 'c1', cwd: root, timestamp: '2026-10-01T10:00:00Z', message: { role: 'user', content: 'tidy docs' } }),
+  ].join('\n') + '\n');
+  const cx = path.join(home, '.codex', 'sessions', '2026', '10', '01');
+  fs.mkdirSync(cx, { recursive: true });
+  fs.writeFileSync(path.join(cx, 'rollout-2026-x.jsonl'), [
+    L({ timestamp: '2026-10-01T10:00:00Z', type: 'session_meta', payload: { id: 'cx9', cwd: path.join(root, 'sub') } }),
+    L({ timestamp: '2026-10-01T10:00:01Z', type: 'response_item', payload: { type: 'custom_tool_call', name: 'apply_patch', input: '*** Begin Patch\n*** Add File: notes.md\n+x\n*** End Patch' } }),
+  ].join('\n') + '\n');
+  const sessions = createSessions(root, { home });
+  assert.equal(locateTranscript('c1', { root, home }), null); // the dir name doesn't match the root
+  const a = await sessionTimeline(sessions, 'c1', { root, home });
+  assert.equal(a.session.sessionId, 'c1');
+  assert.deepEqual(a.timeline.map((e) => e.text), ['tidy docs']);
+  const b = await sessionTimeline(sessions, 'cx9', { root, home });
+  assert.equal(b.timeline.find((e) => e.type === 'edit').path, 'sub/notes.md');
 });
