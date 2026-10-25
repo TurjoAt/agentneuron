@@ -44,10 +44,15 @@ export function createJsonl(file, { maxBytes = MAX_BYTES, keep = KEEP } = {}) {
     const rows = [];
     for (let i = keep; i >= 0; i--) {
       const f = i === 0 ? file : `${file}.${i}`;
-      let st; try { st = fs.statSync(f); } catch { parsed.delete(f); continue; }
       let c = parsed.get(f);
-      if (!c || c.size !== st.size || c.mtimeMs !== st.mtimeMs || c.ino !== st.ino) {
-        let txt; try { txt = fs.readFileSync(f, 'utf8'); } catch { continue; }
+      // stat and read through one descriptor so the cached size/mtime describe the bytes actually parsed
+      let fd; try { fd = fs.openSync(f, 'r'); } catch { parsed.delete(f); continue; }
+      let st, txt;
+      try {
+        st = fs.fstatSync(fd);
+        if (!c || c.size !== st.size || c.mtimeMs !== st.mtimeMs || c.ino !== st.ino) txt = fs.readFileSync(fd, 'utf8');
+      } catch { continue; } finally { fs.closeSync(fd); }
+      if (txt !== undefined) {
         const list = [];
         for (const l of txt.split('\n')) {
           if (!l) continue;
