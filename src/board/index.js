@@ -253,7 +253,8 @@ export function createBoard(ctx) {
     const rel = cleanRel(mdPath);
     const content = ops.readFresh(rel);
     if (content == null) throw new FileError(404, 'file not found');
-    const lines = content.split('\n');
+    const eol = /\r\n/.test(content) && !/(^|[^\r])\n/.test(content) ? '\r\n' : '\n'; // keep a CRLF file CRLF
+    const lines = content.split(eol);
     const newLines = buildTaskLines({ ...patch, status: patch.status || 'todo', checklist: patch.checklist || [] });
     const sec = typeof input.section === 'string' ? input.section.trim() : '';
     let at = -1;
@@ -270,8 +271,8 @@ export function createBoard(ctx) {
     }
     if (at < 0) { while (lines.length && lines[lines.length - 1] === '') lines.pop(); at = lines.length; }
     lines.splice(at, 0, ...newLines);
-    let next = lines.join('\n');
-    if (!next.endsWith('\n')) next += '\n';
+    let next = lines.join(eol);
+    if (!next.endsWith(eol)) next += eol;
     await ops.writeTracked(rel, next);
     const created = parseMdTasks(rel, next).find((t) => t.line === at + 1);
     const s = load();
