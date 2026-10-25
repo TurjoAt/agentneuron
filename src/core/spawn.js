@@ -78,7 +78,7 @@ export function execFile(cmd, args = [], options = {}, cb) {
 
 /** Kill a child and its descendants. On Windows a shim runs under cmd.exe, so kill the whole tree. */
 export function killTree(child, signal = 'SIGTERM') {
-  if (!child?.pid) return;
+  if (!child?.pid || child.exitCode != null || child.signalCode != null) return; // never taskkill a PID that may have been reused
   if (process.platform === 'win32') {
     try {
       const tk = path.join(envGet(process.env, 'SYSTEMROOT') || 'C:\\Windows', 'System32', 'taskkill.exe');
