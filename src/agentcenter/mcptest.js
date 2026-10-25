@@ -1,6 +1,6 @@
 // Connectivity test for an MCP server definition: initialize + tools/list, 15 s hard timeout.
 // Never uses a shell; the child is always killed; env/header values are never returned.
-import { spawn } from 'node:child_process';
+import { spawn, killTree as killWin } from '../core/spawn.js';
 import { maskSecretsInText } from '../health/secrets.js';
 import { VERSION } from '../server/version.js';
 
@@ -62,7 +62,8 @@ function testStdio(def, { cwd, signal, timeoutMs }) {
     };
     // POSIX: the child leads its own process group so wrappers like `npx` do not leave grandchildren behind
     const killTree = (sig) => {
-      try { if (process.platform !== 'win32' && child?.pid) process.kill(-child.pid, sig); else child?.kill(sig); } catch { try { child?.kill(sig); } catch { /* gone */ } }
+      if (process.platform === 'win32') return killWin(child, sig); // cmd.exe-wrapped shims: taskkill /T
+      try { if (child?.pid) process.kill(-child.pid, sig); else child?.kill(sig); } catch { try { child?.kill(sig); } catch { /* gone */ } }
     };
     const onAbort = () => end({ ok: false, error: 'cancelled' });
     signal?.addEventListener?.('abort', onAbort, { once: true });

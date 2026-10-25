@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn, execFile } from 'node:child_process';
+import { spawn, execFile } from '../core/spawn.js';
 import { fileURLToPath } from 'node:url';
 import { VERSION } from '../server/version.js';
 
@@ -58,9 +58,9 @@ export function detectInstall(selfPath, { globalRoot = null } = {}) {
   return 'other';
 }
 
-const npmBin = () => (process.platform === 'win32' ? 'npm.cmd' : 'npm');
-// Node >= 18.20.2 refuses to spawn .cmd files without a shell (CVE-2024-27980); the args are fixed strings.
-const npmOpts = () => ({ windowsHide: true, shell: process.platform === 'win32' });
+// core/spawn resolves npm.cmd on Windows and runs it via cmd.exe with escaped arguments (no shell: true).
+const npmBin = () => 'npm';
+const npmOpts = () => ({ windowsHide: true });
 
 /** `npm root -g`, or null. */
 export function npmGlobalRoot({ timeoutMs = 10000 } = {}) {
