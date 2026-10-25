@@ -5,7 +5,7 @@ import path from 'node:path';
 import { readRegular } from '../files/safeio.js';
 import { MAX_TRANSCRIPT_BYTES, codexPath, firstCwd } from '../agents/sessions.js';
 import { locateTranscript, listCodexTranscripts } from '../agentcenter/transcript.js';
-import { toMs } from './text.js';
+import { toMs, clipMasked } from './text.js';
 
 const WRITE = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const READ = new Set(['Read', 'Glob', 'Grep', 'LS', 'NotebookRead']);
@@ -15,14 +15,14 @@ const TXT = 2000;
 const INJECTED = /^<(?:system-reminder|command-|local-command|environment_context|user_instructions|ide_|task-notification)/i;
 const REJECT = /the user said:\s*([\s\S]*)$/i;
 
-const clipRaw = (s, n = TXT) => String(s ?? '').slice(0, n);
+const clipRaw = (s, n = TXT) => clipMasked(s, n); // masked at parse time: nothing unmasked is cached or cut
 const textOf = (c) => (typeof c === 'string' ? c : Array.isArray(c) ? c.filter((x) => x && x.type === 'text' && typeof x.text === 'string').map((x) => x.text).join('\n') : '');
 const resultText = (c) => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((x) => (typeof x === 'string' ? x : x?.text || '')).join('\n') : '');
 const exitOf = (s) => { const m = /(?:^Exit code|Process exited with code|exit code:?)\s*(-?\d+)/im.exec(String(s || '')); return m ? Number(m[1]) : null; };
 const errLine = (s) => String(s || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^(exit code|process exited|wall time|output:|chunk id)/i.test(l)).find((l) => /err|fail|not found|cannot|denied|invalid|missing|unknown/i.test(l)) || '';
 
-function readLines(file) {
-  const r = readRegular(file, { follow: true, tail: MAX_TRANSCRIPT_BYTES });
+function readLines(file, max = MAX_TRANSCRIPT_BYTES) {
+  const r = readRegular(file, { follow: true, tail: max });
   if (!r) return [];
   const out = [];
   let text = r.buf.toString('utf8');
@@ -202,24 +202,28 @@ export function parseCodex(lines, file, cwd0 = null) {
 const cache = new Map(); // file -> { mtimeMs, size, s }
 
 /** Parse one transcript (cached by mtime + size). */
-export function readSession(file, tool) {
+export function readSession(file, tool, maxBytes = MAX_TRANSCRIPT_BYTES) {
   let st;
   try { st = fs.statSync(file); } catch { cache.delete(file); return null; }
   const c = cache.get(file);
-  if (c && c.mtimeMs === st.mtimeMs && c.size === st.size) return c.s;
-  const lines = readLines(file);
+  if (c && c.mtimeMs === st.mtimeMs && c.size === st.size && c.max === maxBytes) return c.s;
+  const lines = readLines(file, maxBytes);
   const s = tool === 'codex' ? parseCodex(lines, file, firstCwd(file)) : parseClaude(lines, file);
-  cache.set(file, { mtimeMs: st.mtimeMs, size: st.size, s });
+  cache.set(file, { mtimeMs: st.mtimeMs, size: st.size, max: maxBytes, s });
   return s;
 }
 
 /** Project-relative POSIX path, or null when outside the root. */
+const real = new Map();
 export function relTo(root, p) {
   if (typeof p !== 'string' || !p) return null;
   const abs = path.isAbsolute(p) ? path.resolve(p) : path.resolve(root, p);
-  const r = path.relative(path.resolve(root), abs);
-  if (!r || r.startsWith('..') || path.isAbsolute(r)) return null;
-  return r.split(path.sep).join('/');
+  if (!real.has(root)) { let r = path.resolve(root); try { r = fs.realpathSync(root); } catch { /* keep */ } real.set(root, r); }
+  for (const base of new Set([path.resolve(root), real.get(root)])) {
+    const r = path.relative(base, abs);
+    if (r && !r.startsWith('..') && !path.isAbsolute(r)) return r.split(path.sep).join('/');
+  }
+  return null;
 }
 
 /**

@@ -9,6 +9,9 @@ const STOP = new Set(('a an the and or but if then so to of in on at by for with
 /** Mask first, then clip: a secret cut in half could slip past the masker. */
 export const quote = (s, n = 200) => maskSecretsInText(String(s ?? '').replace(/\s+/g, ' ').trim()).slice(0, n);
 
+/** Mask a bounded prefix, then clip: never cuts a secret before the masker sees it. */
+export const clipMasked = (s, n) => maskSecretsInText(String(s ?? '').slice(0, n + 256)).slice(0, n);
+
 export const sha = (s) => crypto.createHash('sha1').update(String(s)).digest('hex');
 
 export const norm = (s) => String(s ?? '').toLowerCase().replace(/[`'"“”‘’]/g, '').replace(/[^\p{L}\p{N}_./@-]+/gu, ' ').replace(/\s+/g, ' ').trim();

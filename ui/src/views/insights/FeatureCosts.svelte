@@ -37,7 +37,7 @@
         <table class="tbl">
           <thead><tr><th>Feature</th><th>Sessions</th><th>Tokens</th><th>Cost</th><th>Agent time</th><th>Commits</th><th>Files</th><th>Matched by</th></tr></thead>
           <tbody>
-            {#each rows as r (r.kind + r.feature)}
+            {#each rows as r (r.kind + ':' + (r.taskId || r.branch || r.feature))}
               <tr class="click" onclick={() => (openRow = openRow === r ? null : r)}>
                 <td class="ft"><span class="badge {KIND[r.kind] || ''}">{r.kind}</span> {r.feature}</td>
                 <td class="tnum">{r.sessions}</td>

@@ -45,7 +45,7 @@ export function parseRules(files, contents) {
       let text = (b ? b[1] : raw).replace(/\*\*|__/g, '').trim();
       if (!b && !DIRECTIVE.test(text)) continue;
       if (/^\[[^\]]*\]\([^)]*\)$/.test(text) || text.split(/\s+/).length < 3 || text.length > 400) continue;
-      const rule = { id: sha(`${f.path}:${norm(text)}`).slice(0, 10), rule: text, file: f.path, line: i + 1, tokenCost: estimateTokens(raw) };
+      const rule = { id: sha(`${f.path}:${i + 1}:${norm(text)}`).slice(0, 10), rule: text, file: f.path, line: i + 1, tokenCost: estimateTokens(raw) };
       rule.check = classify(text);
       out.push(rule);
     }

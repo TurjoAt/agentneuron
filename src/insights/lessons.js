@@ -2,7 +2,7 @@
 // across sessions, clustered (normalised tokens + Jaccard) into proposed rules for the context files.
 import { maskSecretsInText } from '../health/secrets.js';
 import { parseRules, segments } from './rules.js';
-import { tokens, jaccard, containment, stripCode, sentence, quote, sha, norm } from './text.js';
+import { tokens, jaccard, containment, stripCode, sentence, quote, sha, norm, clipMasked } from './text.js';
 
 const MAX_PROMPT = 500; // longer turns are pasted content, not a correction
 const NEG_START = /^(?:no+\b|nope\b|wrong\b|stop\b|don'?t\b|do not\b|never\b|revert\b|undo\b|that'?s (?:not|wrong)\b|not like that\b|instead\b|actually,? (?:no|don'?t|use|we)\b)/i;
@@ -46,8 +46,9 @@ export function toRule(text) {
     .replace(/^(?:you should|you need to|you must|make sure (?:to|you)|remember to)\s+/i, '');
   s = s.replace(/[\s,;:-]+$/, '');
   if (tokens(s).size < 2 || /^(?:revert|undo)(?: (?:that|this|it|the (?:last )?(?:change|edit)s?))?\.?$/i.test(s)) return null;
+  s = maskSecretsInText(s);
   if (s.length > 160) s = `${s.slice(0, 157).replace(/\s+\S*$/, '')}…`;
-  return maskSecretsInText(sentence(s));
+  return sentence(s);
 }
 
 const commandKey = (cmd) => {
@@ -55,7 +56,7 @@ const commandKey = (cmd) => {
   if (!g) return null;
   const args = g.words.slice(1).filter((w) => !w.startsWith('-'));
   const n = /^(npm|pnpm|yarn|bun)$/.test(g.prog) && args[0] === 'run' ? 2 : 1;
-  return [g.prog, ...args.slice(0, n)].join(' ').slice(0, 80);
+  return clipMasked([g.prog, ...args.slice(0, n)].join(' '), 80);
 };
 const sameJob = (a, b) => a.split(' ').slice(1).join(' ') === b.split(' ').slice(1).join(' ');
 
@@ -93,7 +94,7 @@ export function mine(sessions) {
       if (a.add.length < 3 || a.rm === a.add) continue;
       const b = list.slice(i + 1, i + 40).find((y) => y.e.ts - a.e.ts < 7 * 864e5 && y.rm === a.add && y.add === a.rm);
       if (!b) continue;
-      const what = (a.c.removed || a.c.added).split('\n').map((l) => l.trim()).find(Boolean)?.slice(0, 60) || '';
+      const what = clipMasked((a.c.removed || a.c.added).split('\n').map((l) => l.trim()).find(Boolean) || '', 60);
       const rule = maskSecretsInText(a.rm ? `Don't change \`${what}\` in ${p} without asking (an agent edit there was reverted).` : `Don't add \`${what}\` to ${p} (it was reverted).`);
       items.push({ kind: 'revert', key: `revert:${p}:${norm(what)}`, rule, paths: [p], evidence: [
         ev(a.s, a.e, `edit ${p}: ${a.c.removed ? `"${a.c.removed}" → ` : ''}"${a.c.added}"`, { kind: 'edit', path: p }),

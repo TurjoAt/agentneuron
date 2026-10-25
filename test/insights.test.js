@@ -278,15 +278,42 @@ test('MCP suggest_rules: read-only, masked, uncovered lessons only by default', 
   } finally { child.kill(); rmTemp(root); rmTemp(home); }
 });
 
-test('huge transcripts are tail-capped and unreadable ones ignored', async () => {
-  const { MAX_TRANSCRIPT_BYTES } = await import('../src/agents/sessions.js');
-  assert.ok(MAX_TRANSCRIPT_BYTES > 0);
-  const d = tmp();
+test('huge transcripts are tail-capped; unreadable lines ignored', async () => {
   const { readSession } = await import('../src/insights/transcripts.js');
+  const d = tmp();
   assert.equal(readSession(path.join(d, 'missing.jsonl'), 'claude'), null);
-  fs.writeFileSync(path.join(d, 'bad.jsonl'), '{not json\n\n' + JSON.stringify({ type: 'user', timestamp: 'garbage', message: { content: 'hi' } }) + '\n');
-  const s = readSession(path.join(d, 'bad.jsonl'), 'claude');
-  assert.equal(s.events.length, 1);
-  assert.equal(s.events[0].ts, 0);
+  const line = (t, i) => JSON.stringify({ type: 'user', timestamp: new Date(T0 + i * 1000).toISOString(), message: { content: t } });
+  const old = Array.from({ length: 200 }, (_, i) => line(`old prompt number ${i} ${'pad '.repeat(20)}`, i));
+  fs.writeFileSync(path.join(d, 'big.jsonl'), [...old, '{broken', line('the newest prompt', 999)].join('\n') + '\n');
+  const s = readSession(path.join(d, 'big.jsonl'), 'claude', 4096);
+  assert.ok(s.events.length > 0 && s.events.length < 60, `only the tail is parsed (${s.events.length})`);
+  assert.equal(s.events[s.events.length - 1].text, 'the newest prompt');
+  assert.ok(s.events.every((e) => /^(old prompt|the newest)/.test(e.text)), 'the partial first line is dropped');
   rmTemp(d);
+});
+
+test('secrets crossing clip boundaries never leak (prompt, rule, command, revert)', async () => {
+  const { home, root, ins } = await setup();
+  try {
+    const dir = path.join(home, '.claude', 'projects', (await import('../src/agents/sessions.js')).projectDirName(root));
+    const L = (o) => JSON.stringify({ sessionId: 'sess-z', cwd: root, ...o });
+    const at = (m) => new Date(T0 + 500 * 60000 + m * 60000).toISOString();
+    const long = 'x'.repeat(1990) + SECRET; // straddles the 2000-char parse clip
+    fs.writeFileSync(path.join(dir, 'sess-z.jsonl'), [
+      L({ type: 'assistant', timestamp: at(0), message: { content: [{ type: 'tool_use', id: 'z1', name: 'Edit', input: { file_path: path.join(root, 'src/z.js'), old_string: 'y'.repeat(34) + ' ' + SECRET, new_string: 'abc' } }] } }),
+      L({ type: 'user', timestamp: at(1), message: { content: `no, never paste ${'w '.repeat(61)}${SECRET} in code` } }),
+      L({ type: 'user', timestamp: at(2), message: { content: long } }),
+      ...Array.from({ length: 14 }, (_, k) => L({ type: 'user', timestamp: at(2), message: { content: 'x'.repeat(1975 + k) + SECRET } })),
+      ...Array.from({ length: 14 }, (_, k) => L({ type: 'assistant', timestamp: at(2), message: { content: [{ type: 'tool_use', id: `e${k}`, name: 'Edit', input: { file_path: path.join(root, 'src/q.js'), old_string: 'q', new_string: 'y'.repeat(975 + k) + SECRET } }] } })),
+      L({ type: 'assistant', timestamp: at(3), message: { content: [{ type: 'tool_use', id: 'z2', name: 'Bash', input: { command: `curl${' '.repeat(60)}${SECRET}` } }] } }),
+      L({ type: 'user', timestamp: at(3), message: { content: [{ type: 'tool_result', tool_use_id: 'z2', content: `Exit code 1\nerror: bad key ${SECRET}`, is_error: true }] } }),
+      L({ type: 'assistant', timestamp: at(4), message: { content: [{ type: 'tool_use', id: 'z3', name: 'Bash', input: { command: `curl${' '.repeat(60)}${SECRET}` } }] } }),
+      L({ type: 'user', timestamp: at(4), message: { content: [{ type: 'tool_result', tool_use_id: 'z3', content: `Exit code 1\nerror: bad key ${SECRET}`, is_error: true }] } }),
+      L({ type: 'assistant', timestamp: at(5), message: { content: [{ type: 'tool_use', id: 'z4', name: 'Edit', input: { file_path: path.join(root, 'src/z.js'), old_string: 'abc', new_string: 'y'.repeat(34) + ' ' + SECRET } }] } }),
+    ].join('\n') + '\n');
+    const out = JSON.stringify([await ins.lessons({ all: true }), await ins.rules(), await ins.replay({ session: 'sess-z', ts: T0 + 600 * 60000 })]);
+    assert.ok(out.includes('in src/z.js'), 'the revert lesson exists');
+    const rnd = SECRET.slice(13);
+    for (let i = 0; i + 8 <= rnd.length; i++) { const j = out.indexOf(rnd.slice(i, i + 8)); assert.ok(j < 0, `secret fragment leaked: ${out.slice(Math.max(0, j - 120), j + 40)}`); }
+  } finally { rmTemp(root); rmTemp(home); }
 });

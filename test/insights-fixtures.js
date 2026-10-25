@@ -5,7 +5,7 @@ import path from 'node:path';
 import { projectDirName } from '../src/agents/sessions.js';
 
 export const SECRET = 'sk-ant-api03-' + 'Zq9Xw8Vu7Ts6Rp5On4Ml3'.repeat(2);
-export const tmp = (p = 'agentneuron-ins-') => fs.mkdtempSync(path.join(os.tmpdir(), p));
+export const tmp = (p = 'agentneuron-ins-') => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), p)));
 const L = (o) => JSON.stringify(o);
 export const T0 = Date.parse('2026-10-01T10:00:00Z');
 const at = (min) => new Date(T0 + min * 60000).toISOString();
