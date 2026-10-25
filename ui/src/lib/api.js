@@ -85,7 +85,8 @@ export function post(path, body) {
   });
 }
 
-const STREAM_EVENTS = ['event', 'health', 'graph', 'conflict', 'ping', 'job', 'joblog', 'notify', 'board', 'files'];
+const STREAM_EVENTS = ['event', 'health', 'graph', 'conflict', 'ping', 'job', 'joblog', 'notify', 'board', 'files',
+  'agent.session', 'agent.edit', 'agent.command', 'agent.prompt', 'agent.thinking', 'agent.collision', 'agent.claims', 'agent.handoff'];
 
 /**
  * Open the live stream with exponential-backoff reconnect.

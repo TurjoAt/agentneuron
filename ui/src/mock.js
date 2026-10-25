@@ -1482,5 +1482,145 @@ export function createMock() {
   }
 
   void day;
+  installLiveMock({ routes, broadcast, db, emit, need, sessions: () => sessions, quiet: qs.has('quiet') }); // live agents demo (block at the end of this file)
   return { request, stream };
 }
+
+// ============================================================== LIVE AGENTS MOCK (feat/live) ==============
+// /api/live* routes and a synthetic generator of agent.* events so `?mock=1` shows agents editing in real time.
+function installLiveMock({ routes, broadcast, db, emit, need, sessions, quiet }) {
+  const now0 = Date.now();
+  const R = (n) => Math.floor(Math.random() * n);
+  const P = (a) => a[R(a.length)];
+  const S = sessions();
+  const sess = [
+    { tool: 'claude', sessionId: S[0]?.sessionId || 'c-1', title: S[0]?.title || 'Implement PaymentIntent module', model: 'claude-opus-4-5', lastPrompt: S[0]?.lastPrompt || null },
+    { tool: 'claude', sessionId: S[1]?.sessionId || 'c-2', title: S[1]?.title || 'Review docs for stale commands', model: 'claude-sonnet-4-5', lastPrompt: S[1]?.lastPrompt || null },
+    { tool: 'codex', sessionId: S[2]?.sessionId || 'x-1', title: S[2]?.title || 'Add webhook retry docs', model: 'gpt-5-codex', lastPrompt: S[2]?.lastPrompt || null },
+    { tool: 'cursor', sessionId: 'cursor-composer-7f3a', title: 'Polish checkout UI', model: 'cursor-composer', lastPrompt: 'Tighten spacing on the order summary' },
+  ].map((s, i) => ({ ...s, cwd: '.', state: i === 1 ? 'idle' : 'active', startedAt: now0 - (40 + i * 25) * 60000, lastAt: now0 - (i === 1 ? 6 * 60000 : R(40000)), edits: 3 + R(20), commands: R(12), lastThinking: null }));
+  const CODE = ['apps/web/src/checkout/Summary.tsx', 'apps/web/src/checkout/usePayment.ts', 'apps/api/src/payments/intent.ts', 'apps/api/src/payments/webhooks.ts', 'apps/api/src/routes/checkout.ts', 'packages/ui/src/Button.tsx', 'apps/api/test/webhooks.test.ts'];
+  const MD = ['docs/plan.md', 'TODO.md', 'docs/api.md', 'AGENTS.md', 'CLAUDE.md', 'memory/notes.md'];
+  const SNIP = ['const intent = await stripe.paymentIntents.create({ amount, currency });', 'if (!res.ok) throw new HttpError(res.status, await res.text());', 'export function retryDelay(n: number) { return Math.min(30_000, 2 ** n * 250); }', '  <Button variant="primary" onClick={pay}>Pay now</Button>', 'return { status: intent.status, clientSecret: intent.client_secret };', "it('retries 5xx webhooks with jitter', async () => {", '- [x] Wire PaymentIntent into checkout routes', 'Webhook deliveries are retried up to 8 times.', "const API_KEY = process.env.STRIPE_KEY ?? 'sk_live_****';"];
+  const CMDS = [['pnpm test --filter api', 0], ['pnpm lint', 0], ['git diff --stat', 0], ['pnpm tsc --noEmit', 2], ['rg "paymentIntents" apps/', 0], ['pnpm vitest run webhooks', 1], ['git status --short', 0]];
+  const THINK = ['Updating the retry helper so webhook tests stop flaking.', 'The checkout route needs the new intent status; editing it next.', 'Running the API tests to confirm the change.', 'Adding the endpoint to docs/api.md so the docs match.'];
+  const st = { edits: [], commands: [], notes: [], collisions: [], editors: {} };
+  let claims = [
+    { id: 'c1', pattern: 'apps/api/src/payments/**', agent: 'claude-code', sessionId: sess[0].sessionId, taskId: null, note: 'PaymentIntent refactor', createdAt: now0 - 9 * 60000, expiresAt: now0 + 11 * 60000 },
+    { id: 'c2', pattern: 'docs/api.md', agent: 'codex', sessionId: sess[2].sessionId, taskId: null, note: 'webhook docs', createdAt: now0 - 4 * 60000, expiresAt: now0 + 26 * 60000 },
+  ];
+  let handoffs = [
+    { id: 'h1', ts: now0 - 50 * 60000, agent: 'claude-code', sessionId: S[3]?.sessionId || 'old', taskId: null, summary: 'Release 2.14.0 prepared', done: ['changelog', 'version bump'], next: ['tag and publish'], blockers: [], files: ['CHANGELOG.md'] },
+    { id: 'h2', ts: now0 - 18 * 60000, agent: 'codex', sessionId: sess[2].sessionId, taskId: null, summary: 'Retry policy documented', done: ['docs/api.md retry section'], next: ['add jitter example'], blockers: ['need final max-attempts number'], files: ['docs/api.md'] },
+  ];
+  let seq = 0;
+  const ring = (a, x, n) => { a.push(x); if (a.length > n) a.splice(0, a.length - n); };
+  const hunk = (op) => {
+    const out = [{ type: 'ctx', text: P(SNIP) }];
+    if (op !== 'create') for (let i = 0; i < 1 + R(3); i++) out.push({ type: 'del', text: P(SNIP) });
+    if (op !== 'delete') for (let i = 0; i < 1 + R(5); i++) out.push({ type: 'add', text: P(SNIP) });
+    out.push({ type: 'ctx', text: '}' });
+    return out;
+  };
+  const view = (s) => ({ tool: s.tool, sessionId: s.sessionId, state: s.state, title: s.title, model: s.model, cwd: s.cwd, startedAt: s.startedAt, lastAt: s.lastAt, edits: s.edits, commands: s.commands, lastPrompt: s.lastPrompt, lastThinking: s.lastThinking });
+  const edit = (s, path, op, ts = Date.now(), hist = false) => {
+    const h = hunk(op);
+    const e = { id: `${s.tool}:${s.sessionId}:m${++seq}`, tool: s.tool, sessionId: s.sessionId, path, op, linesAdded: h.filter((x) => x.type === 'add').length, linesRemoved: h.filter((x) => x.type === 'del').length, hunk: h, truncated: false, status: hist ? 'confirmed' : 'pending', ts, source: s.tool === 'human' ? 'watcher' : 'transcript' };
+    if (s.tool === 'human') { e.status = 'confirmed'; e.hunk = []; }
+    ring(st.edits, e, 500);
+    st.editors[path] = { tool: s.tool, sessionId: s.sessionId, ts, op };
+    if (s.edits !== undefined) { s.edits++; s.lastAt = ts; }
+    return e;
+  };
+  // seed ~25 min of history
+  for (let i = 30; i > 0; i--) { const s = P(sess); edit(s, P([...CODE, ...MD]), P(['edit', 'edit', 'patch', 'write', 'create']), Date.now() - i * 50000 - R(30000), true); }
+  for (let i = 8; i > 0; i--) { const s = P(sess); const [c, x] = P(CMDS); ring(st.commands, { id: `${s.tool}:${s.sessionId}:k${++seq}`, tool: s.tool, sessionId: s.sessionId, cmd: c, exitCode: x, ok: x === 0, ts: Date.now() - i * 140000 }, 200); }
+  ring(st.collisions, { path: 'docs/api.md', reason: 'overlap', sessions: [sess[1], sess[2]].map((s) => ({ tool: s.tool, sessionId: s.sessionId, title: s.title })), ts: Date.now() - 3 * 60000 }, 50);
+
+  routes['/api/live'] = () => ({ now: Date.now(), startedAt: now0, showPrompts: true, showDiffs: true, sessions: sess.map(view), edits: st.edits, commands: st.commands, notes: st.notes, editing: Object.entries(st.editors).map(([path, e]) => ({ path, ...e })).filter((e) => Date.now() - e.ts < 120000), collisions: st.collisions, claims: claims.filter((c) => c.expiresAt > Date.now()), handoffs });
+  routes['/api/live/claims'] = (_q, b, init) => {
+    if (init?.method !== 'POST') return { claims };
+    need('state');
+    const who = { agent: b.agent || 'human', sessionId: b.sessionId || 'ui' };
+    const granted = [], conflicts = [];
+    for (const p of b.paths || []) {
+      const held = claims.find((c) => c.sessionId !== who.sessionId && (c.pattern === p || p.startsWith(c.pattern.replace(/\*\*.*$/, ''))));
+      if (held) { conflicts.push({ path: p, heldBy: { agent: held.agent, sessionId: held.sessionId }, pattern: held.pattern, expiresAt: held.expiresAt }); if (!b.force) continue; }
+      claims.push({ id: 'c' + (++seq), pattern: p, ...who, taskId: b.taskId || null, note: b.note || '', createdAt: Date.now(), expiresAt: Date.now() + 15 * 60000 });
+      granted.push(p);
+    }
+    broadcast('agent.claims', { claims });
+    return { granted, conflicts, claims: claims.filter((c) => c.sessionId === who.sessionId) };
+  };
+  routes['/api/live/release'] = (_q, b) => {
+    need('state');
+    const n = claims.length;
+    claims = claims.filter((c) => !(c.agent === b.agent && c.sessionId === b.sessionId && (!b.id || c.id === b.id)));
+    broadcast('agent.claims', { claims });
+    return { released: n - claims.length };
+  };
+  routes['/api/live/handoffs'] = ({ taskId }) => ({ handoffs: handoffs.filter((h) => !taskId || h.taskId === taskId) });
+  routes['/api/live/handoff'] = (_q, b) => {
+    need('state');
+    const h = { id: 'h' + (++seq), ts: Date.now(), agent: b.agent || 'human', sessionId: b.sessionId || 'ui', taskId: b.taskId || null, summary: b.summary || '', done: b.done || [], next: b.next || [], blockers: b.blockers || [], files: [] };
+    handoffs = [h, ...handoffs].slice(0, 50);
+    broadcast('agent.handoff', { handoff: h, handoffs: handoffs.slice(0, 20) });
+    return { handoff: h };
+  };
+  routes['/api/live/claim-task'] = (_q, b) => {
+    need('state');
+    const assignee = `${b.agent || 'human'}.${String(b.sessionId || 'ui').replace(/[^A-Za-z0-9]/g, '').slice(0, 8)}`;
+    const r = routes['/api/board/update']({}, { id: b.id, patch: { assignee, status: 'doing' } });
+    return { task: r.task, assignee, claims: { granted: [], conflicts: [] } };
+  };
+
+  if (quiet) return;
+  const later = (fn, ms) => setTimeout(fn, ms);
+  const step = () => {
+    later(step, 900 + R(2200));
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const r = Math.random();
+    const s = r < 0.08 ? { tool: 'human', sessionId: null } : P(sess.filter((x) => x.state !== 'idle').concat(sess[0], sess[2]));
+    if (s.state === 'idle' && Math.random() < 0.5) { s.state = 'active'; broadcast('agent.session', { ...view(s), ts: Date.now() }); }
+    const k = Math.random();
+    if (s.tool === 'human' || k < 0.6) {
+      const md = Math.random() < 0.3;
+      const path = md ? P(MD) : P(CODE);
+      const e = edit(s, path, s.tool === 'codex' ? P(['patch', 'patch', 'create']) : P(['edit', 'edit', 'edit', 'write', 'create']));
+      broadcast('agent.edit', e);
+      if (md && db.has(path) && s.tool !== 'human') {
+        const f = db.get(path);
+        f.content = f.content.replace(/\n*$/, '\n') + P(SNIP) + '\n';
+        later(() => emit('change', path), 250);
+      }
+      if (e.status === 'pending') later(() => { e.status = Math.random() < 0.05 ? 'failed' : 'confirmed'; broadcast('agent.edit', e); }, 400 + R(900));
+      // two sessions on one file -> collision
+      const other = st.edits.slice(-12, -1).find((x) => x.path === path && x.sessionId && x.sessionId !== s.sessionId && Date.now() - x.ts < 300000);
+      if (other && s.sessionId) {
+        const c = { path, reason: 'overlap', sessions: [other, s].map((x) => ({ tool: x.tool, sessionId: x.sessionId, title: sess.find((y) => y.sessionId === x.sessionId)?.title })), ts: Date.now() };
+        ring(st.collisions, c, 50);
+        broadcast('agent.collision', c);
+      }
+    } else if (k < 0.82) {
+      const [c, x] = P(CMDS);
+      const cmd = { id: `${s.tool}:${s.sessionId}:k${++seq}`, tool: s.tool, sessionId: s.sessionId, cmd: c, ts: Date.now() };
+      ring(st.commands, cmd, 200);
+      s.commands++;
+      broadcast('agent.command', cmd);
+      later(() => { cmd.exitCode = x; cmd.ok = x === 0; broadcast('agent.command', cmd); }, 700 + R(2500));
+    } else {
+      const text = P(THINK);
+      s.lastThinking = text;
+      const n = { type: 'thinking', tool: s.tool, sessionId: s.sessionId, text, ts: Date.now() };
+      ring(st.notes, n, 60);
+      broadcast('agent.thinking', n);
+    }
+    if (Math.random() < 0.04) {
+      const s2 = sess[1];
+      s2.state = s2.state === 'idle' ? 'active' : 'idle';
+      broadcast('agent.session', { ...view(s2), ts: Date.now() });
+    }
+  };
+  later(step, 1500);
+}
+// ============================================================== END LIVE AGENTS MOCK ======================

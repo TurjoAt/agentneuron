@@ -8,6 +8,7 @@
   import { canRun, levelReason } from '../actions.js';
   import { PRIORITIES, PRIO, isOverdue } from './util.js';
   import { timeAgo } from '../format.js';
+  import { live, claimsForTask } from '../live.svelte.js';
 
   let { id = null, create = false, title: initTitle = '', files: initFiles = [], line = null, due: initDue = null, status: initStatus = 'todo', onclose } = $props();
 
@@ -28,6 +29,15 @@
   let orig = '';
 
   const mutOk = $derived(canRun('state'));
+  // live coordination: handoff notes written for this task, advisory claims on it
+  let handoffs = $state.raw([]);
+  $effect(() => {
+    void live.handoffs;
+    const tid = id;
+    if (!tid) return;
+    api('/api/live/handoffs', { taskId: tid, limit: 10 }).then((r) => (handoffs = r?.handoffs || []), () => (handoffs = []));
+  });
+  const taskClaims = $derived(task ? claimsForTask(task) : []);
   const reason = $derived(levelReason('state'));
   const mdOk = $derived(canRun('edit'));
   const isMd = $derived(task?.source === 'md');
@@ -227,6 +237,26 @@
             <button class="btn sm" type="submit" disabled={!mutOk || !newFile.trim()}><Icon name="plus" size={12} />Link</button>
           </form>
         </div>
+
+        {#if !isNew && (handoffs.length || taskClaims.length)}
+          <div class="sect">
+            <div class="sh"><span class="eyebrow"><Icon name="users" size={11} /> Agents</span></div>
+            {#each taskClaims as c (c.id)}
+              <div class="faint small"><Icon name="lock" size={11} /> <b>{c.agent}</b> claims <code>{c.pattern}</code> · {Math.max(0, Math.round((c.expiresAt - Date.now()) / 60000))} min left</div>
+            {/each}
+            {#each handoffs as h (h.id)}
+              <div class="cm">
+                <div class="cmh"><b>{h.agent}</b><span class="faint">handoff · {timeAgo(h.ts)}</span></div>
+                <div class="cmb">
+                  {#if h.summary}{h.summary}{/if}
+                  {#if h.done.length}<div><span class="faint">Done:</span> {h.done.join(' · ')}</div>{/if}
+                  {#if h.next.length}<div><span class="faint">Next:</span> {h.next.join(' · ')}</div>{/if}
+                  {#if h.blockers.length}<div><span class="faint">Blockers:</span> {h.blockers.join(' · ')}</div>{/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
 
         {#if !isNew}
           <div class="sect">

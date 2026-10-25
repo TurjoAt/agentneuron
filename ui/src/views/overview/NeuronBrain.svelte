@@ -15,6 +15,7 @@
   import { prefersReducedMotion } from 'svelte/motion';
   import { api } from '../../lib/api.js';
   import { app, openFile } from '../../lib/store.svelte.js';
+  import { recentEditor } from '../../lib/live.svelte.js';
   import { resource } from '../../lib/resource.svelte.js';
   import { page } from '../../lib/visibility.svelte.js';
   import { toolColor, TOOLS, TOOL_ORDER, KINDS } from '../../lib/tools.js';
@@ -215,7 +216,7 @@
       const u = age / 700;
       const x = cx + (p.x - cx) * u;
       const y = cy + (p.y - cy) * u;
-      const col = c.tool[p.n.tool];
+      const col = c.tool[recentEditor(p.n.id) || p.n.tool] || c.tool[p.n.tool]; // agent-coloured signal
       g.strokeStyle = alpha(col, 0.5 * (1 - u * 0.5));
       g.lineWidth = 1.2;
       g.beginPath();
@@ -256,8 +257,8 @@
 
     // nodes (back to front)
     for (const p of pts) {
-      const col = c.tool[p.n.tool] || c.text2;
       const t = pulses[p.n.id];
+      const col = (t && c.tool[recentEditor(p.n.id)]) || c.tool[p.n.tool] || c.text2;
       const age = t ? wall - t : Infinity;
       const pulsing = age >= 0 && age < PULSE_MS;
       const dim = hov && hov !== p.n.id && !hovNbrs?.has(p.n.id);
