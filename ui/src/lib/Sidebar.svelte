@@ -45,6 +45,7 @@
   <div class="scroll">
     <ul class="nav">
       {#each VIEWS as v, i (v.id)}
+        {#if v.group && v.group !== VIEWS[i - 1]?.group}<li class="sec" aria-hidden="true">{v.group}</li>{/if}
         <li class:sm-hide={v.id === 'settings'}>
           <a class="item" class:on={app.route.view === v.id} href={href(v.id)} aria-current={app.route.view === v.id ? 'page' : undefined} title="{v.label}{i < 9 ? ` (${i + 1})` : ''}">
             <Icon name={v.icon} size={16} />
@@ -144,6 +145,8 @@
   .sub { font-size: 11.5px; font-weight: 500; color: var(--text-3); letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
   .scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -4px; padding: 0 4px; display: flex; flex-direction: column; gap: 14px; }
   .nav { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .nav .sec { margin: 12px 0 4px; padding: 0 10px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .nav .sec:first-child { margin-top: 2px; }
   .item {
     position: relative;
     display: flex;
@@ -199,6 +202,7 @@
     .brand, .foot, .grp { display: none; }
     .scroll { margin: 0; padding: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex-direction: row; }
     .nav { flex-direction: row; gap: 0; }
+    .nav .sec { display: none; }
     .nav li { flex: 1 0 auto; }
     .item { flex-direction: column; gap: 3px; height: 50px; padding: 6px 8px; font-size: 10px; justify-content: center; min-width: 58px; }
     .item.on { background: transparent; }

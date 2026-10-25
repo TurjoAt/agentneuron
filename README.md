@@ -1,6 +1,6 @@
 # AgentNeuron
 
-**AgentNeuron is an open-source, local control center for AI coding-agent context files.** It scans, lints and live-monitors `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, GitHub Copilot instructions, Windsurf rules, skills, subagents and MCP configs, and shows them in a web dashboard, a CLI and an MCP server.
+**AgentNeuron is an open-source, local control center for AI coding-agent context files.** It shows what Claude Code, Codex and other agents are editing in real time, checks that `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, Copilot instructions, Windsurf rules, skills and MCP configs are still true and safe, learns rules from your agent sessions, and keeps every tool's rules in sync, in a web dashboard, a CLI and an MCP server.
 
 [![npm version](https://img.shields.io/npm/v/agentneuron)](https://www.npmjs.com/package/agentneuron)
 [![npm downloads](https://img.shields.io/npm/dm/agentneuron)](https://www.npmjs.com/package/agentneuron)
@@ -12,7 +12,7 @@
 npx agentneuron            # then open http://127.0.0.1:4747
 ```
 
-![AgentNeuron overview dashboard: health grade, context token budget, AI tools detected in the project and a live change feed](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/overview.png)
+![AgentNeuron overview dashboard: KPIs, the Neuron brain graph of context files, live agents, truth and safety summary and context health](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/overview.png)
 
 ## What is AgentNeuron?
 
@@ -29,6 +29,20 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - **Works across tools:** one view of 13 AI coding tools instead of one config format at a time.
 
 ## Features
+
+**Watch agents work, live**
+- [Live view](docs/live.md): every file Claude Code, Codex and other agents edit, as it happens, in one lane per agent, with diffs, "now editing" chips, a heat strip and collision warnings when two sessions touch the same file.
+- [Coordination](docs/coordination.md) over MCP: agents claim tasks and files (advisory locks) and leave handoff notes for the next session.
+
+**Check that context is true and safe**
+- [Truth check](docs/verify.md): finds instructions that are no longer true (commands, scripts, paths, versions, ports, env vars) against the real repo and suggests the fix.
+- [Security audit](docs/audit.md) of agent config: unpinned MCP servers, inline tokens, `Bash(*)`, bypass modes, risky hooks, with a 0 to 100 risk score.
+- [Context CI](docs/ci.md): `agentneuron ci` and a GitHub Action that annotate pull requests, with `--base` to report only new problems.
+
+**Learn from your sessions**
+- [Insights](docs/insights.md): corrections, reverted edits and repeatedly failing commands in Claude/Codex sessions become proposed rules you accept with one click.
+- Rule effectiveness: which rules agents follow, ignore or never need, and a "context diet" with token savings.
+- Replay: the exact context an agent had when it made a change. Cost by feature: agent tokens and cost per task or branch.
 
 **Monitor**
 - Live file watcher with a change feed, per-file version history and diffs.
@@ -56,7 +70,7 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - Git stage/commit/branch, package and script runner. Commands are spawned without a shell, stream live output and are written to an audit log.
 
 **Integrate**
-- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 11 read-only tools, so your AI agents can query the same data.
+- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 16 read-only tools, plus 4 opt-in coordination tools, so your AI agents can query the same data.
 - HTTP + Server-Sent Events [API](docs/http-api.md).
 - `agentneuron lint --json` for CI ([example workflow](examples/ci/)).
 - Slack/Discord-compatible webhooks for secrets, conflicts, health drops and job results.
@@ -66,6 +80,10 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 
 | | |
 |---|---|
+| ![Live view: Claude, Codex and Cursor sessions in swimlanes with streaming file edits, line counts, a heat strip of touched files and a collision warning](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/live.png) | ![Overview dashboard with KPIs, the animated Neuron brain orbit graph, live agents, truth and safety summary and context health](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/overview.png) |
+| **Live:** what each agent is editing right now | **Overview:** Neuron brain, live agents, health and tasks |
+| ![Truth check listing false commands and paths in CLAUDE.md with the evidence and a one-click fix](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/verify.png) | ![Insights: lessons mined from agent sessions as proposed rules with evidence quotes and confidence](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/insights.png) |
+| **Truth & safety:** instructions that are no longer true | **Insights:** rules learned from your sessions |
 | ![Link graph of CLAUDE.md, skills, subagents and docs grouped by role in AgentNeuron's neural layout](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/graph.png) | ![Tasks board built from Markdown checkboxes in TODO.md, with labels, due dates and links to the source line](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/tasks.png) |
 | **Graph:** how context files link to and import each other | **Tasks:** checkboxes and `TODO:` comments as a board, table, calendar or timeline |
 | ![Reports page with KPIs, activity over time, heatmap and top files by changes, links and tokens](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/reports.png) | ![Agents center with a matrix of AI coding tools against capabilities such as instructions, rules, MCP, hooks and skills](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/agents.png) |
@@ -139,7 +157,7 @@ Any other Markdown in the project (README, TODO, ROADMAP, ADRs, `docs/`) is trac
 
 ## Use it from your AI agent (MCP)
 
-`agentneuron mcp` is a read-only MCP server on stdio. Its tools: `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`, `report_export`. Full reference: [docs/mcp.md](docs/mcp.md).
+`agentneuron mcp` is a read-only MCP server on stdio. Its tools: `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`, `report_export`, `verify_context`, `audit_agent_config`, `suggest_rules`, `compile_preview`, `list_claims`, `get_handoffs`. With `--level state`, agents can also `claim_task`, `claim_files`, `release_files` and write a `handoff_note`. Full reference: [docs/mcp.md](docs/mcp.md).
 
 **Claude Code** (CLI, or `.mcp.json` at the project root):
 
@@ -196,8 +214,16 @@ Read [docs/permissions-and-security.md](docs/permissions-and-security.md) before
 | `agentneuron lint [--json] [dir]` | Print issues; exit 1 on errors |
 | `agentneuron status [dir]` | Files, tokens and health summary |
 | `agentneuron init [dir]` | Create `.agentneuron/` with config and a copy of the bundle |
+| `agentneuron verify [dir]` | Truth check: false commands, paths and versions in context files |
+| `agentneuron audit [dir]` | Security audit of MCP servers, permissions and hooks |
+| `agentneuron ci [dir]` | Lint + verify + audit for pull requests (GitHub annotations) |
+| `agentneuron lessons [dir]` | Rules to learn from your Claude/Codex sessions |
+| `agentneuron compile [dir]` | Compile `.agentneuron/rules/` into every tool's files |
+| `agentneuron generate [dir]` | Starter AGENTS.md/CLAUDE.md from the code, every line cited |
+| `agentneuron export [dir]` | Report as an AI context pack, JSON, Markdown, CSV or HTML |
+| `agentneuron doctor` / `update` | Check the setup / update to the latest release |
 
-Flags, exit codes and newer commands (`update`, `doctor`, `export`) are in the [CLI reference](docs/cli.md).
+Every flag and exit code is in the [CLI reference](docs/cli.md).
 
 ## FAQ
 
@@ -219,15 +245,19 @@ Not by default. It writes only inside `.agentneuron/`. Editing files and running
 
 ### How do I lint CLAUDE.md or AGENTS.md in CI?
 
-Run `npx agentneuron lint --json`. It exits with code 1 when any error-level issue is found. A GitHub Actions workflow is in [examples/ci](examples/ci/).
+Use the GitHub Action (`uses: TurjoAt/agentneuron@v0.4.0`) or run `npx agentneuron ci`. It runs lint, the truth check and the security audit, annotates the pull request, and with `--base` reports only problems the change introduced. See [docs/ci.md](docs/ci.md) and [examples/ci](examples/ci/).
 
 ### How do I keep CLAUDE.md, AGENTS.md and Cursor rules in sync?
 
-Open **Agents > Sync & drift**. It compares the root instruction files of each tool pairwise and labels each pair `identical`, `linked`, `similar`, `drifted` or `diverged`. With `edit` enabled you can copy one file into the others, or replace them with a short file that `@imports` a single source.
+Write each rule once in `.agentneuron/rules/` and run `agentneuron compile`: it generates CLAUDE.md, AGENTS.md, GEMINI.md, Cursor, Copilot and Windsurf rules, keeps your hand-written text, and `--check` fails CI when they are out of date ([docs/compiler.md](docs/compiler.md)). To compare existing files instead, open **Agents > Sync & drift**. It compares the root instruction files of each tool pairwise and labels each pair `identical`, `linked`, `similar`, `drifted` or `diverged`. With `edit` enabled you can copy one file into the others, or replace them with a short file that `@imports` a single source.
 
 ### Can my AI agent use AgentNeuron?
 
-Yes, through the read-only MCP server (`agentneuron mcp`). An agent can ask for the effective context of a folder, broken links, health issues, recent changes or open tasks.
+Yes, through the MCP server (`agentneuron mcp`). An agent can ask for the effective context of a folder, broken links, false instructions, open tasks or lessons from past sessions, and (with `--level state`) claim files and leave handoff notes for other agents.
+
+### Can I see what Claude Code or Codex is editing right now?
+
+Yes. Open **Live**: AgentNeuron tails the Claude Code and Codex session transcripts for the project and shows each edit as it happens, checked against the file watcher, with diffs and collision warnings. Prompts are shown to admins only. See [docs/live.md](docs/live.md).
 
 More answers: [docs/faq.md](docs/faq.md).
 

@@ -34,7 +34,7 @@ jobs:
       # Exits 1 if any issue has severity "error". Warnings and info do not fail the job.
       # Pin the version you tested; bump it deliberately.
       - name: Lint AI context
-        run: npx --yes agentneuron@0.3.0 lint --json . > agentneuron-report.json
+        run: npx --yes agentneuron@0.4.0 lint --json . > agentneuron-report.json
 
       # Runs even when the lint step failed, so reviewers can read the report.
       - name: Summarize

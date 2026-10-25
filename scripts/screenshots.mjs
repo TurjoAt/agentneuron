@@ -43,6 +43,11 @@ const SHOTS = [
   { name: 'tasks', hash: '#/tasks', theme: 'dark', settle: 1200 },
   { name: 'reports', hash: '#/reports', theme: 'dark', settle: 1500 },
   { name: 'agents', hash: '#/agents', theme: 'dark', settle: 1200 },
+  // views that need agent sessions use the built-in demo data (?mock=1): the example project has no transcripts
+  { name: 'live', query: '?mock=1', hash: '#/live', theme: 'dark', settle: 6000, motion: true },
+  { name: 'verify', query: '?mock=1', hash: '#/verify', theme: 'dark', settle: 1500 },
+  { name: 'insights', query: '?mock=1', hash: '#/insights', theme: 'dark', settle: 1500 },
+  { name: 'rules', query: '?mock=1', hash: '#/rules', theme: 'dark', settle: 1500 },
 ];
 
 async function loadPlaywright() {
@@ -155,7 +160,7 @@ async function main() {
         viewport: { width: 1440, height: 900 },
         deviceScaleFactor: 1,
         colorScheme: shot.theme,
-        reducedMotion: 'reduce',
+        reducedMotion: shot.motion ? 'no-preference' : 'reduce',
       });
       await context.addInitScript((t) => {
         try {
@@ -166,7 +171,7 @@ async function main() {
       }, shot.theme);
       const page = await context.newPage();
       // The UI keeps a Server-Sent Events stream open, so never wait for "networkidle".
-      await page.goto(`${server.url}/${shot.hash}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${server.url}/${shot.query || ''}${shot.hash}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('main, #app > *', { timeout: 15000 });
       if (shot.wait) await page.waitForSelector(shot.wait, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(shot.settle);

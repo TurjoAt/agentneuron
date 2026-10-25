@@ -40,7 +40,7 @@ runs:
         AN_BUDGET: ${{ inputs.budget }}
         AN_VERSION: ${{ inputs.version }}
         # bumped together with package.json at release (a test enforces it)
-        AN_PINNED: "0.3.0"
+        AN_PINNED: "0.4.0"
       run: |
         set -euo pipefail
         version="${AN_VERSION:-$AN_PINNED}"

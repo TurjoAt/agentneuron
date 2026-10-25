@@ -5,7 +5,7 @@ FROM node:20-alpine
 RUN apk add --no-cache git
 
 # Pin the version you have tested
-RUN npm install -g agentneuron@0.3.0 && npm cache clean --force
+RUN npm install -g agentneuron@0.4.0 && npm cache clean --force
 
 # Run as an unprivileged user; override with --user "$(id -u):$(id -g)" so files
 # in the mounted project keep your ownership.

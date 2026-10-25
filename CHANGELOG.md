@@ -4,7 +4,35 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
+From watching context to keeping it true. Includes everything prepared for 0.3.0 below, which was not published separately.
+
+### Added
+
+- **Live view** (`#/live`): files Claude Code, Codex and other agents edit in real time, from their session transcripts, confirmed by the file watcher. One lane per agent, streaming diffs, "now editing" chips, a heat strip, filters and collision warnings when two sessions touch the same file. New SSE events `agent.session`, `agent.edit`, `agent.command`, `agent.collision`; the Overview, Neuron brain and radar show agent activity in agent colours.
+- **Multi-agent coordination**: advisory file claims with TTL, task claims and handoff notes over HTTP and MCP (`claim_task`, `claim_files`, `release_files`, `handoff_note` at `--level state`; `list_claims`, `get_handoffs` read-only), shown on board cards and in Live.
+- **Truth check** (`agentneuron verify`, `/api/verify`, MCP `verify_context`, new lint rule `false-claim`): commands, scripts, paths, versions, competing libraries, env vars and ports claimed in context files, checked against package.json, lockfiles, Makefile, composer, pyproject and the file tree, with suggested fixes (apply at `edit` level).
+- **Security audit** (`agentneuron audit`, `/api/audit/config`, MCP `audit_agent_config`): unpinned or `@latest` MCP servers, plain-http servers, inline tokens, `Bash(*)` and bypass modes, Codex full access, risky hooks, world-writable files and secrets, with a 0 to 100 risk score.
+- **Context CI** (`agentneuron ci`) with GitHub annotations, a job summary, `--base` to report only new problems, and a composite GitHub Action (`uses: TurjoAt/agentneuron@v0.4.0`).
+- **Insights** (`#/insights`, `agentneuron lessons`, MCP `suggest_rules`): lessons from user corrections, reverted edits, repeatedly failing commands and repeated instructions, as proposed rules with evidence; rule effectiveness and a context diet; "why did the agent do that?" replay; cost by feature.
+- **Rules studio** (`#/rules`, `agentneuron compile`, `agentneuron rules import|list`, MCP `compile_preview`): write rules once in `.agentneuron/rules/` and compile them into CLAUDE.md, AGENTS.md, GEMINI.md, Cursor, Copilot and Windsurf files, keeping hand-written text, with `--check` for CI and merge-back of hand edits.
+- **Generate** (`agentneuron generate`): a starter AGENTS.md/CLAUDE.md from the code, every line cited.
+- `examples/drifted-project` for the truth check and audit.
+
+### Changed
+
+- The sidebar is grouped into Monitor, Context, Agents and Project. Keyboard shortcuts 1 to 9 follow the new order (Overview, Live, Graph, Files, Diff, Context, Health, Truth & safety, Rules studio).
+- Valued CLI flags no longer swallow a following `--flag`.
+
+### Security
+
+- File events show the attributed agent's prompt and session title to admins only; viewers get the tool and session id.
+- Live prompts and diffs follow `live.showPrompts`, `live.viewerPrompts` and `live.viewerDiffs` (prompts off for viewers and for non-loopback binds by default).
+
 ## [0.3.0] - 2026-10-25
+
+Not published separately; first released as part of 0.4.0.
 
 ### Added
 
@@ -101,8 +129,9 @@ Initial release, developed as `mdctl`: a live monitor for AI-context Markdown.
 - Agent session discovery and a concurrent-edit conflict radar.
 - Server-Sent Events live updates, text search, token authentication, `init` and `status` commands.
 
-[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...v0.3.0
+[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...v0.4.0
+[0.3.0]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...v0.4.0
 [0.2.1]: https://github.com/TurjoAt/agentneuron/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/TurjoAt/agentneuron/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/TurjoAt/agentneuron/releases/tag/v0.1.0

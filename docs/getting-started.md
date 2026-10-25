@@ -18,7 +18,7 @@ npx agentneuron ./my-project     # a specific directory
 The banner shows the URL, number of tracked files, and which action levels are enabled:
 
 ```
-  AgentNeuron 0.3.0  -  AI context control center
+  AgentNeuron 0.4.0  -  AI context control center
   project : /home/me/my-project
   files   : 42
   open    : http://127.0.0.1:4747/
