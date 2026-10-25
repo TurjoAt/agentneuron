@@ -15,6 +15,10 @@ import { maskSecretsInText } from '../health/secrets.js';
 import { scanAgentSetup } from '../agentcenter/setup.js';
 import { exportReport, rangeFromSpec } from '../reports/index.js';
 import { createJsonl, filterRange } from '../persist/jsonl.js';
+import { getBoard } from '../board/index.js';
+import { createClaims } from '../live/claims.js';
+import { createHandoffs } from '../live/handoffs.js';
+import { claimTask } from '../live/coord.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -40,6 +44,23 @@ const TOOLS = [
     inputSchema: obj({ range: { type: 'string', description: 'Relative range ending now, e.g. "24h", "7d", "30d" (default "7d")' }, format: { type: 'string', enum: ['ai', 'json'] },
       includeContent: { type: 'boolean', description: 'Append size-capped (~40k tokens) contents of the main context files' } }) },
 ];
+
+// ---- multi-agent coordination (claims are advisory; write tools need `agentneuron mcp --level state`) ----
+const WHO = { agent: { type: 'string', description: 'Your agent name (default: the MCP client name)' }, sessionId: { type: 'string', description: 'Your session id (default: this MCP server process)' } };
+const LIST = { type: 'array', items: { type: 'string' } };
+TOOLS.push(
+  { name: 'claim_task', description: 'Claim a board task: assigns it to you, moves it to In progress and claims its files. Check list_claims first.',
+    inputSchema: obj({ id: { type: 'string', description: 'Task id from get_board / the Tasks view' }, ttlMinutes: { type: 'number' }, ...WHO }, ['id']) },
+  { name: 'claim_files', description: 'Advisory lock on project paths or globs (TTL, default 15 min, max 240). Returns conflicts held by other sessions; conflicting paths are not granted unless force.',
+    inputSchema: obj({ paths: LIST, ttlMinutes: { type: 'number' }, note: { type: 'string' }, force: { type: 'boolean' }, ...WHO }, ['paths']) },
+  { name: 'release_files', description: 'Release your claims (all, the given paths, or one claim id).', inputSchema: obj({ paths: LIST, id: { type: 'string' }, ...WHO }) },
+  { name: 'list_claims', description: 'Active file claims of every agent session, optionally only those covering one path.', inputSchema: obj({ path: { type: 'string' } }) },
+  { name: 'handoff_note', description: 'Write an end-of-session handoff: what is done, what is next, blockers. Shown on the board and in the Live view.',
+    inputSchema: obj({ summary: { type: 'string' }, done: LIST, next: LIST, blockers: LIST, taskId: { type: 'string' }, files: LIST, ...WHO }) },
+  { name: 'get_handoffs', description: 'Recent handoff notes (newest first), filtered by task, session or agent.',
+    inputSchema: obj({ taskId: { type: 'string' }, sessionId: { type: 'string' }, agent: { type: 'string' }, limit: { type: 'number' } }) },
+);
+const TOOL_LEVEL = { claim_task: 'state', claim_files: 'state', release_files: 'state', handoff_note: 'state' };
 
 function parseSince(v) {
   if (v == null || v === '') return Date.now() - 24 * 3600 * 1000;
@@ -117,7 +138,28 @@ export async function runMcpServer(root, config = {}, io = {}) {
     },
   };
 
+  // MCP level: `read` (default) or `state` (claims / handoffs / claim_task write .agentneuron/ and the board overlay)
+  const level = (io.level ?? config?.mcpLevel ?? cfg.mcp?.level) === 'state' ? 'state' : 'read';
+  const canMcp = (l) => l === 'read' || (l === 'state' && level === 'state');
+  let clientName = 'agent';
+  const claims = createClaims(absRoot);
+  const handoffs = createHandoffs(absRoot);
+  const boardCtx = { root: absRoot, config: cfg, store, can: (l) => canMcp(l), broadcast: () => {} };
+  const who = (a) => ({ agent: typeof a.agent === 'string' && a.agent ? a.agent : clientName, sessionId: typeof a.sessionId === 'string' && a.sessionId ? a.sessionId : `pid${process.pid}` });
+  const ttl = (m) => (Number(m) > 0 ? Number(m) * 60000 : undefined);
+
   const tools = {
+    claim_task(a = {}) { return claimTask(getBoard(boardCtx), claims, { ...who(a), id: a.id, ttlMs: ttl(a.ttlMinutes) }, 'admin'); },
+    claim_files(a = {}) { return claims.claim({ ...who(a), paths: a.paths, ttlMs: ttl(a.ttlMinutes), note: a.note, force: a.force === true }); },
+    release_files(a = {}) { return claims.release({ ...who(a), paths: a.paths, id: a.id }); },
+    list_claims({ path: p } = {}) {
+      if (p === undefined || p === '') return { claims: claims.list() };
+      const rel = safeRel(p);
+      if (!rel) throw new Error('invalid path');
+      return { path: rel, claims: claims.holders(rel) };
+    },
+    handoff_note(a = {}) { return { handoff: handoffs.add({ ...who(a), taskId: a.taskId, summary: a.summary, done: a.done, next: a.next, blockers: a.blockers, files: a.files }) }; },
+    get_handoffs(a = {}) { return { handoffs: handoffs.list(a) }; },
     list_files({ tool, kind } = {}) {
       return [...store.files.values()].filter((f) => (!tool || f.tool === tool) && (!kind || f.kind === kind)).slice(0, 5000)
         .map((f) => ({ path: f.path, tool: f.tool, kind: f.kind, size: f.size, tokens: f.tokens, lines: f.lines, mtime: f.mtime, title: maskSecretsInText(f.title) }));
@@ -214,18 +256,21 @@ export async function runMcpServer(root, config = {}, io = {}) {
     switch (msg.method) {
       case 'initialize': {
         const want = params.protocolVersion;
+        if (typeof params.clientInfo?.name === 'string' && params.clientInfo.name.trim()) clientName = params.clientInfo.name.trim().slice(0, 40);
         return rpcResult(msg.id, {
           protocolVersion: SUPPORTED.has(want) ? want : PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: 'agentneuron', version: VERSION },
-          instructions: 'agentneuron exposes the AI-context markdown of this project (CLAUDE.md, AGENTS.md, rules, skills, docs). Read-only.',
+          instructions: 'agentneuron exposes the AI-context markdown of this project (CLAUDE.md, AGENTS.md, rules, skills, docs).' +
+            (level === 'state' ? ' Coordination: before editing shared files call list_claims / claim_files, claim_task to take a board task, release_files and handoff_note when you finish.' : ' Read-only.'),
         });
       }
       case 'ping': return isNote ? null : rpcResult(msg.id, {});
-      case 'tools/list': return rpcResult(msg.id, { tools: TOOLS });
+      case 'tools/list': return rpcResult(msg.id, { tools: TOOLS.filter((t) => canMcp(TOOL_LEVEL[t.name] || 'read')) });
       case 'tools/call': {
         const fn = typeof params.name === 'string' && Object.hasOwn(tools, params.name) ? tools[params.name] : null;
         if (!fn) return rpcError(msg.id, -32602, `Unknown tool: ${String(params.name).slice(0, 100)}`);
+        if (!canMcp(TOOL_LEVEL[params.name] || 'read')) return rpcResult(msg.id, { content: [{ type: 'text', text: `${params.name} writes coordination state: start the server with \`agentneuron mcp --level state\` (or "mcp": {"level": "state"} in .agentneuron/config.json)` }], isError: true });
         try {
           const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments) ? params.arguments : {};
           const data = await fn(args);

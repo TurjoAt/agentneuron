@@ -60,9 +60,11 @@ Start the server for one project and print the URL. Read-only unless levels are 
   workspace: `Usage: agentneuron workspace [dir] [start options]
 
 Start the server in workspace mode: dir is a folder holding several projects.`,
-  mcp: `Usage: agentneuron mcp [dir]
+  mcp: `Usage: agentneuron mcp [dir] [--level state]
 
-Run the read-only MCP server on stdio (newline-delimited JSON-RPC). stdout carries only protocol messages.`,
+Run the MCP server on stdio (newline-delimited JSON-RPC). stdout carries only protocol messages.
+Read-only by default; --level state adds the coordination tools that write .agentneuron/
+(claim_task, claim_files, release_files, handoff_note).`,
   lint: `Usage: agentneuron lint [dir] [--json]
 
 Print every issue. Exit code 1 if any issue has severity "error".`,
@@ -98,7 +100,7 @@ Asks before replacing anything unless --yes. agentneuron never checks for update
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -181,7 +183,9 @@ function cmdInit(root) {
 
 async function cmdMcp(root, flags) {
   const { runMcpServer } = await import('./mcp/server.js');
-  const config = loadConfig(root, {});
+  const lv = flags.level === undefined ? undefined : String(flags.level);
+  if (lv !== undefined && lv !== 'read' && lv !== 'state') { console.error('agentneuron: --level must be "read" or "state"'); return 2; }
+  const config = loadConfig(root, lv ? { mcpLevel: lv } : {});
   await runMcpServer(root, config);
   return 0;
 }

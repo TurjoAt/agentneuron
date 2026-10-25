@@ -123,10 +123,12 @@ export async function startServer(config) {
 
   function warn(what, e) { if (process.env.AGENTNEURON_DEBUG) console.error(`[agentneuron] ${what}:`, e); }
 
-  function broadcast(name, data) {
+  /** allow(role): optional per-client filter (live prompts / diffs are role-gated). */
+  function broadcast(name, data, allow) {
     const msg = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const res of clients) {
       if (name === 'joblog' && res.agentRole !== 'admin') continue; // command output is admin-only
+      if (allow && !allow(res.agentRole)) continue;
       try { res.write(msg); } catch { clients.delete(res); } }
   }
 
@@ -353,9 +355,12 @@ export async function startServer(config) {
     if (!['edit', 'exec', 'danger', 'terminal'].includes(level)) return false;
     return !!(config.actions && config.actions[level]);
   };
+  const closers = []; // shutdown hooks registered by route modules (watchers, timers)
+  const runClosers = () => { for (const fn of closers.splice(0)) { try { fn(); } catch {} } };
   const ctx = {
     root, config, store, git, sessions, radar, startedAt,
     analysis, repoInfo, allFiles, broadcast, warn,
+    onClose: (fn) => closers.push(fn),
     invalidate: scheduleRecompute,
     /** read: always; state: admin; edit/exec/danger/terminal: admin AND config.actions[level]. */
     can: canLevel,
@@ -591,6 +596,7 @@ export async function startServer(config) {
   } catch (e) { // e.g. EADDRINUSE: release the watcher, timers and jobs so the process can exit
     clearInterval(ping); clearTimeout(recomputeTimer);
     try { ctx.actions.cancelAll(); ctx.persist.stop(); } catch {}
+    runClosers();
     try { await watcher.close(); } catch {}
     throw e;
   }
@@ -607,6 +613,7 @@ export async function startServer(config) {
     clearInterval(ping); clearTimeout(recomputeTimer);
     try { ctx.actions.cancelAll(); ctx.persist.stop(); } catch {}
     try { ctx.workspace?.cleanup?.(); } catch {}
+    runClosers();
     for (const res of clients) { try { res.end(); } catch {} }
     clients.clear();
     try { await watcher.close(); } catch {}
