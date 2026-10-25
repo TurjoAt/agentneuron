@@ -26,6 +26,7 @@
     'duplicate-rule': { label: 'Duplicate rules', icon: 'copy', desc: 'Same rule repeated across tools — drift risk.' },
     'stale-plan': { label: 'Stale plans', icon: 'clock', desc: 'Plans / TODOs untouched for 30+ days.' },
     'empty-file': { label: 'Empty files', icon: 'file', desc: 'Tracked files with no content.' },
+    'false-claim': { label: 'False claims', icon: 'flag', desc: 'Commands, versions or env vars in context files that do not match the repo (Truth & safety).' },
   };
   const SEV_ICON = { error: 'error', warn: 'alert', info: 'info' };
 

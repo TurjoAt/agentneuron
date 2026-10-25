@@ -17,6 +17,7 @@
   import ToolCard from './overview/ToolCard.svelte';
   import ActionBtn from './overview/ActionBtn.svelte';
   import NeuronBrain from './overview/NeuronBrain.svelte';
+  import TruthTeaser from './overview/TruthTeaser.svelte';
 
   let { params: _params } = $props();
 
@@ -170,6 +171,7 @@
     </div>
 
     <div class="side stagger">
+      <TruthTeaser />
       <section class="card">
         <div class="card-h">Context health <span class="sub">lint + secret scan</span></div>
         <div class="hb">
