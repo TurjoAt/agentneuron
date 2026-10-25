@@ -164,7 +164,8 @@ export function createFileOps(ctx) {
     if (!isDir && !st.isFile()) throw new FileError(400, 'unsupported file type');
     if (isDir && t.rel.startsWith(f.rel + '/')) throw new FileError(400, 'cannot move a directory into itself');
     if (!isDir) { assertWritable(f.rel); assertWritable(t.rel); } // the destination must be a tracked file type too
-    try { fs.lstatSync(t.abs); throw new FileError(409, 'destination already exists'); } catch (e) { if (e instanceof FileError) throw e; }
+    const caseOnly = isCaseAlias(f.abs, t.abs, st);
+    if (!caseOnly) try { fs.lstatSync(t.abs); throw new FileError(409, 'destination already exists'); } catch (e) { if (e instanceof FileError) throw e; }
 
     const moves = new Map();
     if (isDir) {
@@ -196,7 +197,11 @@ export function createFileOps(ctx) {
 
     const trackedMoved = [...moves.keys()].filter((p) => files().has(p));
     fs.mkdirSync(path.dirname(t.abs), { recursive: true });
-    fs.renameSync(f.abs, t.abs);
+    if (caseOnly) { // case-insensitive FS: go through a temporary name so the new casing sticks
+      const tmp = path.join(path.dirname(f.abs), `.${path.basename(f.abs)}.${crypto.randomBytes(4).toString('hex')}.rename`);
+      fs.renameSync(f.abs, tmp);
+      try { fs.renameSync(tmp, t.abs); } catch (e) { try { fs.renameSync(tmp, f.abs); } catch { /* ignore */ } throw e; }
+    } else fs.renameSync(f.abs, t.abs);
     for (const p of pending) {
       try { store.history.record(p.newPath, p.before); } catch { /* ignore */ }
       atomicWrite(resolveSafe(root, p.newPath).abs, p.content);
@@ -373,6 +378,19 @@ export function createFileOps(ctx) {
     readRaw, save, create, rename, remove, listTrash, restore, purge, replace, resolveLink, backlinks,
     writeTracked, readFresh, assertEditable, assertWritable,
   };
+}
+
+/**
+ * True when `to` differs from `from` only by case and resolves to the very same directory entry
+ * (a case-insensitive FS: Windows, macOS). Hard links that happen to differ by case are two entries
+ * (readdir lists the target name) and stay a 409.
+ */
+export function isCaseAlias(from, to, fromStat = fs.lstatSync(from)) {
+  if (from === to || path.dirname(from) !== path.dirname(to) || from.toLowerCase() !== to.toLowerCase()) return false;
+  let ts;
+  try { ts = fs.lstatSync(to); } catch { return false; }
+  if (ts.ino !== fromStat.ino || ts.dev !== fromStat.dev) return false;
+  try { return !fs.readdirSync(path.dirname(to)).includes(path.basename(to)); } catch { return false; }
 }
 
 function expandRep(rep, a) {

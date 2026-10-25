@@ -218,3 +218,67 @@ test('links resolve, backlinks, bookmarks, annotations re-anchor', async () => {
   assert.equal((await api('POST', '/api/annotations', { path: 'README.md', line: 99, text: 'x' })).status, 400);
   void ctx;
 });
+
+test('case-only rename: plain rename on case-sensitive FS, two-step on case-insensitive, 409 for real targets', async () => {
+  // case-sensitive (Linux): an ordinary rename, links rewritten
+  const r = tmp();
+  put(r, 'README.md', 'see [n](notes.md)\n');
+  put(r, 'notes.md', 'n\n');
+  const { ctx, api } = await makeApi(r);
+  const res = await api('POST', '/api/file/rename', { from: 'notes.md', to: 'Notes.md' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.ok(fs.readdirSync(r).includes('Notes.md') && !fs.readdirSync(r).includes('notes.md'));
+  assert.equal(read(r, 'README.md'), 'see [n](Notes.md)\n');
+  assert.ok(ctx.store.files.has('Notes.md') && !ctx.store.files.has('notes.md'));
+
+  // simulated case-insensitive FS: lstat of a missing name falls back to a case-insensitive match
+  const r2 = tmp();
+  put(r2, 'README.md', 'see [n](notes.md)\n');
+  put(r2, 'notes.md', 'n\n');
+  put(r2, 'other.md', 'o\n');
+  const m = await makeApi(r2);
+  const { lstatSync, renameSync } = fs;
+  const renames = [];
+  fs.lstatSync = function (p, ...rest) {
+    try { return lstatSync.call(this, p, ...rest); } catch (e) {
+      const hit = (() => { try { return fs.readdirSync(path.dirname(p)).find((n) => n.toLowerCase() === path.basename(p).toLowerCase()); } catch { return null; } })();
+      if (!hit) throw e;
+      return lstatSync.call(this, path.join(path.dirname(p), hit), ...rest);
+    }
+  };
+  fs.renameSync = function (a, b) { renames.push([path.basename(a), path.basename(b)]); return renameSync.call(this, a, b); };
+  try {
+    assert.equal((await m.api('POST', '/api/file/rename', { from: 'notes.md', to: 'other.md' })).status, 409);
+    assert.equal((await m.api('POST', '/api/file/rename', { from: 'notes.md', to: 'OTHER.md' })).status, 409); // case alias of a different file
+    const ok = await m.api('POST', '/api/file/rename', { from: 'notes.md', to: 'Notes.md' });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  } finally { fs.lstatSync = lstatSync; fs.renameSync = renameSync; }
+  const moves = renames.filter(([a, b]) => !b.endsWith('.tmp') && !a.endsWith('.tmp'));
+  assert.equal(moves.length, 2); // via a temporary name
+  assert.match(moves[0][1], /^\.notes\.md\.[0-9a-f]+\.rename$/);
+  assert.deepEqual([moves[0][0], moves[1][1]], ['notes.md', 'Notes.md']);
+  assert.ok(fs.readdirSync(r2).includes('Notes.md') && !fs.readdirSync(r2).some((n) => n.endsWith('.rename')));
+  assert.equal(read(r2, 'README.md'), 'see [n](Notes.md)\n');
+  assert.ok(m.ctx.store.files.has('Notes.md') && !m.ctx.store.files.has('notes.md'));
+
+  // two entries that differ only by case (hard links on a case-sensitive FS) are distinct: 409
+  const r3 = tmp();
+  put(r3, 'a.md', 'x\n');
+  if (!fs.existsSync(path.join(r3, 'A.MD'))) { // only possible on a case-sensitive FS
+    fs.linkSync(path.join(r3, 'a.md'), path.join(r3, 'A.md'));
+    const m3 = await makeApi(r3);
+    assert.equal((await m3.api('POST', '/api/file/rename', { from: 'a.md', to: 'A.md' })).status, 409);
+  }
+});
+
+test('isCaseAlias: only a same-dir, same-entry, case-only difference', async () => {
+  const { isCaseAlias } = await import('../src/files/ops.js');
+  const r = tmp();
+  put(r, 'docs/a.md', 'x');
+  const a = path.join(r, 'docs', 'a.md');
+  assert.equal(isCaseAlias(a, a), false);
+  assert.equal(isCaseAlias(a, path.join(r, 'docs', 'b.md')), false);
+  assert.equal(isCaseAlias(a, path.join(r, 'DOCS', 'A.md')), false); // parent dir differs
+  // on a case-sensitive FS the other casing doesn't exist; on a case-insensitive one it is the same entry
+  assert.equal(isCaseAlias(a, path.join(r, 'docs', 'A.md')), fs.existsSync(path.join(r, 'docs', 'A.md')));
+});

@@ -4,6 +4,9 @@
   // kind tier (context/rules → agents/skills → docs → tasks), coloured by tool.
   // Rings drift slowly; a file that changes on disk fires a signal from the
   // core and pulses. Hover for details, click to open the file.
+  // Keyboard: a visually hidden list of node buttons (same order as the rings)
+  // mirrors the canvas — Tab in, arrows move, Enter opens; the focused node is
+  // highlighted with a ring drawn on the canvas.
   //
   // Performance: one canvas, one rAF loop capped at ~30fps that only runs while
   // the card is on screen, the tab is visible and reduced motion is off. With
@@ -50,6 +53,8 @@
     return { nodes, edges, rings, total: model.nodes.filter((n) => !n.missing).length, links: model.edges.length };
   });
 
+  const order = $derived(picked ? picked.rings.flatMap((r) => r.nodes) : []);
+
   const toolsPresent = $derived.by(() => {
     const m = new Map();
     for (const n of picked?.nodes || []) m.set(n.tool, (m.get(n.tool) || 0) + 1);
@@ -74,9 +79,14 @@
   let pulses = {};
   let coreFlash = 0;
   let hovered = null;
+  let kbd = null; // keyboard-focused node id
   let pendingStatic = 0;
 
   let tip = $state(null); // { n, x, y }
+  let list = $state();
+  let focusIdx = $state(0); // roving tabindex: the list is one tab stop
+  const hot = () => hovered || kbd;
+  const tipAt = (p) => ({ n: p.n, x: Math.min(W - 230, Math.max(8, p.x + 12)), y: p.y > H - 90 ? p.y - 80 : p.y + 12 });
 
   function readTheme() {
     const cs = getComputedStyle(document.documentElement);
@@ -176,7 +186,7 @@
     g.setLineDash([]);
 
     const byId = new Map(pts.map((p) => [p.n.id, p]));
-    const hov = hovered;
+    const hov = hot();
     const hovNbrs = hov ? new Set((picked?.edges || []).filter((e) => e.source.id === hov || e.target.id === hov).flatMap((e) => [e.source.id, e.target.id])) : null;
 
     // links (curved through the core's pull)
@@ -280,6 +290,16 @@
         g.lineWidth = 1;
         g.stroke();
       }
+      if (kbd === p.n.id) {
+        // keyboard focus ring
+        g.strokeStyle = c.accent;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.arc(p.x, p.y, p.r * 1.45 + 4, 0, Math.PI * 2);
+        g.stroke();
+        const t = hovered ? null : tipAt(p);
+        if (t && (!tip || tip.n.id !== t.n.id || Math.abs(tip.x - t.x) + Math.abs(tip.y - t.y) > 1)) tip = t;
+      }
     }
   }
 
@@ -297,12 +317,12 @@
     if (!shouldRun()) return;
     raf = requestAnimationFrame(frame);
     // ~30fps while something is happening (hover, fresh pulse), ~15fps for the idle drift
-    const busy = hovered || Date.now() - coreFlash < PULSE_MS;
+    const busy = hot() || Date.now() - coreFlash < PULSE_MS;
     if (t - lastFrame < (busy ? FRAME_MS : FRAME_MS * 2)) return;
     const dt = lastT ? Math.min(0.1, (t - lastT) / 1000) : 0;
     lastT = t;
     lastFrame = t;
-    speed += ((hovered ? 0.2 : 1) - speed) * 0.08;
+    speed += ((kbd ? 0 : hovered ? 0.2 : 1) - speed) * 0.08; // a keyboard-focused node holds still
     phase += dt * speed;
     draw(t);
   }
@@ -378,12 +398,13 @@
         canvas.style.cursor = id ? 'pointer' : 'default';
         if (!raf) draw();
       }
-      tip = p ? { n: p.n, x: Math.min(W - 230, Math.max(8, p.x + 12)), y: p.y > H - 90 ? p.y - 80 : p.y + 12 } : null;
+      if (p) tip = tipAt(p);
+      else if (!kbd) tip = null;
     };
     const leave = () => {
       hovered = null;
       tip = null;
-      if (!raf) draw();
+      draw(); // re-shows the keyboard tip, if any
     };
     const click = (e) => {
       const p = hit(e.offsetX, e.offsetY);
@@ -404,6 +425,26 @@
     };
   });
 
+  function focusNode(i) {
+    focusIdx = i;
+    kbd = order[i]?.id || null;
+    tip = null;
+    draw();
+  }
+  function blurNode() {
+    kbd = null;
+    if (!hovered) tip = null;
+    if (!raf) draw();
+  }
+  function onKey(e, i) {
+    const last = order.length - 1;
+    const j = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: last }[e.key];
+    if (e.key === 'Escape') e.currentTarget.blur();
+    else if (j !== undefined) list?.querySelectorAll('button')[j > last ? 0 : j < 0 ? last : j]?.focus();
+    else return;
+    e.preventDefault();
+  }
+
   const summary = $derived(
     picked ? `Context graph glimpse: ${picked.nodes.length} of ${picked.total} files on ${picked.rings.length} orbits, ${picked.edges.length} links. Open the graph view for the full map.` : 'Context graph loading'
   );
@@ -420,6 +461,22 @@
   </div>
   <div class="stage" bind:this={wrap} style="height:{height}px">
     <canvas bind:this={canvas} aria-label={summary}></canvas>
+    {#if order.length}
+      <ul class="sr-only" bind:this={list} aria-label="Neuron brain files (arrow keys to move, Enter to open)">
+        {#each order as n, i (n.id)}
+          <li>
+            <button
+              type="button"
+              tabindex={i === Math.min(focusIdx, order.length - 1) ? 0 : -1}
+              onfocus={() => focusNode(i)}
+              onblur={blurNode}
+              onkeydown={(e) => onKey(e, i)}
+              onclick={() => openFile(n.id, { drawer: true })}
+            >{n.id} — {TOOLS[n.tool]?.label || n.tool}, {KINDS[n.kind] || n.kind}, {n.degree} links</button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
     {#if graph.error && !graph.data}
       <div class="over faint small"><Icon name="alert" size={15} /> Could not load the graph: {graph.error.message}</div>
     {:else if !graph.data}
@@ -441,7 +498,7 @@
         <span class="lg"><span class="sw" style="background:{toolColor(t, app.theme)}"></span>{TOOLS[t].label} <span class="faint tnum">{n}</span></span>
       {/each}
       <span class="spacer"></span>
-      <span class="faint tiny">hover a neuron · click to open</span>
+      <span class="faint tiny">hover or tab to a neuron · click or Enter to open</span>
     </div>
   {/if}
 </section>

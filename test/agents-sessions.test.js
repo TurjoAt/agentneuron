@@ -149,3 +149,77 @@ test('codex sessions best-effort', async () => {
   assert.equal(ref.tool, 'codex');
   assert.equal(ref.lastPrompt, 'update agents file');
 });
+
+const jl = (L) => L.map((x) => JSON.stringify(x)).join('\n') + '\n';
+const patchLine = (ts, file) => ({ timestamp: iso(ts), type: 'response_item', payload: { type: 'function_call', name: 'apply_patch', arguments: JSON.stringify({ input: `*** Begin Patch\n*** Update File: ${file}\n@@\n-a\n+b\n*** End Patch` }) } });
+
+test('codex: patch paths resolve against the session cwd (turn_context too), not the project root', async () => {
+  const { root, home } = setup();
+  const d = path.join(home, '.codex', 'sessions', '2026', '10', '23');
+  fs.mkdirSync(d, { recursive: true });
+  fs.mkdirSync(path.join(root, 'pkg', 'web'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'rollout-a.jsonl'), jl([
+    { timestamp: iso(T0), type: 'session_meta', payload: { id: 'cxa', cwd: path.join(root, 'pkg') } },
+    { timestamp: iso(T0 + 1000), type: 'event_msg', payload: { type: 'user_message', message: 'edit agents' } },
+    patchLine(T0 + 2000, 'AGENTS.md'),
+    { timestamp: iso(T0 + 3000), type: 'turn_context', payload: { cwd: path.join(root, 'pkg', 'web') } },
+    patchLine(T0 + 4000, 'README.md'),
+    patchLine(T0 + 5000, root.split(path.sep).join('/') + '/abs.md'), // the patch regex stops at backslashes
+  ]));
+  const s = createSessions(root, { home });
+  const [l] = await s.list();
+  assert.deepEqual(l.filesTouched.sort(), ['abs.md', 'pkg/AGENTS.md', 'pkg/web/README.md']);
+  assert.equal((await s.attribute('pkg/AGENTS.md', T0 + 2500)).sessionId, 'cxa');
+  assert.equal(await s.attribute('AGENTS.md', T0 + 2500), null);
+  assert.deepEqual(s.fileOf('cxa'), { file: path.join(d, 'rollout-a.jsonl'), tool: 'codex' });
+});
+
+test('size cap: only the tail of a huge transcript is parsed; cwd kept from the head; offsets stay incremental', async () => {
+  const { root, home } = setup();
+  const d = path.join(home, '.codex', 'sessions', '2026', '10', '23');
+  fs.mkdirSync(d, { recursive: true });
+  const f = path.join(d, 'rollout-big.jsonl');
+  const filler = Array.from({ length: 200 }, (_, i) => ({ timestamp: iso(T0 + 3000 + i), type: 'event_msg', payload: { type: 'agent_message', message: 'x'.repeat(200) } }));
+  fs.writeFileSync(f, jl([
+    { timestamp: iso(T0), type: 'session_meta', payload: { id: 'big', cwd: root } },
+    patchLine(T0 + 1000, 'head.md'),
+    ...filler,
+    patchLine(T0 + 9000, 'tail.md'),
+  ]));
+  assert.ok(fs.statSync(f).size > 20000);
+  const s = createSessions(root, { home, maxBytes: 8192 });
+  let [l] = await s.list();
+  assert.equal(l.sessionId, 'big'); // listed although session_meta was cut off: cwd read from the head
+  assert.deepEqual(l.filesTouched, ['tail.md']);
+  assert.ok(l.messages > 0 && l.messages < 200);
+  fs.appendFileSync(f, jl([patchLine(T0 + 10000, 'more.md')]));
+  [l] = await s.list();
+  assert.deepEqual(l.filesTouched.sort(), ['more.md', 'tail.md']);
+  // a backlog larger than the cap jumps ahead too (and skips the partial line)
+  fs.appendFileSync(f, jl([...filler, patchLine(T0 + 20000, 'late.md')]));
+  [l] = await s.list();
+  assert.deepEqual(l.filesTouched.sort(), ['late.md', 'more.md', 'tail.md']);
+});
+
+test('codex dir walk is cached; a new rollout is still picked up', async () => {
+  const { root, home } = setup();
+  const base = path.join(home, '.codex', 'sessions', '2026', '10');
+  const old = path.join(base, '22');
+  const today = path.join(base, '23');
+  fs.mkdirSync(old, { recursive: true });
+  fs.mkdirSync(today, { recursive: true });
+  const meta = (id) => ({ timestamp: iso(T0), type: 'session_meta', payload: { id, cwd: root } });
+  fs.writeFileSync(path.join(old, 'rollout-o.jsonl'), jl([meta('o'), patchLine(T0 + 1000, 'a.md')]));
+  const s = createSessions(root, { home });
+  assert.equal((await s.list()).length, 1);
+  const orig = fs.readdirSync;
+  const seen = [];
+  fs.readdirSync = function (p, ...rest) { seen.push(String(p)); return orig.call(this, p, ...rest); };
+  try {
+    assert.ok(await s.attribute('a.md', T0 + 1500));
+    assert.ok(await s.attribute('a.md', T0 + 1500));
+    assert.ok(!seen.includes(old), 'unchanged tree must not be re-walked per change');
+    fs.writeFileSync(path.join(today, 'rollout-n.jsonl'), jl([meta('n'), patchLine(T0 + 5000, 'b.md')]));
+    assert.equal((await s.attribute('b.md', T0 + 5500)).sessionId, 'n');
+  } finally { fs.readdirSync = orig; }
+});
