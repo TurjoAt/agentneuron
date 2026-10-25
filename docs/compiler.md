@@ -33,7 +33,7 @@ alwaysApply: false              # optional; Cursor alwaysApply / Windsurf model_
 
 The tool names are `claude`, `codex` (also accepted: `agents`), `gemini`, `cursor`, `copilot` and `windsurf`. Rules in shared files are ordered by `priority`, highest first, then by slug.
 
-The folder can be changed with `"compiler": { "rulesDir": "rules" }`. It must be a plain path inside the project, and neither it nor any folder above it may be a symlink. `.agentneuron/` is usually committed with the project. If yours is gitignored, add `!.agentneuron/rules/` or choose another `rulesDir`.
+The folder can be changed with `"compiler": { "rulesDir": "rules" }`. It must be a plain path inside the project, and neither it nor any folder above it may be a symlink. Commit `.agentneuron/rules/` with the project (history, trash and caches in `.agentneuron/` stay local). If you ignore the whole `.agentneuron/` folder, add `!.agentneuron/rules/` or choose another `rulesDir`. A `README.md` in the rules folder is ignored.
 
 ## Generated regions
 

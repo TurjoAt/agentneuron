@@ -193,6 +193,10 @@ test('cli: compile --check / --dry-run / rules import / generate', () => {
   r = run(['generate', root, '--tool', 'gemini', '--out']);
   assert.equal(r.status, 0, r.stderr);
   assert.match(read(root, 'GEMINI.md'), /^# cli-demo/);
+  r = run(['generate', root, '--out', '--force']); // a bare --out must not swallow the next flag
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(read(root, 'AGENTS.md'), /^# cli-demo/);
+  assert.ok(!fs.existsSync(path.join(root, '--force')));
   assert.match(run(['help', 'compile']).stdout, /--merge-back/);
 });
 

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tmp, put, read, makeCtx } from './files-util.js';
-import { planCompile, applyCompile, applyMergeBack, loadRules, parseRule, serializeRule } from '../src/compiler/index.js';
+import { planCompile, applyCompile, applyMergeBack, loadRules, parseRule, serializeRule, validSlug } from '../src/compiler/index.js';
+import { slugify } from '../src/compiler/safety.js';
 import { parseRegions, joinParts, block } from '../src/compiler/markers.js';
 import { parseFrontmatter } from '../src/agentcenter/frontmatter.js';
 
@@ -165,7 +166,6 @@ test('path safety: malicious names, globs, bodies and dirs never escape or injec
   const root = tmp();
   const bad = {
     'Evil Name.md': '---\ntitle: x\n---\nbody\n',
-    'con.md': '---\ntitle: x\n---\nbody\n',
     'trav.md': '---\ntitle: x\nscope: ../../etc/**\n---\nbody\n',
     'abs.md': '---\ntitle: x\nscope: /etc/**\n---\nbody\n',
     'drive.md': '---\ntitle: x\nscope: "C:/x/**"\n---\nbody\n',
@@ -179,7 +179,12 @@ test('path safety: malicious names, globs, bodies and dirs never escape or injec
   fs.mkdirSync(path.join(root, '.agentneuron/rules/sub.md'));
   const ctx = await makeCtx(root);
   const { rules, invalid } = loadRules(root, ctx.config);
-  assert.deepEqual(invalid.map((i) => i.slug).sort(), ['Evil Name', 'abs', 'comma', 'con', 'drive', 'inject', 'marker', 'quote', 'sub', 'trav']);
+  assert.deepEqual(invalid.map((i) => i.slug).sort(), ['Evil Name', 'abs', 'comma', 'drive', 'inject', 'marker', 'quote', 'sub', 'trav']);
+  // Windows device names can't even be created there: check the validators directly
+  assert.equal(validSlug('con'), false);
+  assert.equal(validSlug('nul'), false);
+  assert.equal(slugify('CON'), 'rule-con');
+  assert.equal(slugify('../../etc/passwd'), 'etc-passwd');
   const plan = planCompile(ctx);
   // only the valid rule compiles, into the root file (.git is never a nested target), title sanitised
   assert.deepEqual(plan.outputs.map((o) => o.path), ['CLAUDE.md']);
@@ -216,4 +221,19 @@ test('rules: parse defaults and serialize round-trip', () => {
   for (const k of ['title', 'tools', 'scope', 'priority', 'alwaysApply', 'body']) assert.deepEqual(back[k], r[k], k);
   assert.deepEqual(parseRule('y', 'just text').tools.length, 6);
   assert.match(parseRule('z', '---\ntools: [nope]\n---\nb').warnings.join(), /unknown tools/);
+});
+
+test('compile: a rule that becomes invalid keeps its compiled output until it is fixed; README.md is ignored', async () => {
+  const root = await project({ 'CLAUDE.md': 'Intro.\n' });
+  await compile(root);
+  const before = ['CLAUDE.md', '.cursor/rules/tests.mdc', '.github/instructions/tests.instructions.md'].map((p) => read(root, p));
+  put(root, '.agentneuron/rules/tests.md', RULES['tests.md'].replace('test/**', '../test/**'));
+  put(root, '.agentneuron/rules/README.md', '# How we write rules\n');
+  const { plan } = await compile(root);
+  assert.equal(plan.ok, false);
+  assert.deepEqual(plan.invalid.map((i) => i.slug), ['tests']);
+  assert.deepEqual(['CLAUDE.md', '.cursor/rules/tests.mdc', '.github/instructions/tests.instructions.md'].map((p) => read(root, p)), before);
+  assert.ok(plan.outputs.find((o) => o.path === 'CLAUDE.md').regions.some((r) => r.slug === 'tests' && r.status === 'invalid'));
+  put(root, '.agentneuron/rules/tests.md', RULES['tests.md']);
+  assert.equal((await fresh(root)).ok, true);
 });

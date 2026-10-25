@@ -74,7 +74,7 @@
           <div class="sec">
             <div class="h">{name}</div>
             {#each items as it, i (i)}
-              <div class="it"><span class="tx">{it.text}</span><span class="src mono" title="Source">{it.source}</span></div>
+              <div class="it"><span class="tx">{#each it.text.split('`') as part, j (j)}{#if j % 2}<code>{part}</code>{:else}{part}{/if}{/each}</span><span class="src mono" title="Source">{it.source}</span></div>
             {/each}
           </div>
         {/each}
@@ -94,5 +94,6 @@
   .h { font-weight: 650; font-size: 13px; margin-top: 4px; }
   .it { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 4px 8px; border-radius: 6px; font-size: 12.5px; }
   .it:hover { background: var(--panel-hover); }
+  .tx code { font-family: var(--mono); font-size: 0.92em; background: var(--inset); padding: 0 4px; border-radius: 4px; }
   .src { color: var(--text-3); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
 </style>

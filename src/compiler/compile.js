@@ -60,6 +60,7 @@ export function planCompile(ctx, { tools, force = false } = {}) {
   const sel = selectTools(tools);
   const { dir, rules, invalid } = loadRules(root, config);
   const usable = rules.filter((r) => !r.errors.length);
+  const broken = new Set(rules.filter((r) => r.errors.length).map((r) => sourceOf(r.slug))); // keep their regions until fixed
   const env = { root, config, windsurf: windsurfMode(root, config) };
   const desired = new Map(); // path -> { tool, kind, entries: Map(source -> {rule, content, fm}) }
   for (const rule of usable.sort(byPriority)) {
@@ -117,6 +118,7 @@ export function planCompile(ctx, { tools, force = false } = {}) {
       const e = want.entries.get(part.source);
       const edited = regionHash(want.kind, part.content, fileFm) !== part.hash;
       const slug = /^rules\/([a-z0-9-]+)\.md$/.exec(part.source)?.[1] || null;
+      if (!e && broken.has(part.source)) { out.regions.push({ source: part.source, slug, status: 'invalid' }); editedKept = true; continue; }
       if (!e) {
         out.regions.push({ source: part.source, slug, status: edited ? 'orphan-edited' : 'orphan' });
         if (edited && !force) { editedKept = true; out.conflicts.push(`${part.source} was deleted but its region here was edited by hand`); continue; }
@@ -157,7 +159,7 @@ export function planCompile(ctx, { tools, force = false } = {}) {
     out.action = 'update';
   }
   const mergeBack = mergeCandidates(outputs, rules);
-  const stale = outputs.filter((o) => o.action !== 'none').length;
+  const stale = outputs.filter((o) => o.action !== 'none' && o.action !== 'skip').length;
   const edited = outputs.flatMap((o) => o.regions.filter((r) => r.status === 'edited' || r.status === 'orphan-edited').map((r) => ({ path: o.path, ...r })));
   return {
     rulesDir: dir, tools: sel, windsurf: env.windsurf,

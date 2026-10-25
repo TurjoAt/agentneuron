@@ -129,7 +129,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
       let [k, v] = a.replace(/^-+/, '').split('=');
-      if (v === undefined && valued.has(k)) v = argv[++i];
+      if (v === undefined && valued.has(k) && i + 1 < argv.length && !argv[i + 1].startsWith('--')) v = argv[++i];
       o.flags[k] = v === undefined ? true : v;
     } else o._.push(a);
   }

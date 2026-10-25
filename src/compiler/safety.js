@@ -88,7 +88,7 @@ export function readRuleFiles(root, config) {
   let ents;
   try { ents = fs.readdirSync(abs, { withFileTypes: true }); } catch { return []; }
   const out = [];
-  for (const e of ents.filter((x) => /\.md$/i.test(x.name)).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+  for (const e of ents.filter((x) => /\.md$/i.test(x.name) && !/^readme\.md$/i.test(x.name)).sort((a, b) => (a.name < b.name ? -1 : 1))) {
     if (out.length >= MAX_RULES) break;
     const slug = e.name.replace(/\.md$/i, '');
     if (!e.isFile()) { out.push({ slug, name: e.name, error: 'not a regular file (symlinks are not followed)' }); continue; }

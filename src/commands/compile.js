@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHeadlessCtx } from '../core/headless.js';
+import { ensureAgentneuronDir } from '../core/config.js';
 import { planCompile, applyCompile, applyMergeBack, planImport, applyImport, generateContext, GEN_TARGETS, loadRules } from '../compiler/index.js';
 
 const ICON = { create: '+', update: '~', delete: '-', skip: '!', none: '=' };
@@ -41,6 +42,7 @@ export async function cmdCompile(root, flags, log = console) {
     return flags.check && !plan.ok ? 1 : 0;
   }
   if (!plan.rules.length && !plan.outputs.length) { log.error(`no source rules in ${plan.rulesDir}/ (create some, or run: agentneuron rules import)`); return flags.check ? 1 : 0; }
+  if (!flags.check && !flags['dry-run']) ensureAgentneuronDir(root); // writes keep history/trash in .agentneuron/ (gitignored)
   if (flags['merge-back']) {
     if (!plan.mergeBack.length) log.log('nothing to merge back');
     for (const m of plan.mergeBack) {
@@ -80,6 +82,7 @@ export async function cmdRules(root, sub, flags, log = console) {
   for (const r of plan.rules) log.log(`+ ${plan.dir}/${r.slug}.md  [${r.tools.join(', ')}]${r.scope.length ? ` scope ${r.scope.join(',')}` : ''}  from ${r.from.map((f) => `${f.path}:${f.line}`).join(', ')}`);
   for (const d of plan.duplicates) log.log(`= ${d.from.path}:${d.from.line} ${d.identical ? 'duplicates' : 'nearly duplicates'} ${d.into.path}:${d.into.line} (${d.title})`);
   if (flags['dry-run']) { log.log(`${plan.rules.length} rule(s) would be created (dry run)`); return 0; }
+  ensureAgentneuronDir(root);
   const r = applyImport(ctx, plan);
   for (const e of r.errors) log.error(`error ${e.slug}: ${e.error}`);
   log.log(`created ${r.created.length} rule(s) in ${r.dir}/. Next: review them, then agentneuron compile --dry-run`);
@@ -94,7 +97,7 @@ export async function cmdGenerate(root, flags, log = console) {
   const dest = flags.out === true ? path.join(root, g.path) : path.resolve(String(flags.out));
   if (fs.existsSync(dest) && !flags.force) { log.error(`agentneuron: ${dest} exists; pass --force to overwrite (or omit --out to print)`); return 1; }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, g.content);
+  fs.writeFileSync(dest, g.content, { flag: flags.force ? 'w' : 'wx' });
   log.error(`wrote ${dest} (${g.items.length} cited line(s))`);
   return 0;
 }
