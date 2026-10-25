@@ -3,7 +3,7 @@
   import { app, openFile, isPulsing, navigate } from '../lib/store.svelte.js';
   import { resource } from '../lib/resource.svelte.js';
   import { KINDS } from '../lib/tools.js';
-  import { TOOL_TOKEN_BUDGET, toolBudget } from '../lib/budget.js';
+  import { TOOL_TOKEN_BUDGET } from '../lib/budget.js';
   import { fmtNum, timeAgo, basename, dirname, toMs } from '../lib/format.js';
   import { openTask, newFile } from '../lib/fileActions.js';
   import HealthRing from '../lib/HealthRing.svelte';
@@ -15,6 +15,7 @@
   import Kpi from './overview/Kpi.svelte';
   import ToolCard from './overview/ToolCard.svelte';
   import ActionBtn from './overview/ActionBtn.svelte';
+  import NeuronBrain from './overview/NeuronBrain.svelte';
 
   let { params: _params } = $props();
 
@@ -169,7 +170,7 @@
     {:else}
       <div class="tgrid">
         {#each detected as t (t.id)}
-          <ToolCard tool={t} tokens={toolTokens(t)} budget={toolBudget(t.id, setup.data)} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
+          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_TOKEN_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
         {:else}
           <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
         {/each}
@@ -186,13 +187,16 @@
   </section>
 
   <div class="grid">
-    <section class="card activity">
-      <div class="card-h">
-        <span class="live-dot"></span> Live activity
-        <span class="sub">{app.events.length} events</span>
-      </div>
-      <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
-    </section>
+    <div class="side">
+      <NeuronBrain />
+      <section class="card activity">
+        <div class="card-h">
+          <span class="live-dot"></span> Live activity
+          <span class="sub">{app.events.length} events</span>
+        </div>
+        <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
+      </section>
+    </div>
 
     <div class="side">
       <section class="card">
@@ -315,7 +319,7 @@
   .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .activity { display: flex; flex-direction: column; }
-  .feed-wrap { overflow: auto; max-height: 640px; }
+  .feed-wrap { overflow: auto; max-height: 460px; }
   .hb { display: flex; align-items: center; gap: 20px; padding: 4px 18px 18px; flex-wrap: wrap; }
   .sev { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 2px; }
   .sev-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px; color: var(--text-2); font-size: 13px; text-decoration: none; }
