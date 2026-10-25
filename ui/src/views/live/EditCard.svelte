@@ -12,7 +12,7 @@
   const isCmd = $derived(item.cmd !== undefined);
   const op = $derived(OP[item.op] || OP.edit);
   const tracked = $derived(!isCmd && fileIndex().set.has(item.path));
-  const who = $derived(session?.title || (item.sessionId ? item.sessionId.slice(0, 8) : item.tool === 'human' ? 'no agent transcript' : ''));
+  const who = $derived(session?.title || session?.promptTitle || (item.sessionId ? item.sessionId.slice(0, 8) : item.tool === 'human' ? 'no agent transcript' : ''));
 
   function openIt(e) {
     e.stopPropagation();

@@ -143,7 +143,7 @@
           <span><button class="lnk mono" onclick={() => openPath(c.path)}>{c.path}</button> was edited by <ToolBadge tool={c.sessions?.[0]?.tool} compact /> {c.sessions?.[0]?.title || c.sessions?.[0]?.sessionId?.slice(0, 8)} while <b>{c.claim?.agent}</b> holds a claim on <code>{c.claim?.pattern}</code>.</span>
         {:else}
           <span><button class="lnk mono" onclick={() => openPath(c.path)}>{c.path}</button> is being edited by {c.sessions?.length || 2} sessions:
-            {#each c.sessions || [] as s, k (s.sessionId + k)}{#if k}<span class="faint"> & </span>{/if}<ToolBadge tool={s.tool} compact /> {s.title || s.sessionId?.slice(0, 8)}{/each}</span>
+            {#each c.sessions || [] as s, k (s.sessionId + k)}{#if k}<span class="faint"> & </span>{/if}<ToolBadge tool={s.tool} compact /> {s.title || s.promptTitle || s.sessionId?.slice(0, 8)}{/each}</span>
         {/if}
         <span class="spacer"></span><span class="faint tiny">{timeAgo(c.at || c.ts, app.now)}</span>
       </div>
@@ -158,7 +158,7 @@
       </div>
       <select class="input sm" bind:value={session} aria-label="Session">
         <option value="">All sessions</option>
-        {#each sessionOptions as s (skey(s))}<option value={skey(s)}>{s.tool} · {(s.title || s.sessionId).slice(0, 40)}</option>{/each}
+        {#each sessionOptions as s (skey(s))}<option value={skey(s)}>{s.tool} · {(s.title || s.promptTitle || s.sessionId).slice(0, 40)}</option>{/each}
       </select>
       <input class="input sm" placeholder="Filter by file…" bind:value={fileQ} aria-label="Filter by file" />
       {#if agent !== 'all' || session || fileQ}<button class="btn sm ghost" onclick={() => ((agent = 'all'), (session = ''), (fileQ = ''))}>Clear</button>{/if}

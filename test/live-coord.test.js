@@ -221,6 +221,7 @@ test('HTTP: /api/live snapshot + SSE agent.* events per role; claims/handoffs ro
     assert.ok(!got.viewer.some(([n]) => n === 'agent.prompt' || n === 'agent.thinking'), 'viewer gets no prompts');
     assert.ok(got.viewer.filter(([n]) => n === 'agent.edit').every(([, d]) => d.hunk.length === 0 && d.hunkHidden));
     assert.ok(got.viewer.filter(([n]) => n === 'agent.session').every(([, d]) => !('lastPrompt' in d)));
+    assert.ok(!JSON.stringify(got.viewer.filter(([n]) => n.startsWith('agent.'))).includes('rewrite the readme'), JSON.stringify(got.viewer.filter(([n, d]) => JSON.stringify(d).includes('rewrite the readme'))).slice(0, 600));
     assert.ok(got.admin.some(([n, d]) => n === 'agent.session' && d.state === 'start' && d.tool === 'claude'));
     // events of other kinds still arrive (backward compatible stream)
     await until(() => got.viewer.some(([n]) => n === 'event'));
@@ -231,6 +232,8 @@ test('HTTP: /api/live snapshot + SSE agent.* events per role; claims/handoffs ro
     assert.equal(snap.editing[0].path, 'CLAUDE.md');
     const vs = await (await fetch(url + '/api/live', { headers: V })).json();
     assert.equal(vs.sessions[0].lastPrompt, undefined); assert.equal(vs.notes.length, 0);
+    assert.ok(!JSON.stringify(vs).includes('rewrite the readme'), 'viewer snapshot carries no prompt text');
+    assert.equal(snap.sessions[0].promptTitle, 'rewrite the readme please');
 
     const post = (p, body, h) => fetch(url + p, { method: 'POST', headers: { 'content-type': 'application/json', ...h }, body: JSON.stringify(body) });
     assert.equal((await post('/api/live/claims', { paths: ['docs/**'] }, V)).status, 403);

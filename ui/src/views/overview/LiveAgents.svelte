@@ -22,7 +22,7 @@
       {@const e = editingOf(s)}
       <div class="srow">
         <span class="sd" class:idle={s.state === 'idle'} style="--c:var(--tool-{colorTool(s.tool)})"></span>
-        <span class="ellipsis grow small" title={s.title || s.sessionId}>{s.title || s.sessionId.slice(0, 8)}</span>
+        <span class="ellipsis grow small" title={s.title || s.promptTitle || s.sessionId}>{s.title || s.promptTitle || s.sessionId.slice(0, 8)}</span>
         {#if e && app.now - e.ts < 120000}<button class="lnk mono tiny ellipsis" onclick={() => open(e.path)} title={e.path}>{basename(e.path)}</button>{:else}<span class="faint tiny">{s.state}</span>{/if}
       </div>
     {:else}

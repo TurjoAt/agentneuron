@@ -46,7 +46,8 @@ export function liveAccess(config = {}) {
 }
 
 export const stripEdit = (e) => ({ ...e, hunk: [], hunkHidden: true });
-export const stripSession = ({ lastPrompt, lastThinking, ...s }) => s; // eslint-disable-line no-unused-vars
+/** Session without prompt text (prompt-derived title included); `title` is only ever a transcript summary. */
+export const stripSession = ({ lastPrompt, lastThinking, promptTitle, ...s }) => s; // eslint-disable-line no-unused-vars
 
 /** Snapshot as one role may see it. */
 export function snapshotFor(snap, role, access) {

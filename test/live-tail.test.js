@@ -71,7 +71,7 @@ test('Claude transcript: incremental tailing emits session/prompt/edit/command o
     live.discover(); live.poll();
     assert.deepEqual(s.events.map((e) => e.name).sort(), ['agent.prompt', 'agent.session']);
     const se = s.events.find((e) => e.name === 'agent.session');
-    assert.equal(se.data.state, 'start'); assert.equal(se.kind, 'session'); assert.equal(se.data.title, 'Please fix the parser');
+    assert.equal(se.data.state, 'start'); assert.equal(se.kind, 'session'); assert.equal(se.data.promptTitle, 'Please fix the parser'); assert.equal(se.data.title, null);
     assert.equal(s.events.find((e) => e.name === 'agent.prompt').kind, 'prompt');
     s.events.length = 0;
 

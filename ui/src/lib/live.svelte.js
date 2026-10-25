@@ -98,7 +98,7 @@ function flush() {
   for (const [name, d] of batch) {
     if (name === 'agent.session') {
       const prev = sessions.find((s) => skey(s) === skey(d));
-      sessions = upsert(sessions, prev && !('lastPrompt' in d) ? { ...d, lastPrompt: prev.lastPrompt, lastThinking: prev.lastThinking } : d, skey, 200);
+      sessions = upsert(sessions, prev && !('lastPrompt' in d) ? { ...d, lastPrompt: prev.lastPrompt, lastThinking: prev.lastThinking, promptTitle: prev.promptTitle } : d, skey, 200);
     } else if (name === 'agent.edit') {
       edits = upsert(edits, d, (x) => x.id, MAX.edits);
       editors ??= { ...live.editors };
@@ -163,3 +163,14 @@ export async function claimPaths(paths, opts = {}) {
 export async function releaseClaim(c) {
   return post('/api/live/release', { agent: c.agent, sessionId: c.sessionId, id: c.id });
 }
+
+// after an SSE reconnect, re-sync from the snapshot (missed edits, statuses that changed meanwhile)
+let wasLive = false;
+$effect.root(() => {
+  $effect(() => {
+    const c = app.conn;
+    if (c !== 'live') return;
+    if (wasLive && live.loaded) loadLive();
+    wasLive = true;
+  });
+});

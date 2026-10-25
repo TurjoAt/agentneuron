@@ -203,7 +203,7 @@ export function createLive({
     const key = skey(T.kind, T.st.sessionId);
     let S = sessions.get(key);
     if (!S) {
-      S = { tool: T.kind, sessionId: T.st.sessionId, title: T.st.title || null, model: T.st.model || null, cwd: relDir(T.st.cwd), state: 'start', startedAt: ts || now(), lastAt: ts || now(), edits: 0, commands: 0, lastPrompt: null, lastThinking: null };
+      S = { tool: T.kind, sessionId: T.st.sessionId, title: T.st.title || null, model: T.st.model || null, cwd: relDir(T.st.cwd), state: 'start', startedAt: ts || now(), lastAt: ts || now(), edits: 0, commands: 0, lastPrompt: null, lastThinking: null, promptTitle: null };
       sessions.set(key, S);
       if (sessions.size > 300) for (const [k, v] of sessions) if (v.state === 'end') { sessions.delete(k); if (sessions.size <= 200) break; }
       if (hist) S.state = now() - S.lastAt > idleMs ? 'idle' : 'active';
@@ -214,7 +214,7 @@ export function createLive({
     else if (!hist) S.lastAt = now();
     return S;
   }
-  const sessionView = (S) => ({ tool: S.tool, sessionId: S.sessionId, state: S.state, title: S.title, model: S.model, cwd: S.cwd, startedAt: S.startedAt, lastAt: S.lastAt, edits: S.edits, commands: S.commands, lastPrompt: S.lastPrompt, lastThinking: S.lastThinking });
+  const sessionView = (S) => ({ tool: S.tool, sessionId: S.sessionId, state: S.state, title: S.title, model: S.model, cwd: S.cwd, startedAt: S.startedAt, lastAt: S.lastAt, edits: S.edits, commands: S.commands, promptTitle: S.promptTitle, lastPrompt: S.lastPrompt, lastThinking: S.lastThinking });
   function emitSession(S) {
     emit('agent.session', { ...sessionView(S), ts: now() }, 'session');
   }
@@ -244,7 +244,7 @@ export function createLive({
         if (!hist) emit('agent.command', rec);
       } else if (it.kind === 'result') onResult(T, it, hist);
       else if (it.kind === 'prompt' || it.kind === 'thinking') {
-        if (it.kind === 'prompt') { S.lastPrompt = it.text; if (!S.title) S.title = it.text.slice(0, 120); } else S.lastThinking = it.text;
+        if (it.kind === 'prompt') { S.lastPrompt = it.text; if (!S.promptTitle) S.promptTitle = it.text.slice(0, 120); } else S.lastThinking = it.text;
         const n = { type: it.kind, tool: S.tool, sessionId: S.sessionId, text: it.text, ts: it.ts || now() };
         push(notes, n, RING_NOTES);
         if (!hist) emit(`agent.${it.kind}`, n, 'prompt');

@@ -36,7 +36,7 @@
       <button class="sess" class:on={sessionFilter === skey(s)} onclick={() => onsession?.(sessionFilter === skey(s) ? '' : skey(s))} title="Filter the lanes to this session">
         <span class="sd {s.state}" style="--c:var(--tool-{colorTool(s.tool)})"></span>
         <div class="grow sb">
-          <div class="r1"><b class="ellipsis">{s.title || s.sessionId.slice(0, 8)}</b></div>
+          <div class="r1"><b class="ellipsis">{s.title || s.promptTitle || s.sessionId.slice(0, 8)}</b></div>
           <div class="r2 faint">
             <span>{s.state}</span>·<span class="tnum">{s.edits || 0} edits</span>{#if s.model}·<span class="ellipsis">{s.model}</span>{/if}·<time title={fmtTime(s.lastAt)}>{timeAgo(s.lastAt, app.now)}</time>
           </div>
