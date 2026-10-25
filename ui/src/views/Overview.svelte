@@ -211,7 +211,7 @@
       </section>
 
       <section class="card">
-        <div class="card-h">Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks">Board</a></div>
+        <div class="card-h">Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks?tab=board">Board</a></div>
         <div class="card-b col" style="gap:10px">
           {#if colCounts.length}
             <div class="stk" aria-label="Tasks per column">

@@ -1,5 +1,4 @@
 <script>
-  import { untrack } from 'svelte';
   import { api, post } from '../lib/api.js';
   import { app, openFile, navigate, onStream, toast, saveLocal } from '../lib/store.svelte.js';
   import { resource } from '../lib/resource.svelte.js';
@@ -19,11 +18,12 @@
   let { params = {} } = $props();
 
   const VIEWS = ['board', 'list', 'table', 'calendar', 'timeline', 'decisions'];
-  const initTab = untrack(() => params.tab || params.view);
-  let tab = $state(VIEWS.includes(initTab) ? initTab : 'board');
-  $effect(() => {
+  // Table is the default view: `#/tasks` ↔ table, `#/tasks?tab=board` ↔ board.
+  // `?tab=table` (and legacy `?view=`) still resolve. The URL is the source of truth.
+  const DEFAULT_TAB = 'table';
+  const tab = $derived.by(() => {
     const t = params.tab || params.view;
-    if (t && VIEWS.includes(t) && t !== tab) tab = t;
+    return VIEWS.includes(t) ? t : DEFAULT_TAB;
   });
 
   const board = resource(() => api('/api/board'));
@@ -47,7 +47,7 @@
   const overdue = $derived(all.filter(isOverdue).length);
 
   function setTab(t) {
-    navigate('tasks', t === 'board' ? {} : { tab: t });
+    navigate('tasks', t === DEFAULT_TAB ? {} : { tab: t });
   }
 
   async function move(id, status, order) {
@@ -104,7 +104,7 @@
         { id: 'calendar', label: 'Calendar' }, { id: 'timeline', label: 'Timeline' },
         { id: 'decisions', label: 'Decisions', count: decs.length || undefined },
       ]}
-      bind:active={tab}
+      active={tab}
       onchange={setTab}
     />
   </div>
