@@ -14,11 +14,14 @@ All notable changes to this project are documented here. The format follows [Kee
 - Dashboard: animated "Neuron brain" orbit view of the context graph, and a radar indicator in the top bar that sweeps while the live stream is connected and stops when it drops.
 - UI motion: sliding tab indicator, card entrance, sparkline draw-in, loading skeletons. Animations respect reduced-motion and pause in hidden tabs.
 - `llms.txt`, a comparison page, and a rewritten README.
+- Neuron brain nodes are keyboard accessible (arrow keys, Enter to open, Esc to leave).
 
 ### Changed
 
 - Tasks open in the Table view by default (`#/tasks?tab=board` for the board).
 - One version source for the CLI, server and MCP server.
+- `update` cross-checks the GitHub release bundle against the same version's npm tarball (sha512 integrity, then the bundle's sha256) before replacing anything; `--allow-unverified` only covers a version not on npm yet.
+- CodeQL skips the test folder.
 
 ### Fixed
 
@@ -26,6 +29,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - A failed `listen` (port in use) left watchers and timers keeping the process alive.
 - `lint`, `status` and `export` wrote history snapshots into the project.
 - Multi-byte characters split across process output chunks; leaked timers in the action registry; git-quoted non-ASCII file names never matched; checklist item edits on markdown tasks were silently dropped; new tasks in CRLF files mixed line endings.
+- Windows: actions that run `npm`, `pnpm`, `yarn`, `npx` and other `.cmd` shims now work (safe `cmd.exe` argument escaping, no shell), and timeouts/cancel stop the whole process tree.
+- Case-only renames (`notes.md` → `Notes.md`) work on case-insensitive filesystems (Windows, macOS), and the watcher no longer re-adds the old name.
+- Agent sessions: transcripts are parsed up to the last 64 MB; the Codex sessions folder is not re-walked on every change; sessions matched by working directory have a timeline; Codex patch paths resolve against the session's own folder.
 - Several Svelte reactivity bugs (dialogs, rules tester re-running on every keystroke) and accessibility of chart legends.
 
 ### Performance

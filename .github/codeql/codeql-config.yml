@@ -1,0 +1,4 @@
+name: agentneuron CodeQL config
+# Tests use temp dirs and check-then-act fs calls on purpose; they are not shipped in the package.
+paths-ignore:
+  - test
