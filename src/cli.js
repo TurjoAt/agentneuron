@@ -3,38 +3,100 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { loadConfig, ensureAgentneuronDir, parseEnable } from './core/config.js';
-import { createStore } from './core/store.js';
-import { buildGraph } from './analysis/graph.js';
-import { lint } from './health/lint.js';
-import { healthScore } from './health/score.js';
+import { createHeadlessCtx } from './core/headless.js';
 import { startServer, VERSION } from './server/app.js';
 
 const HELP = `agentneuron ${VERSION} - live monitor for AI-context markdown
 
 Usage:
-  agentneuron [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--open]
-  agentneuron workspace [dir]         start in workspace mode (dir = folder holding your projects)
-  agentneuron mcp [dir]               run the MCP server on stdio (for AI tools)
-  agentneuron lint [--json] [dir]     exit 1 if any error-level issue
-  agentneuron status [dir]            short text summary
-  agentneuron init [dir]              create .agentneuron/ (config + copy of this bundle)
-  agentneuron --version | --help
+  agentneuron [command] [dir] [options]
 
-Options:
-  --port, -p <n>   port (default 4747; 0 = random)
-  --host <h>       bind host (default 127.0.0.1; non-loopback requires/auto-creates a token)
-  --token <t>      require a token (login screen, ?token=<t> or Authorization: Bearer <t>)
+Server:
+  start [dir]        start the web UI for one project (default command)
+  workspace [dir]    start in workspace mode (dir = folder holding your projects)
+  mcp [dir]          run the MCP server on stdio (for AI tools)
+
+Analysis:
+  lint [dir]         list issues; exit 1 if any error-level issue (--json)
+  status [dir]       short text summary
+  export [dir]       write a report (--format ai|json|md|csv|html, --range 7d, --out file)
+
+Setup & maintenance:
+  init [dir]         create .agentneuron/ (config + copy of this bundle)
+  doctor [dir]       check Node, git, port, config, permissions, AI tools (--json)
+  update             update agentneuron (--check: only compare with npm; --yes: no prompt)
+  help [command]     show help for a command
+
+Common options:
+  --port, -p <n>     port (default 4747; 0 = random)
+  --host <h>         bind host (default 127.0.0.1; non-loopback requires/auto-creates a token)
+  --token <t>        require a token (login screen, ?token=<t> or Authorization: Bearer <t>)
   --admin-token <t>  admin token; then --token becomes the read-only viewer token
-  --enable <list>  enable action levels (comma list of: edit, exec, danger, terminal).
-                   Everything beyond read/state is OFF by default; or set "actions" in .agentneuron/config.json
-  --write          alias for --enable edit
-  --open           open the browser
-  --json           machine-readable output (lint)
+  --enable <list>    enable action levels (comma list of: edit, exec, danger, terminal).
+                     Everything beyond read/state is OFF by default; or set "actions" in .agentneuron/config.json
+  --write            alias for --enable edit
+  --open             open the browser
+  --json             machine-readable output (lint, doctor)
+  --version, -v      print the version
+  --help, -h         this help; "agentneuron <command> --help" for one command
+
+Examples:
+  agentneuron                          read-only UI for the current folder on 127.0.0.1:4747
+  agentneuron ./app --port 5000 --open
+  agentneuron lint --json > issues.json
+  agentneuron export --format md --range 30d --out report.md
+  agentneuron doctor
+  agentneuron update --check
 `;
+
+const CMD_HELP = {
+  start: `Usage: agentneuron [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--write] [--open]
+
+Start the server for one project and print the URL. Read-only unless levels are enabled.
+
+  agentneuron ./app --port 5000 --open
+  agentneuron --enable edit,exec
+  agentneuron --host 0.0.0.0 --admin-token "$ADMIN" --token "$VIEWER"`,
+  workspace: `Usage: agentneuron workspace [dir] [start options]
+
+Start the server in workspace mode: dir is a folder holding several projects.`,
+  mcp: `Usage: agentneuron mcp [dir]
+
+Run the read-only MCP server on stdio (newline-delimited JSON-RPC). stdout carries only protocol messages.`,
+  lint: `Usage: agentneuron lint [dir] [--json]
+
+Print every issue. Exit code 1 if any issue has severity "error".`,
+  status: `Usage: agentneuron status [dir]
+
+Print files, tokens and health in a few lines.`,
+  init: `Usage: agentneuron init [dir]
+
+Create .agentneuron/ with config.json and, from the bundled build, a copy of the bundle
+(.agentneuron/agentneuron.mjs) so the project can run it with plain node.`,
+  export: `Usage: agentneuron export [dir] [--format ai|json|md|csv|html] [--range 7d] [--out file]
+
+Write an activity/health report. Default format "ai" (compact, for pasting into an AI chat).
+--range: 24h, 7d, 2w, 90d or all (default 7d). Output goes to stdout unless --out is given.
+
+  agentneuron export > context-report.txt
+  agentneuron export --format html --range 30d --out report.html`,
+  doctor: `Usage: agentneuron doctor [dir] [--json] [--port n] [--host h]
+
+Check the environment: Node version, git, port availability, config validity, enabled
+permission levels, write access to .agentneuron/ and detected AI tools. Exit 1 on a failure.`,
+  update: `Usage: agentneuron update [--check] [--yes]
+
+--check  compare this version with the latest on npm (5 s timeout) and exit.
+Without --check, update the way this copy was installed:
+  global npm install   runs "npm install -g agentneuron@latest"
+  .agentneuron copy    downloads the GitHub release bundle, verifies its sha256, keeps a .bak
+  npx / other          prints the command to run instead
+Asks before replacing anything unless --yes. agentneuron never checks for updates on its own.`,
+};
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -61,14 +123,10 @@ function resolveRoot(dirArg) {
 }
 
 async function analyze(root, overrides = {}) {
-  const config = loadConfig(root, overrides);
-  const store = createStore(root, config);
-  await store.init();
-  const files = [...store.files.values()];
-  const graph = buildGraph(files, store.contents);
-  const issues = lint({ root, files, contents: store.contents, links: graph.edges }) || [];
-  const health = healthScore(issues, files);
-  return { config, files, issues, health, graph };
+  const ctx = await createHeadlessCtx(root, overrides, { git: false });
+  const files = ctx.allFiles();
+  const { issues, health, graph } = await ctx.analysis();
+  return { config: ctx.config, files, issues, health, graph };
 }
 
 async function cmdLint(root, flags) {
@@ -179,14 +237,21 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update']);
+
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
-  if (flags.help || flags.h) { console.log(HELP); return 0; }
+  const explicit = _.length > 0 && COMMANDS.has(_[0]);
+  const cmd = explicit ? _.shift() : 'start';
+  if (cmd === 'help') {
+    console.log(CMD_HELP[_[0]] || HELP); return 0;
+  }
+  if (flags.help || flags.h) { console.log(explicit ? CMD_HELP[cmd] || HELP : HELP); return 0; }
   if (flags.version || flags.v) { console.log(VERSION); return 0; }
-  const cmds = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace']);
-  let cmd = 'start';
-  if (_.length && cmds.has(_[0])) cmd = _.shift();
-  if (cmd === 'help') { console.log(HELP); return 0; }
+  if (cmd === 'update') {
+    const { cmdUpdate } = await import('./commands/update.js');
+    return cmdUpdate(flags);
+  }
   const root = resolveRoot(_[0]);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     console.error(`agentneuron: not a directory: ${root}`); return 2;
@@ -196,6 +261,8 @@ export async function main(argv = process.argv.slice(2)) {
     case 'status': return cmdStatus(root);
     case 'init': return cmdInit(root);
     case 'mcp': return cmdMcp(root, flags);
+    case 'export': return (await import('./commands/export.js')).cmdExport(root, flags);
+    case 'doctor': return (await import('./commands/doctor.js')).cmdDoctor(root, flags);
     case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }
