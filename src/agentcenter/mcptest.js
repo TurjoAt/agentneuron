@@ -76,6 +76,7 @@ function testStdio(def, { cwd, signal, timeoutMs }) {
     child.stderr.on('error', () => {});
     const send = (m) => { try { child.stdin.write(`${JSON.stringify(m)}\n`); } catch { /* closed */ } };
     child.stdin.on('error', () => {});
+    child.stdout.setEncoding('utf8'); // a multi-byte char split across chunks must not become U+FFFD
     child.stdout.on('data', (d) => {
       buf += d;
       if (buf.length > MAX_OUT) return end({ ok: false, error: 'server output too large' });

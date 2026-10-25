@@ -292,7 +292,7 @@ export function createGit2(root) {
 
   async function stats({ since, until } = {}) {
     const c = await check(); if (c !== true) return c;
-    const args = ['log', '--numstat', '--relative', `--format=${RS}%H${US}%an${US}%ae${US}%aI`];
+    const args = ['-c', 'core.quotepath=off', 'log', '--numstat', '--relative', `--format=${RS}%H${US}%an${US}%ae${US}%aI`];
     if (since) args.push(`--since=${String(since).replace(/\0/g, '')}`);
     if (until) args.push(`--until=${String(until).replace(/\0/g, '')}`);
     args.push('--');
@@ -322,6 +322,7 @@ export function createGit2(root) {
       byAuthor: [...byA.values()].sort((a, b) => b.commits - a.commits),
       byDay: [...byD.values()].sort((a, b) => a.date.localeCompare(b.date)),
       topFiles: [...byF.values()].sort((a, b) => b.commits - a.commits || (b.added + b.removed) - (a.added + a.removed)).slice(0, 50),
+      truncated: !r.ok, // timeout / maxBuffer: the numbers cover only part of the history
     };
   }
 

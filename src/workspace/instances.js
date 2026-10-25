@@ -57,6 +57,7 @@ export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutM
     const timer = setTimeout(() => finish(new Error('timed out waiting for agentneuron to print its URL')), timeoutMs);
     timer.unref?.();
     const onData = (d) => {
+      if (done) return; // keep draining the pipe, but stop buffering once the URL is known
       buf += d.toString();
       const m = /https?:\/\/[^\s'"]+/.exec(buf);
       if (m) {
@@ -67,7 +68,7 @@ export function open(dir, { host = '127.0.0.1', token, cli = cliPath(), timeoutM
       }
     };
     child.stdout.on('data', onData);
-    child.stderr.on('data', (d) => { buf += d.toString(); if (buf.length > 20000) buf = buf.slice(-20000); });
+    child.stderr.on('data', (d) => { if (done) return; buf += d.toString(); if (buf.length > 20000) buf = buf.slice(-20000); });
     child.on('error', (e) => finish(e));
     child.on('exit', (code) => {
       if (children.get(abs)?.child === child) children.delete(abs);
