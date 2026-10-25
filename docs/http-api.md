@@ -134,7 +134,51 @@ All accept `from` and `to` as epoch milliseconds (default: the last 7 days).
 | `GET /api/reports/series` | `bucket` = `hour`, `day` (default), `week`; `metric` = `changes` (default), `lines`, `commits`, `agents`, `tokens`, `health`, `tasks`; `split` = `none`, `tool`, `kind`, `author`, `session` |
 | `GET /api/reports/top` | `by` = `churn` (default), `links`, `stale`, `tokens` |
 | `GET /api/reports/heatmap` | `days` (default 365) |
-| `GET /api/reports/export` | `format` = `csv` (default), `md`, `html`; returns a file download |
+| `GET /api/reports/export` | `format` = `csv` (default), `md`, `html`, `json`, `ai` (alias `llm`); `include=content` (json, ai); returns a file download |
+
+### Exports
+
+The export is sent as an attachment named `agentneuron-report-<project>-<from>_<to>.<ext>` (project name lower-cased and reduced to `a-z0-9._-`; dates are UTC `YYYY-MM-DD`). The response also carries `x-agentneuron-tokens`, an estimate of the body's size in tokens.
+
+| `format` | Content type | Extension | Contents |
+|---|---|---|---|
+| `csv` | `text/csv` | `csv` | One row per day: `date,changes,lines,commits,agent_edits` |
+| `md` | `text/markdown` | `md` | KPI table with the previous period, top churned files, daily table |
+| `html` | `text/html` | `html` | Standalone page (inline styles, no scripts) |
+| `json` | `application/json` | `json` | The `agentneuron.report/v1` object below |
+| `ai` / `llm` | `text/markdown` | `ai.md` | Context pack for pasting into an LLM (below) |
+
+Every format is passed through secret masking, and absolute paths (project root, home directory) are replaced with `.` and `~`. Environment values, tokens and manifests are never included.
+
+**`agentneuron.report/v1`** (keys in this order; times are ISO 8601 UTC):
+
+```text
+schema        "agentneuron.report/v1"
+generatedAt   string
+project       { name, stack: [{ id, version|null }] }
+range         { from, to }
+prevRange     { from, to }              previous period of the same length
+kpis          { <key>: { value, previous, delta } } for changes, filesTouched, linesAdded,
+              linesRemoved, commits, agentEdits, activeSessions, tokensNow, tokensDelta,
+              healthNow, healthDelta, tasksOpened, tasksClosed (null when unknown)
+series        [{ date, changes, lines, commits, agentEdits }]   one per UTC day
+top           [{ path, changes, added, removed, lastChangedAt }] most churned, max 20
+fileChanges   { added: [path], removed: [path] }               files created/deleted in range
+health        { score, grade, counts: { error, warn, info } }
+tasks         { open, done, items: [{ path, line, text, section }] }   open items, max 50
+contextFiles  [{ path, tool, kind, tokens, updatedAt }]
+issues        [{ rule, severity, path, line, message, hint }]   errors first, max 100
+contents?     { budget, tokens, files: [{ path, tool, kind, tokens, truncated, content }], omitted: [path] }
+              only with include=content
+```
+
+New fields may be added within `v1`; existing ones keep their meaning. A breaking change bumps the schema to `v2`.
+
+**AI context pack** (`ai`): YAML front-matter (`schema`, `format`, `generatedAt`, `project`, `range`, `tokenEstimate`, `includesContent`), then a short summary, a KPI table with deltas, what changed (top churned, new and removed files), ranked health issues, open tasks, context budget per tool, and suggested next actions. With `include=content` it appends the main context files (kinds `context`, `rules`, `agent`, `skill`, `memory`, `command`, in that order), masked, capped at about 40k tokens in total and 12k per file, with `… [truncated: …]` markers; files past the budget are listed as omitted.
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" "http://127.0.0.1:4747/api/reports/export?format=ai&include=content" > pack.md
+```
 
 ## Workspace (read)
 

@@ -12,6 +12,7 @@ agentneuron mcp [dir]
 - stdout carries only protocol messages. Set `AGENTNEURON_DEBUG=1` for diagnostics on stderr.
 - It reads the project itself and watches it for changes. It does not need the web server to be running, and it does not use tokens.
 - Secrets found in files are masked in everything it returns. Output is capped (file text 200 KB; any single tool result 1 MB; request lines 4 MB). `get_context` accepts only the tools `claude`, `codex` and `cursor`.
+- `report_export` reads the history that `agentneuron serve` keeps in `.agentneuron/` (events, metrics) when present, plus changes seen since the MCP server started; it never writes it.
 
 ## Tools
 
@@ -26,6 +27,7 @@ agentneuron mcp [dir]
 | `recent_changes` | `since?` (ISO date, epoch ms, or `2h`, `3d`, `1w`; default 24 h), `limit?` | Changed files and recent events |
 | `get_tasks` | `status?` (`open`, `done`, `all`), `limit?` | Checkbox and TODO/FIXME tasks |
 | `get_links` | `path` | Incoming and outgoing links, with broken ones flagged |
+| `report_export` | `range?` (`24h`, `7d`, `30d`, `2w`...; default `7d`), `format?` (`ai` default, `json`), `includeContent?` | Report for the period ending now. `ai` returns the Markdown context pack as plain text; `json` returns the `agentneuron.report/v1` object (see [HTTP API](http-api.md#exports)) |
 
 ## Claude Code
 
