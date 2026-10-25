@@ -1,5 +1,7 @@
 # AgentNeuron documentation
 
+AgentNeuron is an open-source Node.js CLI, local web dashboard and read-only MCP server that monitors, lints and manages AI coding-agent context files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, Copilot instructions, skills, subagents, MCP configs). New here? Run `npx agentneuron` and read [getting started](getting-started.md).
+
 | Guide | What it covers |
 |---|---|
 | [Getting started](getting-started.md) | Install, first run, a tour of each page, enabling actions safely |
@@ -13,7 +15,8 @@
 | [Supported tools](supported-tools.md) | Which files are detected for which AI tool |
 | [Project intelligence](project-intelligence.md) | Stacks, dependencies, CI, env, Laravel, doc drift |
 | [Architecture](architecture.md) | Module map, data flow, single-file build |
-| [FAQ](faq.md) | Short answers |
+| [FAQ](faq.md) | Short answers to common questions |
+| [Comparison](comparison.md) | How it relates to Markdown linters, sync scripts and manual review |
 | [Troubleshooting](troubleshooting.md) | Ports, permissions, firewalls, migrating from mdctl |
 
 See also the runnable [examples](../examples/) and the [changelog](../CHANGELOG.md).
