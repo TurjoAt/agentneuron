@@ -2,6 +2,7 @@
   import { api, apiUrl, isMock } from '../lib/api.js';
   import { resource } from '../lib/resource.svelte.js';
   import { navigate, toast } from '../lib/store.svelte.js';
+  import { openMenu } from '../lib/menu.svelte.js';
   import { fmtNum } from '../lib/format.js';
   import { TOOLS } from '../lib/tools.js';
   import Icon from '../lib/Icon.svelte';
@@ -25,7 +26,7 @@
   const preset = $derived(['24h', '7d', '30d', '90d', 'custom'].includes(params.range) ? params.range : '7d');
   const cmp = $derived(params.cmp !== '0');
   const split = $derived(['none', 'tool', 'kind', 'author'].includes(params.split) ? params.split : 'tool');
-  let by = $state(params.by || 'churn');
+  const by = $derived(['churn', 'links', 'stale', 'tokens'].includes(params.by) ? params.by : 'churn');
 
   const range = $derived.by(() => {
     if (preset === 'custom') {
@@ -42,7 +43,7 @@
   const prevRange = $derived({ from: range.from - span, to: range.from });
 
   function set(patch) {
-    navigate('reports', { range: preset, from: params.from, to: params.to, cmp: cmp ? undefined : '0', split, ...patch });
+    navigate('reports', { range: preset, from: params.from, to: params.to, cmp: cmp ? undefined : '0', split, by: params.by, ...patch });
   }
   function pickCustom(k, v) {
     set({ range: 'custom', from: params.from || dstr(range.from), to: params.to || dstr(range.to), [k]: v });
@@ -125,19 +126,73 @@
   const rangeLabel = $derived(`${new Date(range.from).toLocaleDateString()} – ${new Date(range.to).toLocaleDateString()}`);
 
   // ---- export
-  async function exportAs(format) {
+  const exportQ = (format, extra = {}) => ({ from: range.from, to: range.to, format, ...extra });
+  /** Fetch an export as text (mock: { content, tokens }; server: body + x-agentneuron-tokens). */
+  async function fetchExport(format, extra) {
+    if (isMock()) {
+      const r = await api('/api/reports/export', exportQ(format, extra));
+      return { text: r.content, tokens: r.tokens ?? null, filename: r.filename, mime: r.mime };
+    }
+    const res = await fetch(apiUrl('/api/reports/export', exportQ(format, extra)), { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(res.statusText || `HTTP ${res.status}`);
+    const cd = res.headers.get('content-disposition') || '';
+    const t = Number(res.headers.get('x-agentneuron-tokens'));
+    return { text: await res.text(), tokens: Number.isFinite(t) && t > 0 ? t : null, filename: /filename="([^"]+)"/.exec(cd)?.[1] || 'agentneuron-report.md', mime: res.headers.get('content-type') || 'text/plain' };
+  }
+  async function exportAs(format, extra) {
     try {
       if (isMock()) {
-        const r = await api('/api/reports/export', { from: range.from, to: range.to, format });
-        const url = URL.createObjectURL(new Blob([r.content], { type: r.mime }));
-        dl(url, r.filename);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        const r = await fetchExport(format, extra);
+        saveBlob(r.text, r.mime, r.filename);
       } else {
-        dl(apiUrl('/api/reports/export', { from: range.from, to: range.to, format }), '');
+        dl(apiUrl('/api/reports/export', exportQ(format, extra)), '');
       }
     } catch (e) {
       toast(`Export failed: ${e.message}`, 'error');
     }
+  }
+  function saveBlob(text, mime, name) {
+    const url = URL.createObjectURL(new Blob([text], { type: mime }));
+    dl(url, name);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function copyFallback(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
+  async function copyForAi() {
+    try {
+      const r = await fetchExport('ai');
+      const tk = r.tokens ? ` (~${fmtNum(r.tokens)} tokens)` : '';
+      let ok = false;
+      try { await navigator.clipboard.writeText(r.text); ok = true; } catch { ok = copyFallback(r.text); }
+      if (ok) toast(`AI context pack copied${tk}`, 'ok');
+      else { saveBlob(r.text, 'text/markdown', r.filename); toast(`Clipboard unavailable, downloaded instead${tk}`, 'info'); }
+    } catch (e) {
+      toast(`Copy failed: ${e.message}`, 'error');
+    }
+  }
+  function exportMenu(el) {
+    openMenu(el, [
+      { header: 'Download' },
+      { label: 'CSV (daily)', icon: 'table', run: () => exportAs('csv') },
+      { label: 'Markdown', icon: 'file', run: () => exportAs('md') },
+      { label: 'HTML', icon: 'globe', run: () => exportAs('html') },
+      { label: 'JSON (agentneuron.report/v1)', icon: 'code', run: () => exportAs('json') },
+      { sep: true },
+      { header: 'For AI' },
+      { label: 'Download AI context pack', icon: 'sparkles', run: () => exportAs('ai') },
+      { label: 'AI context pack + file contents', icon: 'layers', run: () => exportAs('ai', { include: 'content' }) },
+      { label: 'Copy for AI', icon: 'copy', run: copyForAi },
+    ], 'Export report');
   }
   function dl(href, name) {
     const a = document.createElement('a');
@@ -172,9 +227,8 @@
       {/if}
       <label class="sw-l"><input type="checkbox" class="sw sm" checked={cmp} onchange={(e) => set({ cmp: e.currentTarget.checked ? undefined : '0' })} /> Compare to previous</label>
       <div class="exp">
-        {#each [['csv', 'CSV'], ['md', 'MD'], ['html', 'HTML']] as [f, l] (f)}
-          <button class="btn sm" onclick={() => exportAs(f)} title="Download report as {l}"><Icon name="download" size={13} /> {l}</button>
-        {/each}
+        <button class="btn sm" onclick={copyForAi} title="Copy an AI context pack for this range to the clipboard"><Icon name="sparkles" size={13} /> Copy for AI</button>
+        <button class="btn sm" onclick={(e) => exportMenu(e.currentTarget)} aria-haspopup="menu" title="Export report"><Icon name="download" size={13} /> Export <Icon name="chevronDown" size={12} /></button>
       </div>
     </div>
   </div>
@@ -251,7 +305,7 @@
       {/if}
     </div>
 
-    <div class="tt"><TopTables from={range.from} to={range.to} bind:by onby={(v) => set({ by: v })} /></div>
+    <div class="tt"><TopTables from={range.from} to={range.to} {by} onby={(v) => set({ by: v })} /></div>
 
     {#if Array.isArray(heat.data) && heat.data.length}
       <section class="card tt">
