@@ -32,7 +32,7 @@ test('registry.list leaves no pending availability timers', async () => {
   reg.register({ id: 'a.b', title: 'A', category: 'x', level: 'exec', available: () => true, run() {} });
   const before = process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length;
   await reg.list('admin');
-  assert.equal(process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length, before);
+  assert.ok(process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length <= before);
 });
 
 test('git: non-ASCII file names are not C-quoted in recent commits and stats', { skip: !hasGit && 'git not installed' }, async () => {

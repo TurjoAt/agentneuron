@@ -4,6 +4,7 @@ import path from 'node:path';
 
 export const MAX_BYTES = 20 * 1024 * 1024;
 export const KEEP = 3;
+const CACHE_MS = 30000;
 
 export function createJsonl(file, { maxBytes = MAX_BYTES, keep = KEEP } = {}) {
   let size = -1;
@@ -34,8 +35,12 @@ export function createJsonl(file, { maxBytes = MAX_BYTES, keep = KEEP } = {}) {
   // Parsed rows per file part, reused while its size and mtime are unchanged: report
   // exports query events.jsonl several times per request (up to keep x maxBytes of JSON).
   const parsed = new Map(); // part -> { size, mtimeMs, rows }
+  let evict = null; // dropped shortly after the last read: a burst of queries shares it, idle servers hold nothing
   /** All parsed rows, oldest first (rotated files included). Treat the row objects as read-only. */
   function readAll() {
+    clearTimeout(evict);
+    evict = setTimeout(() => parsed.clear(), CACHE_MS);
+    evict.unref?.();
     const rows = [];
     for (let i = keep; i >= 0; i--) {
       const f = i === 0 ? file : `${file}.${i}`;
