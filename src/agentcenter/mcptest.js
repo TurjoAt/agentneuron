@@ -2,6 +2,7 @@
 // Never uses a shell; the child is always killed; env/header values are never returned.
 import { spawn } from 'node:child_process';
 import { maskSecretsInText } from '../health/secrets.js';
+import { VERSION } from '../server/version.js';
 
 export const TEST_TIMEOUT_MS = 15000;
 const PROTOCOL = '2025-06-18';
@@ -97,7 +98,7 @@ function testStdio(def, { cwd, signal, timeoutMs }) {
         }
       }
     });
-    send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'agentneuron', version: '0.2.1' } } });
+    send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'agentneuron', version: VERSION } } });
   });
 }
 
@@ -148,7 +149,7 @@ async function testHttp(def, { signal, timeoutMs }) {
     return { status: r.status, json: parseBody(text, r.headers.get('content-type')) };
   };
   try {
-    const init = await post({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'agentneuron', version: '0.2.1' } } });
+    const init = await post({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'agentneuron', version: VERSION } } });
     if (!isObj(init.json?.result)) return finish(base, { ok: false, error: mask(init.json?.error?.message || `HTTP ${init.status}`) });
     headers['mcp-protocol-version'] = typeof init.json.result.protocolVersion === 'string' && /^[\w.-]{1,20}$/.test(init.json.result.protocolVersion) ? init.json.result.protocolVersion : PROTOCOL;
     await post({ jsonrpc: '2.0', method: 'notifications/initialized' }).catch(() => {});
