@@ -3,14 +3,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn, execFile } from 'node:child_process';
+import zlib from 'node:zlib';
+import { spawn, execFile } from '../core/spawn.js';
 import { fileURLToPath } from 'node:url';
 import { VERSION } from '../server/version.js';
 
 export const PKG = 'agentneuron';
 export const REGISTRY_URL = `https://registry.npmjs.org/${PKG}/latest`;
 export const RELEASE_BASE = 'https://github.com/TurjoAt/agentneuron/releases/download';
+export const NPM_BASE = `https://registry.npmjs.org/${PKG}`;
 const MAX_BUNDLE = 50 * 1024 * 1024;
+const MAX_TARBALL = 50 * 1024 * 1024;
+const MAX_UNPACKED = 200 * 1024 * 1024;
+const MAX_META = 1024 * 1024;
+const TAR_ENTRY = 'package/dist/agentneuron.mjs';
 
 /** -1 / 0 / 1. Numeric x.y.z; a pre-release sorts before its release. */
 export function compareVersions(a, b) {
@@ -58,9 +64,9 @@ export function detectInstall(selfPath, { globalRoot = null } = {}) {
   return 'other';
 }
 
-const npmBin = () => (process.platform === 'win32' ? 'npm.cmd' : 'npm');
-// Node >= 18.20.2 refuses to spawn .cmd files without a shell (CVE-2024-27980); the args are fixed strings.
-const npmOpts = () => ({ windowsHide: true, shell: process.platform === 'win32' });
+// core/spawn resolves npm.cmd on Windows and runs it via cmd.exe with escaped arguments (no shell: true).
+const npmBin = () => 'npm';
+const npmOpts = () => ({ windowsHide: true });
 
 /** `npm root -g`, or null. */
 export function npmGlobalRoot({ timeoutMs = 10000 } = {}) {
@@ -77,22 +83,100 @@ export function parseSha256File(text) {
   return /^[0-9a-f]{64}$/.test(tok) ? tok : null;
 }
 
+// The timer stays armed until the body is read: a server that stalls mid-body must not hang us.
 async function download(fetchFn, url, max, timeoutMs) {
-  let r;
-  try { r = await fetchWithTimeout(fetchFn, url, timeoutMs); } catch (e) { throw new Error(`download failed: ${url} (${e?.name === 'AbortError' ? 'timeout' : 'network error'})`); }
-  if (!r.ok) throw new Error(`download failed: ${url} (HTTP ${r.status})`);
-  const len = Number(r.headers?.get?.('content-length'));
-  if (Number.isFinite(len) && len > max) throw new Error(`download too large: ${url}`);
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length > max) throw new Error(`download too large: ${url}`);
-  return buf;
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  const fail = (e) => new Error(`download failed: ${url} (${e?.name === 'AbortError' || ac.signal.aborted ? 'timeout' : 'network error'})`);
+  try {
+    let r;
+    try { r = await fetchFn(url, { signal: ac.signal, redirect: 'follow', headers: { 'user-agent': `${PKG}/${VERSION}` } }); } catch (e) { throw fail(e); }
+    if (!r.ok) throw Object.assign(new Error(`download failed: ${url} (HTTP ${r.status})`), { status: r.status });
+    const len = Number(r.headers?.get?.('content-length'));
+    if (Number.isFinite(len) && len > max) throw new Error(`download too large: ${url}`);
+    let buf;
+    try { buf = Buffer.from(await r.arrayBuffer()); } catch (e) { throw fail(e); }
+    if (buf.length > max) throw new Error(`download too large: ${url}`);
+    return buf;
+  } finally { clearTimeout(t); }
+}
+
+const tarStr = (b, off, len) => { const s = b.subarray(off, off + len); const z = s.indexOf(0); return (z < 0 ? s : s.subarray(0, z)).toString('utf8'); };
+const tarOctal = (b, off, len) => {
+  if (b[off] & 0x80) return NaN; // base-256 sizes are never needed for a bundle
+  const s = tarStr(b, off, len).trim();
+  return /^[0-7]+$/.test(s) ? Number.parseInt(s, 8) : NaN;
+};
+
+/** Minimal ustar reader: returns the contents of regular file `want`, or throws. pax/GNU long-name records are skipped. */
+export function tarExtract(tar, want) {
+  let off = 0, found = null;
+  while (off + 512 <= tar.length) {
+    const h = tar.subarray(off, off + 512);
+    if (h.every((x) => x === 0)) break;
+    let sum = 0;
+    for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 32 : h[i];
+    if (tarOctal(h, 148, 8) !== sum) throw new Error('npm tarball is malformed (bad tar header checksum)');
+    const size = tarOctal(h, 124, 12);
+    if (!Number.isSafeInteger(size)) throw new Error('npm tarball is malformed (bad tar entry size)');
+    const type = String.fromCharCode(h[156]);
+    const prefix = tarStr(h, 257, 6) === 'ustar' ? tarStr(h, 345, 155) : '';
+    const name = prefix ? `${prefix}/${tarStr(h, 0, 100)}` : tarStr(h, 0, 100);
+    const start = off + 512;
+    if (start + size > tar.length) throw new Error('npm tarball is malformed (truncated entry)');
+    if ((type === '0' || type === '\0') && name === want) {
+      if (found) throw new Error(`npm tarball is malformed (duplicate ${want})`);
+      found = Buffer.from(tar.subarray(start, start + size));
+    }
+    off = start + Math.ceil(size / 512) * 512;
+  }
+  if (!found) throw new Error(`npm tarball does not contain ${want}`);
+  return found;
+}
+
+/** "sha512-<base64>" from an SRI string (several space-separated hashes allowed) -> 64-byte Buffer, or null. */
+export function parseSha512Integrity(sri) {
+  for (const tok of String(sri || '').trim().split(/\s+/)) {
+    const m = /^sha512-([A-Za-z0-9+/]+={0,2})(\?.*)?$/.exec(tok);
+    if (!m) continue;
+    const b = Buffer.from(m[1], 'base64');
+    if (b.length === 64) return b;
+  }
+  return null;
 }
 
 /**
- * Replace an init copy with the release bundle for `version`. Verifies sha256, writes a temp
- * file next to the target and renames it over; the previous copy is kept as <target>.bak.
+ * Second origin: the npm tarball for `version`. Returns the sha256 of package/dist/agentneuron.mjs,
+ * or null when npm has no such version (HTTP 404). Every other problem throws.
  */
-export async function updateLocalCopy(target, version, { fetch: fetchFn = globalThis.fetch, timeoutMs = 60000 } = {}) {
+export async function npmBundleSha256(version, { fetch: fetchFn = globalThis.fetch, timeoutMs = 60000 } = {}) {
+  let meta;
+  try { meta = await download(fetchFn, `${NPM_BASE}/${version}`, MAX_META, timeoutMs); } catch (e) {
+    if (e.status === 404) return null;
+    throw e;
+  }
+  let j; try { j = JSON.parse(meta.toString('utf8')); } catch { throw new Error('npm registry sent invalid JSON'); }
+  if (j?.name !== PKG || j?.version !== version) throw new Error('npm registry metadata does not match the requested version');
+  let u; try { u = new URL(String(j.dist?.tarball)); } catch { throw new Error('npm registry sent no usable tarball URL'); }
+  if (u.protocol !== 'https:' || u.hostname !== 'registry.npmjs.org' || u.username || u.password) throw new Error(`npm tarball URL is not on https://registry.npmjs.org: ${u.origin}`);
+  const want = parseSha512Integrity(j.dist?.integrity);
+  if (!want) throw new Error('npm registry sent no sha512 integrity for the tarball');
+  const tgz = await download(fetchFn, u.href, MAX_TARBALL, timeoutMs);
+  if (!crypto.createHash('sha512').update(tgz).digest().equals(want)) throw new Error('npm tarball does not match its registry integrity (sha512); nothing was changed');
+  let tar;
+  try { tar = zlib.gunzipSync(tgz, { maxOutputLength: MAX_UNPACKED }); } catch (e) {
+    throw new Error(e?.code === 'ERR_BUFFER_TOO_LARGE' || e instanceof RangeError ? 'npm tarball unpacks too large' : 'npm tarball is malformed (gzip)');
+  }
+  return crypto.createHash('sha256').update(tarExtract(tar, TAR_ENTRY)).digest('hex');
+}
+
+/**
+ * Replace an init copy with the release bundle for `version`. Verifies the GitHub asset against its
+ * .sha256 and against the bundle inside the npm tarball (itself checked against the registry's sha512
+ * integrity); only if npm has no such version and allowUnverified is set does the GitHub check alone
+ * suffice. Writes a temp file next to the target and renames it over; the previous copy is kept as <target>.bak.
+ */
+export async function updateLocalCopy(target, version, { fetch: fetchFn = globalThis.fetch, timeoutMs = 60000, allowUnverified = false, warn = () => {} } = {}) {
   if (!validVersion(version)) throw new Error('bad version');
   const base = `${RELEASE_BASE}/v${version}/agentneuron.mjs`;
   const [bundle, shaText] = await Promise.all([download(fetchFn, base, MAX_BUNDLE, timeoutMs), download(fetchFn, `${base}.sha256`, 4096, timeoutMs)]);
@@ -100,6 +184,13 @@ export async function updateLocalCopy(target, version, { fetch: fetchFn = global
   if (!want) throw new Error('release checksum file is malformed');
   const got = crypto.createHash('sha256').update(bundle).digest('hex');
   if (got !== want) throw new Error(`checksum mismatch (expected ${want.slice(0, 12)}..., got ${got.slice(0, 12)}...); nothing was changed`);
+  const npmSha = await npmBundleSha256(version, { fetch: fetchFn, timeoutMs });
+  if (npmSha === null) {
+    if (!allowUnverified) throw new Error(`npm has no ${PKG}@${version} to cross-check the GitHub release against; nothing was changed (retry later, or pass --allow-unverified to trust the GitHub release alone)`);
+    warn(`agentneuron: warning: npm has no ${PKG}@${version}; --allow-unverified: installing with the GitHub release checksum only (one origin)`);
+  } else if (npmSha !== got) {
+    throw new Error(`GitHub release and npm tarball disagree (github ${got.slice(0, 12)}..., npm ${npmSha.slice(0, 12)}...); nothing was changed`);
+  }
   const tmp = path.join(path.dirname(target), `.agentneuron.mjs.${process.pid}.${Date.now()}.tmp`);
   try {
     fs.writeFileSync(tmp, bundle, { mode: 0o755, flag: 'wx' });
@@ -110,7 +201,7 @@ export async function updateLocalCopy(target, version, { fetch: fetchFn = global
     try { fs.unlinkSync(tmp); } catch { /* not created */ }
     throw e;
   }
-  return { target, backup: `${target}.bak`, sha256: got };
+  return { target, backup: `${target}.bak`, sha256: got, npmVerified: npmSha !== null };
 }
 
 /** Ask y/N on a TTY. Without a TTY the answer is no (use --yes). */
@@ -162,10 +253,10 @@ export async function cmdUpdate(flags, deps = {}) {
   };
 
   if (mode === 'local') {
-    if (!(await ok(`Replace ${self} with agentneuron ${latest} (from GitHub releases, sha256-verified)`))) return 1;
+    if (!(await ok(`Replace ${self} with agentneuron ${latest} (GitHub release, sha256-verified and cross-checked against npm)`))) return 1;
     try {
-      const r = await updateLocalCopy(self, latest, { fetch: fetchFn });
-      log.log(`updated ${r.target} to ${latest} (sha256 ${r.sha256.slice(0, 12)}...); previous copy: ${path.basename(r.backup)}`);
+      const r = await updateLocalCopy(self, latest, { fetch: fetchFn, allowUnverified: !!flags['allow-unverified'], warn: (m) => log.error(m) });
+      log.log(`updated ${r.target} to ${latest} (sha256 ${r.sha256.slice(0, 12)}..., ${r.npmVerified ? 'matches npm' : 'GitHub only'}); previous copy: ${path.basename(r.backup)}`);
       return 0;
     } catch (e) { log.error(`agentneuron: update failed: ${e.message}`); return 1; }
   }

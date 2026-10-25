@@ -1,5 +1,5 @@
 // Actions registry + job runner. See docs/internal/CONTRACT-v0.2.md.
-import { spawn } from 'node:child_process';
+import { spawn, killTree } from '../core/spawn.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { HttpError } from '../server/router.js';
@@ -268,8 +268,8 @@ export function createRegistry(ctx) {
       let killTimer = null;
       const kill = (why) => {
         if (why) job.log('info', why);
-        try { child.kill('SIGTERM'); } catch { /* gone */ }
-        killTimer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } }, 3000);
+        killTree(child, 'SIGTERM');
+        killTimer = setTimeout(() => killTree(child, 'SIGKILL'), 3000);
         killTimer.unref?.();
       };
       const onAbort = () => kill('cancelled');
