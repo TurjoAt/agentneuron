@@ -21,6 +21,12 @@ Analysis:
   status [dir]       short text summary
   export [dir]       write a report (--format ai|json|md|csv|html, --range 7d, --out file)
 
+Rules:
+  compile [dir]      compile .agentneuron/rules/*.md into every tool's files (--dry-run, --check, --tools, --merge-back)
+  rules import [dir] create source rules from existing CLAUDE.md / AGENTS.md / Cursor / Copilot files (--dry-run)
+  rules list [dir]   list source rules
+  generate [dir]     starter AGENTS.md from the code, every line cited (--tool agents|claude|..., --out [file])
+
 Setup & maintenance:
   init [dir]         create .agentneuron/ (config + copy of this bundle)
   doctor [dir]       check Node, git, port, config, permissions, AI tools (--json)
@@ -80,6 +86,26 @@ Write an activity/health report. Default format "ai" (compact, for pasting into 
 
   agentneuron export > context-report.txt
   agentneuron export --format html --range 30d --out report.html`,
+  compile: `Usage: agentneuron compile [dir] [--dry-run] [--check] [--tools claude,cursor,...] [--merge-back] [--force] [--json]
+
+Compile the source rules in .agentneuron/rules/*.md (config: compiler.rulesDir) into CLAUDE.md, AGENTS.md,
+GEMINI.md, .cursor/rules/*.mdc, .github/copilot-instructions.md + .github/instructions/*.instructions.md
+and .windsurf/rules/*.md. Only the agentneuron:begin/end regions are rewritten; your text around them is kept.
+  --dry-run     print what would change, with a diff; write nothing
+  --check       exit 1 if any output is stale or was edited by hand (CI)
+  --tools       limit to some tools: claude, codex (AGENTS.md), gemini, cursor, copilot, windsurf
+  --merge-back  pull edits made inside generated regions back into the source rules, then compile
+  --force       overwrite regions that were edited by hand`,
+  rules: `Usage: agentneuron rules import [dir] [--dry-run]
+       agentneuron rules list [dir] [--json]
+
+import: split the existing context files into source rules (one per ## section, one per Cursor/Copilot/Windsurf
+rule file), merging identical rules found in several tools. Never overwrites a rule file.`,
+  generate: `Usage: agentneuron generate [dir] [--tool agents|claude|gemini|copilot|cursor|windsurf] [--out [file]] [--force]
+
+Build a starter context file from what the code shows: install/build/test/lint commands, stack and versions,
+top-level folders and detected conventions. Each line cites its source. Prints to stdout unless --out is given
+(--out alone writes the tool's default path); an existing file is only replaced with --force.`,
   doctor: `Usage: agentneuron doctor [dir] [--json] [--port n] [--host h]
 
 Check the environment: Node version, git, port availability, config validity, enabled
@@ -98,7 +124,7 @@ Asks before replacing anything unless --yes. agentneuron never checks for update
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'tools', 'tool']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -239,7 +265,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'compile', 'rules', 'generate']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -254,6 +280,7 @@ export async function main(argv = process.argv.slice(2)) {
     const { cmdUpdate } = await import('./commands/update.js');
     return cmdUpdate(flags);
   }
+  const sub = cmd === 'rules' ? _.shift() : null;
   const root = resolveRoot(_[0]);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     console.error(`agentneuron: not a directory: ${root}`); return 2;
@@ -265,6 +292,9 @@ export async function main(argv = process.argv.slice(2)) {
     case 'mcp': return cmdMcp(root, flags);
     case 'export': return (await import('./commands/export.js')).cmdExport(root, flags);
     case 'doctor': return (await import('./commands/doctor.js')).cmdDoctor(root, flags);
+    case 'compile': return (await import('./commands/compile.js')).cmdCompile(root, flags);
+    case 'rules': return (await import('./commands/compile.js')).cmdRules(root, sub, flags);
+    case 'generate': return (await import('./commands/compile.js')).cmdGenerate(root, flags);
     case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }
