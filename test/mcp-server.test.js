@@ -46,7 +46,7 @@ test('MCP stdio server: initialize, tools/list, tools/call', async () => {
     assert.ok(init.result.capabilities.tools);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const list = await rpc('tools/list', {});
-    assert.deepEqual(list.result.tools.map((t) => t.name).sort(), ['get_context', 'get_health', 'get_links', 'get_tasks', 'list_files', 'project_info', 'read_file', 'recent_changes', 'report_export', 'search']);
+    assert.deepEqual(list.result.tools.map((t) => t.name).sort(), ['compile_preview', 'get_context', 'get_health', 'get_links', 'get_tasks', 'list_files', 'project_info', 'read_file', 'recent_changes', 'report_export', 'search']);
     for (const t of list.result.tools) assert.equal(t.inputSchema.type, 'object');
 
     const files = await call('list_files', {});

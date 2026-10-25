@@ -15,6 +15,7 @@ import { maskSecretsInText } from '../health/secrets.js';
 import { scanAgentSetup } from '../agentcenter/setup.js';
 import { exportReport, rangeFromSpec } from '../reports/index.js';
 import { createJsonl, filterRange } from '../persist/jsonl.js';
+import { planCompile, summarize } from '../compiler/index.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -39,6 +40,8 @@ const TOOLS = [
   { name: 'report_export', description: 'Activity/health report for a time range. format "ai" returns a compact Markdown context pack (KPIs, changes, ranked issues, open tasks, context budget, next actions); "json" returns the agentneuron.report/v1 object. Secrets masked.',
     inputSchema: obj({ range: { type: 'string', description: 'Relative range ending now, e.g. "24h", "7d", "30d" (default "7d")' }, format: { type: 'string', enum: ['ai', 'json'] },
       includeContent: { type: 'boolean', description: 'Append size-capped (~40k tokens) contents of the main context files' } }) },
+  { name: 'compile_preview', description: 'Preview compiling the source rules (.agentneuron/rules/*.md) into each tool\'s files: which outputs are stale, which generated regions were edited by hand, what merge-back would pull in. Read-only.',
+    inputSchema: obj({ tools: { type: 'string', description: 'Comma list: claude, codex, gemini, cursor, copilot, windsurf (default all)' }, diff: { type: 'boolean', description: 'Include per-file diffs' } }) },
 ];
 
 function parseSince(v) {
@@ -196,6 +199,10 @@ export async function runMcpServer(root, config = {}, io = {}) {
       const out = await exportReport(reportCtx, rangeFromSpec(range), format, { includeContent: includeContent === true });
       // ai: raw Markdown (not JSON-encoded) so the model reads it directly; json: the v1 object
       return format === 'json' ? JSON.parse(out.body) : { [RAW_TEXT]: out.body };
+    },
+    compile_preview({ tools, diff = false } = {}) {
+      if (tools !== undefined && typeof tools !== 'string') throw new Error('tools must be a comma separated string');
+      return summarize(planCompile({ root: absRoot, config: cfg, store }, { tools }), { content: diff === true });
     },
   };
 
