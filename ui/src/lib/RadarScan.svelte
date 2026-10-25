@@ -32,7 +32,8 @@
     })
   );
 
-  const mode = $derived(app.conn === 'live' ? 'live' : app.conn === 'offline' ? 'off' : 'wait');
+  // live → sweeping; first connect → slow amber sweep; reconnecting/offline → stopped, red.
+  const mode = $derived(app.conn === 'live' ? 'live' : app.conn === 'connecting' ? 'wait' : 'off');
   const last = $derived(app.events[0]);
   const label = $derived(
     (app.mock ? 'Demo stream' : { live: 'Scanning — live', connecting: 'Connecting…', reconnecting: 'Reconnecting…', offline: 'Offline — not scanning' }[app.conn] || app.conn) +
