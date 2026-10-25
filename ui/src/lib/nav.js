@@ -1,6 +1,7 @@
 // View registry: order defines the 1–9 keyboard shortcuts.
 export const VIEWS = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
+  { id: 'live', label: 'Live', icon: 'radar' },
   { id: 'graph', label: 'Graph', icon: 'graph' },
   { id: 'files', label: 'Files', icon: 'files' },
   { id: 'diff', label: 'Diff', icon: 'diff' },

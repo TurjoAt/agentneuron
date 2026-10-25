@@ -33,6 +33,8 @@ Restart AgentNeuron after editing; the file is read at startup.
 | `includeGlobalAgents` | boolean | `false` | Also scan your home-level agent config (`~/.claude`, `~/.codex` and similar) in the Agents pages. Read-only. |
 | `allowWrite` | boolean | `false` | Legacy alias for `actions.edit`. Prefer `actions`. |
 | `debounceMs` | number | `150` | Milliseconds the file watcher waits to merge bursts of events for one file. Rarely needs changing. |
+| `live` | object | see [Live view](live.md#configuration) | Live agent view: `enabled`, `showPrompts` (default: on for a loopback bind), `viewerPrompts`, `viewerDiffs`, `idleMs`, `endMs`, `collisionWindowMs`. |
+| `mcp` | object | `{ "level": "read" }` | `"level": "state"` enables the MCP [coordination](coordination.md) tools (same as `agentneuron mcp --level state`). |
 
 ### `actions`
 
@@ -107,6 +109,8 @@ Treat results as estimates, not billing data.
 | `cache/` | Cached results (for example outdated packages) |
 | `trash/` | Files deleted from the UI, restorable |
 | `board.json` | Task board overlay (columns, native tasks, comments) |
+| `claims.json` | Advisory file claims of agent sessions ([coordination](coordination.md)) |
+| `handoffs.jsonl` | Agent handoff notes; rotates at 5 MB |
 | `events.jsonl`, `metrics.jsonl`, `audit.jsonl` | Change events, health snapshots, audit log. A file over 20 MB rotates; three old files are kept. |
 
 Bookmarks and annotations are also stored here. The generated `.gitignore` excludes `history/`, `cache/`, `trash/` and `*.jsonl`. Commit `config.json` only if it holds no secrets.

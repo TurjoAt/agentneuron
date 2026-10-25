@@ -1,9 +1,9 @@
 # MCP server
 
-`agentneuron mcp` exposes the same data the UI shows to any MCP-capable AI tool, so an agent can ask "what is the effective context for `src/api`?" or "which links are broken?" instead of guessing. It is **read-only**: no tool writes or runs anything.
+`agentneuron mcp` exposes the same data the UI shows to any MCP-capable AI tool, so an agent can ask "what is the effective context for `src/api`?" or "which links are broken?" instead of guessing. By default it is **read-only**: no tool writes or runs anything. With `--level state` it adds the [coordination](coordination.md) tools, which write only inside `.agentneuron/`.
 
 ```sh
-agentneuron mcp [dir]
+agentneuron mcp [dir] [--level state]
 ```
 
 - Transport: stdio, newline-delimited JSON-RPC 2.0.
@@ -28,6 +28,21 @@ agentneuron mcp [dir]
 | `get_tasks` | `status?` (`open`, `done`, `all`), `limit?` | Checkbox and TODO/FIXME tasks |
 | `get_links` | `path` | Incoming and outgoing links, with broken ones flagged |
 | `report_export` | `range?` (`24h`, `7d`, `30d`, `2w`...; default `7d`), `format?` (`ai` default, `json`), `includeContent?` | Report for the period ending now. `ai` returns the Markdown context pack as plain text; `json` returns the `agentneuron.report/v1` object (see [HTTP API](http-api.md#exports)) |
+| `list_claims` | `path?` | Active advisory file claims of every agent session (only those covering `path` when given) |
+| `get_handoffs` | `taskId?`, `sessionId?`, `agent?`, `limit?` | Handoff notes, newest first |
+
+### Coordination tools (`--level state`)
+
+These tools are hidden from `tools/list` and refused at the default `read` level. Enable them with `agentneuron mcp --level state` or `"mcp": { "level": "state" }` in `.agentneuron/config.json`. See [Coordination](coordination.md).
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `claim_files` | `paths`, `ttlMinutes?` (default 15, max 240), `note?`, `force?`, `agent?`, `sessionId?` | `{ granted, conflicts, claims }`. Paths held by another session are not granted unless `force` |
+| `release_files` | `paths?`, `id?`, `agent?`, `sessionId?` | `{ released }` (all your claims when no paths or id are given) |
+| `claim_task` | `id`, `ttlMinutes?`, `agent?`, `sessionId?` | Assigns the board task to you, moves it to In progress and claims its files |
+| `handoff_note` | `summary?`, `done?`, `next?`, `blockers?`, `taskId?`, `files?`, `agent?`, `sessionId?` | The stored note |
+
+`agent` defaults to the MCP client name sent in `initialize`, and `sessionId` defaults to this server process.
 
 ## Claude Code
 

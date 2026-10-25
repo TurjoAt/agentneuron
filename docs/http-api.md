@@ -101,6 +101,22 @@ Writes (`POST`) with a cross-site `Sec-Fetch-Site` or an `Origin` that does not 
 
 Board edits are stored in `.agentneuron/board.json`. Changing a task that comes from a Markdown file also writes the checkbox, priority, labels or due date back into that file, but only if `edit` is enabled; otherwise only the board overlay changes.
 
+## Live agents
+
+See [Live view](live.md) and [Coordination](coordination.md).
+
+| Method | Path | Level | Body / query | Returns |
+|---|---|---|---|---|
+| GET | `/api/live` | read | | `{ now, startedAt, showPrompts, showDiffs, sessions, edits, commands, notes, editing, collisions, claims, handoffs }`. Viewers get no prompts and no diff hunks unless allowed by `live.*` config |
+| GET | `/api/live/claims` | read | | `{ claims: [{ id, pattern, agent, sessionId, taskId, note, createdAt, expiresAt }] }` |
+| POST | `/api/live/claims` | state | `{ paths, agent?, sessionId?, ttlMs?, note?, taskId?, force? }` | `{ granted, conflicts, claims }` |
+| POST | `/api/live/release` | state | `{ agent?, sessionId?, paths?, id? }` | `{ released }` |
+| GET | `/api/live/handoffs` | read | `taskId`, `sessionId`, `agent`, `limit` | `{ handoffs }` newest first |
+| POST | `/api/live/handoff` | state | `{ summary?, done?, next?, blockers?, taskId?, files?, agent?, sessionId? }` | `{ handoff }` |
+| POST | `/api/live/claim-task` | state | `{ id, agent?, sessionId?, ttlMs?, force? }` | `{ task, assignee, previousAssignee, claims }` |
+
+Over HTTP, `agent` defaults to `human` and `sessionId` to `ui`.
+
 ## Git (read)
 
 `GET /api/git/branches`, `/api/git/log` (`branch`, `path`, `author`, `since`, `until`, `limit`=100, `skip`), `/api/git/commit` (`hash`), `/api/git/changes`, `/api/git/diff` (`path`, `staged=1`), `/api/git/tags`, `/api/git/stash`, `/api/git/remotes`, `/api/git/blame` (`path`), `/api/git/stats` (`since`, `until`), `/api/changelog` (`from`, `to`=`HEAD`).
@@ -219,3 +235,12 @@ At most 100 streams are served at once (`503` beyond that). Reconnects replay mi
 | `joblog` | `{ id, stream, text }` live output (`stdout`, `stderr`, `info`) |
 | `notify` | `{ type, title, body, level, ts, path? }` |
 | `ping` | `{ ts }` |
+| `agent.session` | `{ tool, sessionId, state: start|active|idle|end, title, model, cwd, startedAt, lastAt, edits, commands, promptTitle?, lastPrompt?, lastThinking?, ts }`. `title` comes only from a transcript summary; `promptTitle` (first prompt) and the prompt fields are role-gated like prompts |
+| `agent.edit` | `{ id, tool, sessionId, path, op: edit|write|create|delete|patch, linesAdded, linesRemoved, hunk: [{ type: add|del|ctx, text }], truncated, status: pending|confirmed|failed|unverified, ts, source: transcript|watcher, from?, historyId?, hunkHidden? }`. Sent again with the same `id` when its status or op changes |
+| `agent.command` | `{ id, tool, sessionId, cmd, ts, exitCode?, ok? }`. Sent again with the exit code |
+| `agent.prompt`, `agent.thinking` | `{ type, tool, sessionId, text, ts }`, only to clients allowed to see prompts |
+| `agent.collision` | `{ path, reason: overlap|claim, sessions: [{ tool, sessionId, title }], claim?, ts }` |
+| `agent.claims` | `{ claims }` whenever claims change (from any process) |
+| `agent.handoff` | `{ handoff?, handoffs }` |
+
+`tool` is `claude`, `codex`, or `human` for watcher changes without a transcript. Every `agent.*` payload is secret-masked. `cwd` is relative to the project (`.` is the root).

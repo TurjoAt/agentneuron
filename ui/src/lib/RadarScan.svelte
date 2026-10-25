@@ -33,6 +33,22 @@
       timers.add(t);
     })
   );
+  // agent edits (from transcripts) blip in the agent's colour, once per edit
+  const seenEdits = new Set();
+  $effect(() =>
+    onStream('agent.edit', (e) => {
+      if (!e?.path || !e.id || seenEdits.has(e.id) || !page.visible) return;
+      seenEdits.add(e.id);
+      if (seenEdits.size > 500) seenEdits.clear();
+      const h = hash(e.path);
+      const a = ((h % 360) * Math.PI) / 180;
+      const r = 0.3 + ((h >>> 9) % 55) / 100;
+      const b = { id: ++seq, x: 50 + Math.cos(a) * r * 50, y: 50 + Math.sin(a) * r * 50, kind: 'agent', tool: !e.tool || e.tool === 'human' ? 'generic' : e.tool };
+      blips = [...blips.slice(-(MAX_BLIPS - 1)), b];
+      const t = setTimeout(() => { timers.delete(t); blips = blips.filter((x) => x.id !== b.id); }, BLIP_MS);
+      timers.add(t);
+    })
+  );
   $effect(() => () => { for (const t of timers) clearTimeout(t); timers.clear(); });
 
   // live → sweeping; first connect → slow amber sweep; reconnecting/offline → stopped, red.
@@ -59,7 +75,7 @@
     <span class="cross"></span>
     {#if mode !== 'off'}<span class="sweep"></span>{/if}
     {#each blips as b (b.id)}
-      <span class="blip {b.kind}" style="left:{b.x}%;top:{b.y}%"></span>
+      <span class="blip {b.kind}" style="left:{b.x}%;top:{b.y}%{b.tool ? `;--b:var(--tool-${b.tool})` : ''}"></span>
     {/each}
     <span class="core"></span>
   </span>
@@ -141,6 +157,7 @@
   }
   .blip.add { background: var(--info); box-shadow: 0 0 6px var(--info); }
   .blip.del { background: var(--err); box-shadow: 0 0 6px var(--err); }
+  .blip.agent { background: var(--b); box-shadow: 0 0 6px var(--b); }
   /* reduced motion: still sweep wedge, blips just appear then vanish (timer) */
   .rm .sweep { animation: none; transform: rotate(-30deg); }
   .rm .blip { animation: none; opacity: 0.9; }
