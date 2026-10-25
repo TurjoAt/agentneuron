@@ -31,7 +31,7 @@ CLAUDE.md
     16  FALSE   env        `STRIPE_SECRET`  not in .env.example and not referenced in source
                        fix: add STRIPE_SECRET to .env.example or remove the mention
 
-14 claims in 1 context files: 6 ok, 8 false, 1 unknown (--all lists ok claims)
+14 claims in 1 context files: 5 ok, 8 false, 1 unknown (--all lists ok claims)
 ```
 
 ## What is checked

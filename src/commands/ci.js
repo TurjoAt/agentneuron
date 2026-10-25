@@ -80,7 +80,7 @@ export async function materializeBase(root, ref) {
   // a private index + checkout-index: the repository's own index, HEAD and worktree are never modified;
   // symlinks are written as plain files so a hostile base tree cannot point outside the temp dir
   const r1 = await git(top.out.trim(), ['-c', 'core.symlinks=false', 'read-tree', commit.out.trim()], env);
-  const r2 = r1.ok && await git(top.out.trim(), ['-c', 'core.symlinks=false', 'checkout-index', '-a', '-f', `--prefix=${tree}${path.sep}`], env);
+  const r2 = r1.ok && await git(top.out.trim(), ['-c', 'core.symlinks=false', 'checkout-index', '-a', '-f', `--prefix=${tree.split(path.sep).join('/')}/`], env);
   if (!r1.ok || !r2.ok) { rmrf(tmp); throw new Error(`could not check out ${ref}: ${(r1.ok ? r2.err : r1.err).trim().slice(0, 300)}`); }
   const dir = path.join(tree, ...prefix.split('/').filter(Boolean));
   fs.mkdirSync(dir, { recursive: true });
@@ -157,7 +157,8 @@ export async function cmdCi(root, flags, log = console) {
     const { format: _f, ...rest } = res;
     log.log(JSON.stringify({ schema: 'agentneuron.ci/v1', ...rest }, null, 2));
   } else if (format === 'github') {
-    const rel = path.relative(process.cwd(), res.root).split(path.sep).join('/');
+    const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } }; // macOS /var -> /private/var
+    const rel = path.relative(real(process.cwd()), real(res.root)).split(path.sep).join('/');
     for (const l of annotations(res.issues, rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : '')) log.log(l);
     const md = markdown(res);
     const summary = process.env.GITHUB_STEP_SUMMARY;

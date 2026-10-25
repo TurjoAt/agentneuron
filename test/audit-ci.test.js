@@ -129,7 +129,11 @@ test('MCP: verify_context and audit_agent_config are read-only tools with masked
   call(1, 'verify_context');
   call(2, 'audit_agent_config', { minSeverity: 'high' });
   call(3, 'verify_context', { status: 'bogus' });
-  await new Promise((r) => setTimeout(r, 400));
+  await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout: ${buf}`)), 15000);
+    const check = () => { if (['"id":1', '"id":2', '"id":3'].every((k) => buf.includes(k))) { clearTimeout(t); resolve(); } };
+    output.on('data', check); check();
+  });
   input.end();
   await done;
   const res = Object.fromEntries(buf.trim().split('\n').map((l) => JSON.parse(l)).map((m) => [m.id, m.result]));
@@ -218,7 +222,7 @@ test('CLI: ci --base reports only issues introduced since the base revision', { 
   const j = JSON.parse(r.stdout);
   assert.deepEqual(j.issues.map((i) => i.message), ['`npm run test:unit`: no "test:unit" script in package.json (has: unit, build)']);
   assert.equal(j.base.preexisting, 1);
-  assert.equal(g('status', '--porcelain').trim(), 'M package.json'); // index and worktree untouched
+  assert.deepEqual(g('status', '--porcelain').trim().split(/\r?\n/), ['M package.json']); // index and worktree untouched
   assert.equal(run(['ci', root, '--base', 'no-such-ref']).status, 2);
   assert.equal(run(['ci', root, '--base', '--upload-pack=x']).status, 2);
 });
