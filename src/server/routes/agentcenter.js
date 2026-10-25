@@ -6,7 +6,7 @@ import { FileError } from '../../files/paths.js';
 import { scanAgentSetup, rulesForFile } from '../../agentcenter/setup.js';
 import { listTemplates, renderTemplate } from '../../agentcenter/templates.js';
 import { syncStatus, syncPlan } from '../../agentcenter/sync.js';
-import { sessionTimeline, locateTranscript, readTranscriptUsageCached } from '../../agentcenter/transcript.js';
+import { sessionTimeline, locateTranscript, listCodexTranscripts, readTranscriptUsageCached } from '../../agentcenter/transcript.js';
 import { estimateCosts } from '../../agentcenter/costs.js';
 import { contextAt, contextDiff } from '../../agentcenter/timetravel.js';
 
@@ -71,8 +71,9 @@ export default async function register(router, ctx) {
     const to = num(q.get('to')) || Date.now() + 86400000;
     const list = (await ctx.sessions.list()).filter((s) => !s.lastAt || (s.lastAt >= from && (s.startedAt || s.lastAt) <= to)).slice(0, 300);
     const transcripts = new Map();
+    const codexFiles = list.length ? listCodexTranscripts(home) : []; // walked once per request, not once per session
     for (const s of list) {
-      const loc = locateTranscript(s.sessionId, { root: ctx.root, home });
+      const loc = locateTranscript(s.sessionId, { root: ctx.root, home, codexFiles });
       const u = loc ? readTranscriptUsageCached(loc.file, loc.tool) : null;
       if (u) transcripts.set(s.sessionId, u);
     }

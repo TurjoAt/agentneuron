@@ -47,3 +47,19 @@ test('git: non-ASCII file names are not C-quoted in recent commits and stats', {
   assert.equal(st.topFiles[0].path, 'über.md');
   assert.equal(st.truncated, false);
 });
+
+test('locateTranscript: uses a pre-walked codex list; foreign claude dirs ignored with a root', async () => {
+  const { locateTranscript, listCodexTranscripts } = await import('../src/agentcenter/transcript.js');
+  const home = tmp();
+  fs.mkdirSync(path.join(home, '.claude/projects/other'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.claude/projects/other/s1.jsonl'), '{}\n');
+  fs.mkdirSync(path.join(home, '.codex/sessions/2026/01'), { recursive: true });
+  const cf = path.join(home, '.codex/sessions/2026/01/rollout-x-c1.jsonl');
+  fs.writeFileSync(cf, '{}\n');
+  assert.equal(locateTranscript('s1', { root: '/some/project', home }), null);
+  assert.equal(locateTranscript('s1', { home }).tool, 'claude');
+  const files = listCodexTranscripts(home);
+  assert.deepEqual(files, [cf]);
+  assert.equal(locateTranscript('c1', { root: '/p', home, codexFiles: files }).file, cf);
+  assert.equal(locateTranscript('c1', { root: '/p', home, codexFiles: [] }), null, 'pre-walked list is used as-is');
+});

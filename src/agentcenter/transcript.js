@@ -35,8 +35,11 @@ function walkJsonl(dir, depth = 0, out = []) {
   return out;
 }
 
+/** All Codex rollout files (walk once and pass as codexFiles when locating many sessions). */
+export function listCodexTranscripts(home = os.homedir()) { return walkJsonl(path.join(home, '.codex', 'sessions')); }
+
 /** Find the transcript file for a session id. Returns { file, tool } | null. */
-export function locateTranscript(id, { root, home = os.homedir() } = {}) {
+export function locateTranscript(id, { root, home = os.homedir(), codexFiles = null } = {}) {
   if (typeof id !== 'string' || !/^[\w.-]{1,200}$/.test(id)) return null;
   const projects = path.join(home, '.claude', 'projects');
   const tryDir = (d) => { const f = path.join(d, `${id}.jsonl`); return fs.existsSync(f) ? f : null; };
@@ -44,17 +47,16 @@ export function locateTranscript(id, { root, home = os.homedir() } = {}) {
     const f = tryDir(path.join(projects, projectDirName(root))) || tryDir(path.join(projects, path.resolve(root).replace(/\//g, '-')));
     if (f) return { file: f, tool: 'claude' };
   }
-  try {
-    for (const d of fs.readdirSync(projects, { withFileTypes: true })) {
-      if (!d.isDirectory()) continue;
-      const f = tryDir(path.join(projects, d.name));
-      if (f) {
-        // only trust a foreign project dir when no root is given
-        if (!root) return { file: f, tool: 'claude' };
+  if (!root) { // a foreign project dir is only trusted when no root is given
+    try {
+      for (const d of fs.readdirSync(projects, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        const f = tryDir(path.join(projects, d.name));
+        if (f) return { file: f, tool: 'claude' };
       }
-    }
-  } catch { /* none */ }
-  for (const f of walkJsonl(path.join(home, '.codex', 'sessions'))) {
+    } catch { /* none */ }
+  }
+  for (const f of codexFiles || listCodexTranscripts(home)) {
     const b = path.basename(f);
     if (b === `${id}.jsonl` || b.endsWith(`-${id}.jsonl`)) return { file: f, tool: 'codex' };
   }
