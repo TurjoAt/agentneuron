@@ -15,6 +15,9 @@ import { maskSecretsInText } from '../health/secrets.js';
 import { scanAgentSetup } from '../agentcenter/setup.js';
 import { exportReport, rangeFromSpec } from '../reports/index.js';
 import { createJsonl, filterRange } from '../persist/jsonl.js';
+import { createSessions } from '../agents/sessions.js';
+import { projectSessions } from '../insights/transcripts.js';
+import { lessonsFrom, readState, hiddenOf } from '../insights/index.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -39,6 +42,8 @@ const TOOLS = [
   { name: 'report_export', description: 'Activity/health report for a time range. format "ai" returns a compact Markdown context pack (KPIs, changes, ranked issues, open tasks, context budget, next actions); "json" returns the agentneuron.report/v1 object. Secrets masked.',
     inputSchema: obj({ range: { type: 'string', description: 'Relative range ending now, e.g. "24h", "7d", "30d" (default "7d")' }, format: { type: 'string', enum: ['ai', 'json'] },
       includeContent: { type: 'boolean', description: 'Append size-capped (~40k tokens) contents of the main context files' } }) },
+  { name: 'suggest_rules', description: 'Lessons mined from Claude Code / Codex sessions of this project (user corrections, reverted edits, repeatedly failing commands, repeated instructions) as proposed rules with evidence quotes (secrets masked), confidence, target file and whether an existing rule already covers them. Read-only.',
+    inputSchema: obj({ limit: { type: 'number', description: 'Max lessons (default 20)' }, includeCovered: { type: 'boolean', description: 'Include lessons an existing rule already covers (default false)' } }) },
 ];
 
 function parseSince(v) {
@@ -86,6 +91,7 @@ export async function runMcpServer(root, config = {}, io = {}) {
     try { watcher = createWatcher(absRoot, cfg, (e) => { store.handleFsEvent(e).catch(() => {}); }); } catch { /* optional */ }
   }
 
+  let sessionsApi = null;
   let cache = null;
   store.on('changed', () => { cache = null; });
   function analysis() {
@@ -196,6 +202,12 @@ export async function runMcpServer(root, config = {}, io = {}) {
       const out = await exportReport(reportCtx, rangeFromSpec(range), format, { includeContent: includeContent === true });
       // ai: raw Markdown (not JSON-encoded) so the model reads it directly; json: the v1 object
       return format === 'json' ? JSON.parse(out.body) : { [RAW_TEXT]: out.body };
+    },
+    async suggest_rules({ limit, includeCovered = false } = {}) {
+      const sctx = { root: absRoot, home: io.home, store, sessions: (sessionsApi ||= createSessions(absRoot, io.home ? { home: io.home } : {})) };
+      const list = lessonsFrom(await projectSessions(sctx), { files: [...store.files.values()], contents: store.contents, hidden: hiddenOf(readState(absRoot)) })
+        .filter((l) => includeCovered === true || !l.alreadyCovered).slice(0, cap(limit, 20, 100));
+      return { lessons: list.map(({ lastAt, ...l }) => l), note: 'Accept or dismiss in the AgentNeuron UI (Insights > Lessons) or append the rule to the target file yourself.' };
     },
   };
 

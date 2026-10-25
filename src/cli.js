@@ -20,6 +20,7 @@ Analysis:
   lint [dir]         list issues; exit 1 if any error-level issue (--json)
   status [dir]       short text summary
   export [dir]       write a report (--format ai|json|md|csv|html, --range 7d, --out file)
+  lessons [dir]      rules to learn from agent sessions (corrections, reverts, failing commands) (--json)
 
 Setup & maintenance:
   init [dir]         create .agentneuron/ (config + copy of this bundle)
@@ -80,6 +81,13 @@ Write an activity/health report. Default format "ai" (compact, for pasting into 
 
   agentneuron export > context-report.txt
   agentneuron export --format html --range 30d --out report.html`,
+  lessons: `Usage: agentneuron lessons [dir] [--json] [--covered] [--all]
+
+Mine Claude Code and Codex sessions of this project for user corrections, reverted edits, commands
+that keep failing and instructions repeated across sessions; print them as proposed rules with
+confidence, evidence (secrets masked) and the context file to add them to. Read-only.
+--covered  also list lessons an existing rule already covers
+--all      also list dismissed / accepted lessons`,
   doctor: `Usage: agentneuron doctor [dir] [--json] [--port n] [--host h]
 
 Check the environment: Node version, git, port availability, config validity, enabled
@@ -239,7 +247,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'lessons']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -265,6 +273,7 @@ export async function main(argv = process.argv.slice(2)) {
     case 'mcp': return cmdMcp(root, flags);
     case 'export': return (await import('./commands/export.js')).cmdExport(root, flags);
     case 'doctor': return (await import('./commands/doctor.js')).cmdDoctor(root, flags);
+    case 'lessons': return (await import('./commands/lessons.js')).cmdLessons(root, flags);
     case 'workspace': return cmdStart(root, flags, true);
     default: return cmdStart(root, flags);
   }
