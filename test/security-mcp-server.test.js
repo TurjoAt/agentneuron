@@ -127,7 +127,7 @@ test('mcp: malformed JSON-RPC yields errors and never crashes', async () => {
     assert.equal(sinceBad.result.isError, true);
     // still alive and answering
     const ok = await s.raw('{"jsonrpc":"2.0","id":17,"method":"tools/list"}');
-    assert.equal(ok.result.tools.length, 9);
+    assert.equal(ok.result.tools.length, 10);
   } finally { await s.close(); }
 });
 

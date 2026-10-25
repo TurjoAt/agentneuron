@@ -1,5 +1,5 @@
 import { HttpError } from '../router.js';
-import { parseRange, summary, series, top, heatmap, exportReport } from '../../reports/index.js';
+import { parseRange, summary, series, top, heatmap, exportReport, EXPORT_FORMATS } from '../../reports/index.js';
 
 export default async function register(router, ctx) {
   router.get('/api/reports/summary', ({ q }) => summary(ctx, parseRange(q)));
@@ -13,12 +13,14 @@ export default async function register(router, ctx) {
   });
   router.get('/api/reports/heatmap', ({ q }) => heatmap(ctx, Number(q.get('days')) || 365));
   router.get('/api/reports/export', async ({ q, res }) => {
-    const f = q.get('format') || 'csv';
-    if (!['csv', 'md', 'html'].includes(f)) throw new HttpError(400, 'format must be csv|md|html');
-    const out = await exportReport(ctx, parseRange(q), f);
+    const f = String(q.get('format') || 'csv').toLowerCase();
+    if (!EXPORT_FORMATS.includes(f)) throw new HttpError(400, `format must be ${EXPORT_FORMATS.join('|')}`);
+    const includeContent = String(q.get('include') || '').split(',').includes('content');
+    const out = await exportReport(ctx, parseRange(q), f, { includeContent });
     res.writeHead(200, {
       'content-type': out.type, 'cache-control': 'no-store',
       'content-disposition': `attachment; filename="${out.filename}"`,
+      'x-agentneuron-tokens': String(out.tokens || 0),
     });
     res.end(out.body);
   });

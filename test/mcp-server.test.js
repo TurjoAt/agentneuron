@@ -46,7 +46,7 @@ test('MCP stdio server: initialize, tools/list, tools/call', async () => {
     assert.ok(init.result.capabilities.tools);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const list = await rpc('tools/list', {});
-    assert.deepEqual(list.result.tools.map((t) => t.name).sort(), ['get_context', 'get_health', 'get_links', 'get_tasks', 'list_files', 'project_info', 'read_file', 'recent_changes', 'search']);
+    assert.deepEqual(list.result.tools.map((t) => t.name).sort(), ['get_context', 'get_health', 'get_links', 'get_tasks', 'list_files', 'project_info', 'read_file', 'recent_changes', 'report_export', 'search']);
     for (const t of list.result.tools) assert.equal(t.inputSchema.type, 'object');
 
     const files = await call('list_files', {});
@@ -67,6 +67,21 @@ test('MCP stdio server: initialize, tools/list, tools/call', async () => {
     assert.equal((await call('get_tasks', { status: 'done' })).data.total, 1);
     assert.equal((await call('get_links', { path: 'CLAUDE.md' })).data.out[0].to, 'docs/plan.md');
     assert.equal((await call('project_info', {})).data.files, 2);
+    const ai = await rpc('tools/call', { name: 'report_export', arguments: { range: '7d', format: 'ai', includeContent: true } });
+    assert.equal(ai.result.isError, false);
+    const md = ai.result.content[0].text;
+    assert.match(md, /^---\nschema: "agentneuron\.report\/v1"/);
+    assert.match(md, /## Suggested next actions/);
+    assert.match(md, /### CLAUDE\.md/);
+    assert.match(md, /- \[ \] ship it/);
+    assert.ok(!md.includes('Zq9Xw8Vu7Ts6Rp5On4Ml3Zq9'), 'secret leaked');
+    assert.ok(!md.includes(root), 'absolute root leaked');
+    const js = await call('report_export', { range: '30d', format: 'json' });
+    assert.equal(js.data.schema, 'agentneuron.report/v1');
+    assert.equal(js.data.tasks.open, 1);
+    assert.deepEqual(js.data.contextFiles.map((f) => f.path).sort(), ['CLAUDE.md', 'docs/plan.md']);
+    assert.equal((await call('report_export', { range: 'forever' })).isError, true);
+    assert.equal((await call('report_export', { format: 'csv' })).isError, true);
     assert.equal((await rpc('nope/method', {})).error.code, -32601);
     assert.equal((await rpc('tools/call', { name: 'zzz' })).error.code, -32602);
     child.stdin.write('not json\n');

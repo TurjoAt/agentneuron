@@ -1322,6 +1322,54 @@ export function createMock() {
   // UI-B insight routes (reports, project, agents, workspace, git stats…) — called as fn(q, init)
   const insight = insightRoutes({ graph, files: filesList, sessions: () => sessions, health });
   for (const [k, fn] of Object.entries(insight)) if (!routes[k]) routes[k] = (q, _b, init) => fn(q, init);
+  routes['/api/reports/export'] = (q) => reportExport(q || {});
+
+  // reports export: csv/md/html from the insight stub; json (agentneuron.report/v1) and ai context pack here
+  function reportExport(q) {
+    const fmt = q.format === 'llm' ? 'ai' : q.format || 'md';
+    const sm = insight['/api/reports/summary'](q);
+    const day = (t) => new Date(t).toISOString().slice(0, 10);
+    const ext = { csv: 'csv', md: 'md', html: 'html', json: 'json', ai: 'ai.md' }[fmt];
+    if (!ext) throw httpErr(400, 'bad format');
+    const filename = `agentneuron-report-${PROJECT.name}-${day(sm.range.from)}_${day(sm.range.to)}.${ext}`;
+    const mask = (t) => String(t).replace(/\bsk-ant-[A-Za-z0-9_-]{20,}/g, (m) => m.slice(0, 4) + '****');
+    const est = (t) => Math.ceil((t.length / 4 + (t.match(/\S+/g) || []).length * 1.3) / 2);
+    if (!['json', 'ai'].includes(fmt)) { const r = insight['/api/reports/export'](q); return { ...r, filename, content: mask(r.content), tokens: est(r.content) }; }
+    const h = health();
+    const files = filesList();
+    const open = tasks().filter((t) => !t.done);
+    const kpis = Object.fromEntries(Object.keys(sm.kpis).map((k) => [k, { value: sm.kpis[k], previous: sm.prev[k] ?? null, delta: typeof sm.kpis[k] === 'number' && typeof sm.prev[k] === 'number' ? sm.kpis[k] - sm.prev[k] : null }]));
+    const top = insight['/api/reports/top']({ ...q, by: 'churn' }).slice(0, 10);
+    const iso = (t) => new Date(t).toISOString();
+    const rep = {
+      schema: 'agentneuron.report/v1', generatedAt: iso(Date.now()), project: { name: PROJECT.name, stack: [{ id: 'node', version: '20' }, { id: 'typescript', version: null }] },
+      range: { from: iso(sm.range.from), to: iso(sm.range.to) }, prevRange: { from: iso(sm.prevRange.from), to: iso(sm.prevRange.to) }, kpis, series: [],
+      top: top.map((r) => ({ path: r.path, changes: r.changes, added: r.added, removed: r.removed, lastChangedAt: iso(r.last) })), fileChanges: { added: [], removed: [] },
+      health: { score: h.score, grade: h.grade, counts: h.counts }, tasks: { open: open.length, done: tasks().length - open.length, items: open.slice(0, 50).map((t) => ({ path: t.path, line: t.line, text: t.text, section: t.section || null })) },
+      contextFiles: files.map((f) => ({ path: f.path, tool: f.tool, kind: f.kind, tokens: f.tokens || 0, updatedAt: iso(f.mtime || Date.now()) })),
+      issues: h.issues.slice().sort((a, b) => ({ error: 0, warn: 1, info: 2 })[a.severity] - ({ error: 0, warn: 1, info: 2 })[b.severity]).map((i) => ({ rule: i.rule, severity: i.severity, path: i.path, line: i.line ?? null, message: i.message, hint: i.hint || null })),
+    };
+    if (fmt === 'json') { const content = mask(JSON.stringify(rep, null, 2)); return { filename, mime: 'application/json', content, tokens: est(content) }; }
+    const byTool = {};
+    for (const f of rep.contextFiles) byTool[f.tool] = (byTool[f.tool] || 0) + f.tokens;
+    const total = Object.values(byTool).reduce((a, b) => a + b, 0);
+    const sg = (n) => (typeof n !== 'number' ? '-' : n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+    const L = [`# AgentNeuron context pack: ${PROJECT.name}`, '', `Period: ${day(sm.range.from)} → ${day(sm.range.to)} (demo data).`, '', '## Summary', '',
+      `${sm.kpis.changes} changes touched ${sm.kpis.filesTouched} files. Health is ${h.score} (${h.grade}) with ${h.counts.error} error(s), ${h.counts.warn} warning(s). Context totals ${total} tokens; ${open.length} open task(s).`, '',
+      '## KPIs', '', '| KPI | Value | Previous | Δ |', '|---|---:|---:|---:|', ...Object.entries(kpis).map(([k, v]) => `| ${k} | ${v.value ?? '-'} | ${v.previous ?? '-'} | ${sg(v.delta)} |`), '',
+      '## What changed', '', ...top.map((t) => `- \`${t.path}\`: ${t.changes} change(s), +${t.added}/−${t.removed}`), '',
+      '## Health issues', '', ...rep.issues.slice(0, 15).map((i, n) => `${n + 1}. **${i.severity}** \`${i.rule}\` \`${i.path}${i.line ? `:${i.line}` : ''}\`: ${i.message}`), '',
+      '## Open tasks', '', ...open.slice(0, 15).map((t) => `- [ ] ${t.text} (\`${t.path}:${t.line}\`)`), '',
+      '## Context budget by tool', '', '| Tool | Tokens |', '|---|---:|', ...Object.entries(byTool).sort((a, b) => b[1] - a[1]).map(([t, n]) => `| ${t} | ${n} |`), '',
+      '## Suggested next actions', '', `1. Fix ${h.counts.error} error-level issue(s).`, `2. Triage ${open.length} open task(s).`, ''];
+    if (q.include === 'content') {
+      L.push('## File contents', '');
+      for (const f of files.filter((x) => ['context', 'rules', 'agent', 'skill', 'memory'].includes(x.kind))) L.push(`### ${f.path}`, '', '```markdown', db.get(f.path)?.content || '', '```', '');
+    }
+    const body = mask(L.join('\n'));
+    const fm = `---\nschema: "agentneuron.report/v1"\nformat: "ai"\ngeneratedAt: "${rep.generatedAt}"\nproject: "${PROJECT.name}"\nrange: { from: "${rep.range.from}", to: "${rep.range.to}" }\ntokenEstimate: ${est(body)}\nincludesContent: ${q.include === 'content'}\n---\n`;
+    return { filename, mime: 'text/markdown', content: fm + body, tokens: est(fm + body) };
+  }
 
   const STATE_POSTS = new Set(['/api/bookmarks', '/api/annotations']);
   async function request(path, params = {}, init = {}) {
