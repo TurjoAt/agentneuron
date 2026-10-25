@@ -12,6 +12,8 @@ import { lint } from '../health/lint.js';
 import { healthScore } from '../health/score.js';
 import { maskSecretsInText } from '../health/secrets.js';
 import { scanAgentSetup } from '../agentcenter/setup.js';
+import { exportReport, rangeFromSpec } from '../reports/index.js';
+import { createJsonl, filterRange } from '../persist/jsonl.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -33,6 +35,9 @@ const TOOLS = [
   { name: 'get_tasks', description: 'Open and done tasks (checkboxes, TODO/FIXME) found in markdown.', inputSchema: obj({ status: { type: 'string', enum: ['open', 'done', 'all'] }, limit: { type: 'number' } }) },
   { name: 'get_links', description: 'Incoming and outgoing links for a file.', inputSchema: obj({ path: { type: 'string' } }, ['path']) },
   { name: 'project_info', description: 'Project overview: root, file counts, tokens, detected AI tools.', inputSchema: obj() },
+  { name: 'report_export', description: 'Activity/health report for a time range. format "ai" returns a compact Markdown context pack (KPIs, changes, ranked issues, open tasks, context budget, next actions); "json" returns the agentneuron.report/v1 object. Secrets masked.',
+    inputSchema: obj({ range: { type: 'string', description: 'Relative range ending now, e.g. "24h", "7d", "30d" (default "7d")' }, format: { type: 'string', enum: ['ai', 'json'] },
+      includeContent: { type: 'boolean', description: 'Append size-capped (~40k tokens) contents of the main context files' } }) },
 ];
 
 function parseSince(v) {
@@ -65,6 +70,7 @@ function maskDeep(v, depth = 0) {
   return out;
 }
 
+const RAW_TEXT = Symbol('rawText');
 const cap = (n, d = 50, max = 500) => Math.max(1, Math.min(max, Math.floor(Number(n)) || d));
 
 export async function runMcpServer(root, config = {}, io = {}) {
@@ -92,6 +98,16 @@ export async function runMcpServer(root, config = {}, io = {}) {
     cache = { files, graph, issues, health, tasks };
     return cache;
   }
+
+  // read-only report context: in-memory store plus persisted history written by `agentneuron serve` (never written here)
+  const persisted = (name) => createJsonl(path.join(absRoot, '.agentneuron', `${name}.jsonl`));
+  const reportCtx = {
+    root: absRoot, config: cfg, store, allFiles: () => [...store.files.values()], analysis: async () => analysis(),
+    persist: {
+      events: { query: ({ from, to, limit } = {}) => filterRange([...persisted('events').readAll(), ...store.events].sort((a, b) => a.ts - b.ts), { from, to, limit }) },
+      metrics: { query: ({ from, to } = {}) => filterRange(persisted('metrics').readAll(), { from, to }) },
+    },
+  };
 
   const tools = {
     list_files({ tool, kind } = {}) {
@@ -167,6 +183,12 @@ export async function runMcpServer(root, config = {}, io = {}) {
       return { name: path.basename(absRoot), root: absRoot, files: a.files.length, tokens, byTool, health: { score: a.health.score, grade: a.health.grade },
         tools: setup.tools.filter((t) => t.detected).map((t) => t.id), setup: setup.totals };
     },
+    async report_export({ range = '7d', format = 'ai', includeContent = false } = {}) {
+      if (!['ai', 'json'].includes(format)) throw new Error('format must be "ai" or "json"');
+      const out = await exportReport(reportCtx, rangeFromSpec(range), format, { includeContent: includeContent === true });
+      // ai: raw Markdown (not JSON-encoded) so the model reads it directly; json: the v1 object
+      return format === 'json' ? JSON.parse(out.body) : { [RAW_TEXT]: out.body };
+    },
   };
 
   const rpcResult = (id, result) => ({ jsonrpc: '2.0', id, result });
@@ -199,7 +221,7 @@ export async function runMcpServer(root, config = {}, io = {}) {
         try {
           const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments) ? params.arguments : {};
           const data = await fn(args);
-          let text = JSON.stringify(maskDeep(data), null, 2);
+          let text = data && typeof data[RAW_TEXT] === 'string' ? maskSecretsInText(data[RAW_TEXT]) : JSON.stringify(maskDeep(data), null, 2);
           if (text.length > MAX_RESPONSE) text = `${text.slice(0, MAX_RESPONSE)}\n… [output truncated at ${MAX_RESPONSE} bytes]`;
           return rpcResult(msg.id, { content: [{ type: 'text', text }], isError: false });
         } catch (e) {

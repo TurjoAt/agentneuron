@@ -1,10 +1,13 @@
 import { createGit2 } from '../git2/index.js';
+import { estimateTokens } from '../core/tokens.js';
+import { buildReportV1, renderAi, makeScrubber, scrubDeep, exportFilename } from './export.js';
 import {
   DAY, parseRange, prevRangeOf, getEvents, getMetrics, currentMetric, evTool, evKind, evLines,
   bucketStart, makeBuckets,
 } from './data.js';
 
 export { parseRange, prevRangeOf };
+export { SCHEMA, buildReportV1, renderAi, rangeFromSpec, slugify, exportFilename, collectContents } from './export.js';
 
 const gitFor = (ctx) => ctx.git2 || (ctx.git2 = createGit2(ctx.root));
 const withTimeout = (p, ms, fb) => new Promise((res) => {
@@ -225,7 +228,7 @@ const fmt = (v) => (v === null || v === undefined ? '-' : String(v));
 const mdCell = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 export function renderMd(rep) {
-  const L = [`# agentneuron report`, '', `Range: ${iso(rep.range.from)} to ${iso(rep.range.to)} (previous: ${iso(rep.prevRange.from)} to ${iso(rep.prevRange.to)})`, '',
+  const L = [`# agentneuron report${rep.project ? `: ${mdCell(rep.project)}` : ''}`, '', `Range: ${iso(rep.range.from)} to ${iso(rep.range.to)} (previous: ${iso(rep.prevRange.from)} to ${iso(rep.prevRange.to)})`, '',
     '| KPI | Value | Previous |', '|---|---:|---:|'];
   for (const [k, label] of KPI_LABELS) L.push(`| ${label} | ${fmt(rep.kpis[k])} | ${fmt(rep.prev[k])} |`);
   L.push('', '## Top churned files', '', '| File | Changes | Added | Removed |', '|---|---:|---:|---:|');
@@ -242,7 +245,7 @@ export function renderHtml(rep) {
   const bars = rep.daily.map((d) => `<div title="${esc(d.date)}: ${d.changes}" style="flex:1;background:#6aa;height:${Math.round((d.changes / max) * 100)}%"></div>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>agentneuron report</title>
 <style>body{font:15px system-ui;max-width:860px;margin:2rem auto;padding:0 1rem;color:#222}table{border-collapse:collapse;width:100%;margin:1rem 0}td,th{border-bottom:1px solid #ddd;padding:.3rem .5rem;text-align:left}td.n,th.n{text-align:right}.bars{display:flex;align-items:flex-end;gap:1px;height:80px}</style></head><body>
-<h1>agentneuron report</h1><p>${esc(iso(rep.range.from))} to ${esc(iso(rep.range.to))}</p>
+<h1>agentneuron report${rep.project ? `: ${esc(rep.project)}` : ''}</h1><p>${esc(iso(rep.range.from))} to ${esc(iso(rep.range.to))}</p>
 <table><tr><th>KPI</th><th class="n">Value</th><th class="n">Previous</th></tr>
 ${KPI_LABELS.map(([k, l]) => `<tr><td>${esc(l)}</td><td class="n">${esc(fmt(rep.kpis[k]))}</td><td class="n">${esc(fmt(rep.prev[k]))}</td></tr>`).join('\n')}
 </table><h2>Changes per day</h2><div class="bars">${bars}</div>
@@ -252,10 +255,32 @@ ${rep.top.slice(0, 20).map((r) => `<tr><td>${esc(r.path)}</td><td class="n">${r.
 `;
 }
 
-export async function exportReport(ctx, range, format) {
+export const EXPORT_FORMATS = ['csv', 'md', 'html', 'json', 'ai', 'llm'];
+const EXPORT_TYPES = {
+  csv: ['text/csv; charset=utf-8', 'csv'], md: ['text/markdown; charset=utf-8', 'md'], html: ['text/html; charset=utf-8', 'html'],
+  json: ['application/json; charset=utf-8', 'json'], ai: ['text/markdown; charset=utf-8', 'ai.md'],
+};
+
+/**
+ * Export a report. format: csv | md | html | json | ai (alias llm).
+ * opts.includeContent appends capped contents of the main context files (json, ai).
+ * Returns { body, type, filename, format, tokens? }. All text is secret-masked and has no absolute paths.
+ */
+export async function exportReport(ctx, range, format = 'csv', opts = {}) {
+  let f = String(format || 'csv').toLowerCase();
+  if (f === 'llm') f = 'ai';
+  if (!EXPORT_TYPES[f]) throw new Error(`unknown export format "${String(format).slice(0, 20)}" (use ${EXPORT_FORMATS.join('|')})`);
   const rep = await buildReport(ctx, range);
-  const stamp = new Date(range.to).toISOString().slice(0, 10);
-  if (format === 'md') return { body: renderMd(rep), type: 'text/markdown; charset=utf-8', filename: `agentneuron-report-${stamp}.md` };
-  if (format === 'html') return { body: renderHtml(rep), type: 'text/html; charset=utf-8', filename: `agentneuron-report-${stamp}.html` };
-  return { body: renderCsv(rep), type: 'text/csv; charset=utf-8', filename: `agentneuron-report-${stamp}.csv` };
+  const v1 = await buildReportV1(ctx, rep, { includeContent: !!opts.includeContent && (f === 'json' || f === 'ai') });
+  const scrub = makeScrubber(ctx.root);
+  const [type, ext] = EXPORT_TYPES[f];
+  const out = { format: f, type, filename: exportFilename(v1.project.name, range, ext) };
+  if (f === 'json') out.body = scrub(JSON.stringify(v1, null, 2)) + '\n';
+  else if (f === 'ai') { const r = renderAi(v1); out.body = scrub(r.body); out.tokens = r.tokens; }
+  else {
+    const named = scrubDeep({ ...rep, project: v1.project.name }, scrub);
+    out.body = scrub(f === 'md' ? renderMd(named) : f === 'html' ? renderHtml(named) : renderCsv(named));
+  }
+  if (out.tokens === undefined) out.tokens = estimateTokens(out.body);
+  return out;
 }
