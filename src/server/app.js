@@ -21,6 +21,7 @@ import { registerActions } from '../actions/index.js';
 import { createPersist } from '../persist/index.js';
 import { createNotifier } from '../notify/index.js';
 import { validRev } from '../git2/run.js';
+import { liveAccess, redactPrompts } from '../live/coord.js';
 
 export { VERSION };
 const SESSION_COOKIE = 'agentneuron_session';
@@ -504,7 +505,10 @@ export async function startServer(config) {
         return json(res, 200, { available: true, ...((await repoInfo()) || {}) });
       }
       case '/api/config': return json(res, 200, readAgentConfig(root));
-      case '/api/sessions': return json(res, 200, await withTimeout(sessions.list(), 5000, []));
+      case '/api/sessions': {
+        const list = await withTimeout(sessions.list(), 5000, []);
+        return json(res, 200, liveAccess(config).prompts(role) ? list : redactPrompts(list));
+      }
       case '/api/conflicts': return json(res, 200, radar.active());
       case '/api/search': {
         const needle = (q.get('q') || '').toLowerCase();

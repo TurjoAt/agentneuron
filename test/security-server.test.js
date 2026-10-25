@@ -236,3 +236,10 @@ test('redactPrompts drops prompt rows and blanks titles and quotes', async () =>
   const out = redactPrompts({ session: { title: 't' }, prompts: [{ text: 'p' }], timeline: [{ kind: 'prompt', text: 'p' }, { kind: 'edit', path: 'a' }, { type: 'prompt', text: 'p' }], lessons: [{ evidence: [{ quote: 'q', ts: 1 }] }] });
   assert.deepEqual(out, { session: { title: '' }, prompts: [], timeline: [{ kind: 'edit', path: 'a' }], lessons: [{ evidence: [{ quote: '', ts: 1 }] }] });
 });
+
+test('without tokens on loopback, insights replay keeps session titles', async () => {
+  const { srv, port } = await boot({});
+  srv.store.events.push({ id: 999997, type: 'change', path: 'CLAUDE.md', ts: Date.now(), agent: { tool: 'claude', sessionId: 's3', title: 'local session title', ts: 1 } });
+  const body = JSON.parse((await raw(port, { p: '/api/insights/replay', headers: { host: `127.0.0.1:${port}` } })).body);
+  assert.ok(JSON.stringify(body).includes('local session title'));
+});

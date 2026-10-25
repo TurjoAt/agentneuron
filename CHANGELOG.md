@@ -29,6 +29,7 @@ From watching context to keeping it true. Includes everything prepared for 0.3.0
 
 - File events show the attributed agent's prompt and session title to admins only; viewers get the tool and session id.
 - Live prompts and diffs follow `live.showPrompts`, `live.viewerPrompts` and `live.viewerDiffs` (prompts off for viewers and for non-loopback binds by default).
+- Session lists, the session timeline, cost rows and Insights (Replay, Lessons, cost by feature) follow the same prompt policy. This changes existing endpoints: on a non-loopback bind, admins now need `live.showPrompts: true` to see session titles and prompts there.
 
 ## [0.3.0] - 2026-10-25
 

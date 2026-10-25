@@ -68,7 +68,7 @@ export default async function register(router, ctx) {
     return liveAccess(ctx.config).prompts(role) ? out : redactPrompts(out);
   });
 
-  router.get('/api/agents/costs', async ({ q }) => {
+  router.get('/api/agents/costs', async ({ q, role }) => {
     const from = num(q.get('from')) || 0;
     const to = num(q.get('to')) || Date.now() + 86400000;
     const list = (await ctx.sessions.list()).filter((s) => !s.lastAt || (s.lastAt >= from && (s.startedAt || s.lastAt) <= to)).slice(0, 300);
@@ -79,7 +79,8 @@ export default async function register(router, ctx) {
       const u = loc ? readTranscriptUsageCached(loc.file, loc.tool) : null;
       if (u) transcripts.set(s.sessionId, u);
     }
-    return estimateCosts(list, transcripts, ctx.config?.pricing || {}, { from, to });
+    const out = estimateCosts(list, transcripts, ctx.config?.pricing || {}, { from, to });
+    return liveAccess(ctx.config).prompts(role) ? out : redactPrompts(out);
   });
 
   const tool = (q) => { const t = q.get('tool') || 'claude'; if (!TOOLS.has(t)) throw new HttpError(400, 'tool must be claude|codex|cursor'); return t; };

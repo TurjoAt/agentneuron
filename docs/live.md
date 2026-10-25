@@ -64,6 +64,7 @@ The browser applies events once per animation frame, applies nothing while the t
   | Prompt or intent | 200 characters |
 
 - **Prompts.** `agent.prompt`, `agent.thinking` and the `lastPrompt`/`lastThinking` fields of sessions are sent only when prompts are allowed. They are allowed by default when the server is bound to a loopback address and off for any other bind (`live.showPrompts`). Viewers never get them unless `live.viewerPrompts` is `true`.
+  The same rule covers session titles, prompt rows and quoted evidence in `/api/sessions`, `/api/agents/session`, `/api/agents/costs` and `/api/insights/*` (Replay, Lessons, cost by feature). On a non-loopback bind, set `"live": { "showPrompts": true }` to see them as admin.
 - **Diffs.** Viewers get edit events without hunks (`hunk: []`, `hunkHidden: true`) unless `live.viewerDiffs` is `true`.
 
 ## Configuration
