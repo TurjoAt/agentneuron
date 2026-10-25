@@ -100,13 +100,20 @@ export async function runMcpServer(root, config = {}, io = {}) {
     return cache;
   }
 
-  // read-only report context: in-memory store plus persisted history written by `agentneuron serve` (never written here)
+  // read-only report context: in-memory store plus persisted history written by `agentneuron start` (never written here)
   const persisted = (name) => createJsonl(path.join(absRoot, '.agentneuron', `${name}.jsonl`));
+  const pEvents = persisted('events'), pMetrics = persisted('metrics'); // one instance each, so the parse cache is shared
+  const allEvents = () => {
+    const saved = pEvents.readAll();
+    // a running server persists the same file changes this process sees: only add in-memory events newer than its history
+    const last = saved.length ? saved[saved.length - 1].ts : -Infinity;
+    return [...saved, ...store.events.filter((e) => e.ts > last)].sort((a, b) => a.ts - b.ts);
+  };
   const reportCtx = {
     root: absRoot, config: cfg, store, allFiles: () => [...store.files.values()], analysis: async () => analysis(),
     persist: {
-      events: { query: ({ from, to, limit } = {}) => filterRange([...persisted('events').readAll(), ...store.events].sort((a, b) => a.ts - b.ts), { from, to, limit }) },
-      metrics: { query: ({ from, to } = {}) => filterRange(persisted('metrics').readAll(), { from, to }) },
+      events: { query: ({ from, to, limit } = {}) => filterRange(allEvents(), { from, to, limit }) },
+      metrics: { query: ({ from, to } = {}) => filterRange(pMetrics.readAll(), { from, to }) },
     },
   };
 

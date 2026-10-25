@@ -12,7 +12,7 @@ agentneuron mcp [dir]
 - stdout carries only protocol messages. Set `AGENTNEURON_DEBUG=1` for diagnostics on stderr.
 - It reads the project itself and watches it for changes. It does not need the web server to be running, and it does not use tokens.
 - Secrets found in files are masked in everything it returns. Output is capped (file text 200 KB; any single tool result 1 MB; request lines 4 MB). `get_context` accepts only the tools `claude`, `codex` and `cursor`.
-- `report_export` reads the history that `agentneuron serve` keeps in `.agentneuron/` (events, metrics) when present, plus changes seen since the MCP server started; it never writes it.
+- `report_export` reads the history that `agentneuron start` keeps in `.agentneuron/` (events, metrics) when present, plus changes seen since the MCP server started that are newer than that history (so nothing is counted twice); it never writes it.
 
 ## Tools
 

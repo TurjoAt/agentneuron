@@ -37,8 +37,6 @@ export async function cmdExport(root, flags, log = console) {
   if (flags.out === true) { log.error('agentneuron: --out needs a file name'); return 2; }
   const ctx = await createHeadlessCtx(root);
   const out = await exportReport(ctx, range.from === null ? resolveAll(ctx, range.to) : range, format);
-  // exportReport falls back to CSV for formats it does not know; never print CSV for another format
-  if (format !== 'csv' && /csv/i.test(String(out?.type || ''))) { log.error(`agentneuron: format "${format}" is not supported by this build`); return 2; }
   const body = typeof out.body === 'string' || Buffer.isBuffer(out.body) ? out.body : JSON.stringify(out.body, null, 2);
   if (flags.out) {
     const dest = path.resolve(String(flags.out));

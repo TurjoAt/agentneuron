@@ -17,7 +17,7 @@ test('config defaults, file and overrides', () => {
   const r = tmp();
   assert.equal(loadConfig(r).port, 4747);
   ensureAgentneuronDir(r);
-  assert.equal(fs.readFileSync(path.join(r, '.agentneuron/.gitignore'), 'utf8'), 'history/\ncache/\n');
+  assert.equal(fs.readFileSync(path.join(r, '.agentneuron/.gitignore'), 'utf8'), 'history/\ncache/\n*.bak\n');
   fs.writeFileSync(path.join(r, '.agentneuron/config.json'), JSON.stringify({ port: 5000, ignore: ['tmp'] }));
   const c = loadConfig(r, { host: '0.0.0.0', port: undefined });
   assert.equal(c.port, 5000);

@@ -49,10 +49,14 @@ export function makeScrubber(root) {
   if (root) add(path.resolve(String(root)), '.');
   try { add(os.homedir(), '~'); } catch { /* no home */ }
   needles.sort((a, b) => b[0].length - a[0].length);
+  // only whole absolute paths: not preceded by a path character, and followed by a separator or a delimiter,
+  // so relative paths such as docs/project-plan.md survive a root of /project
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const res = needles.map(([n, rep]) => [n, new RegExp(`(?<![\\w.\\-/\\\\])${esc(n)}(?=$|[\\\\/\\s"'\`)\\],;:])`, 'g'), rep]);
   return (text) => {
     if (typeof text !== 'string') return text;
     let out = maskSecretsInText(text);
-    for (const [n, rep] of needles) if (out.includes(n)) out = out.split(n).join(rep);
+    for (const [n, re, rep] of res) if (out.includes(n)) out = out.replace(re, rep);
     return out;
   };
 }

@@ -55,7 +55,7 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - Git stage/commit/branch, package and script runner. Commands are spawned without a shell, stream live output and are written to an audit log.
 
 **Integrate**
-- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 9 read-only tools, so your AI agents can query the same data.
+- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 10 read-only tools, so your AI agents can query the same data.
 - HTTP + Server-Sent Events [API](docs/http-api.md).
 - `agentneuron lint --json` for CI ([example workflow](examples/ci/)).
 - Slack/Discord-compatible webhooks for secrets, conflicts, health drops and job results.

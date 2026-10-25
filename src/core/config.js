@@ -95,6 +95,6 @@ export function ensureAgentneuronDir(root) {
   const dir = path.join(path.resolve(root), '.agentneuron');
   fs.mkdirSync(dir, { recursive: true });
   const gi = path.join(dir, '.gitignore');
-  try { fs.writeFileSync(gi, 'history/\ncache/\n', { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+  try { fs.writeFileSync(gi, 'history/\ncache/\n*.bak\n', { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
   return dir;
 }

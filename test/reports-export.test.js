@@ -130,3 +130,13 @@ test('ai: front-matter, sections, content cap and masking', async () => {
   assert.ok(c.tokens < CONTENT_BUDGET + 4000, `tokens ${c.tokens}`);
   leaks(c.body);
 });
+
+test('scrubber replaces whole absolute paths only, never parts of relative ones', async () => {
+  const { makeScrubber } = await import('../src/reports/export.js');
+  const s = makeScrubber('/project');
+  assert.equal(s('docs/project-plan.md and src/project/index.js'), 'docs/project-plan.md and src/project/index.js');
+  assert.equal(s('/project/CLAUDE.md, "/project" (/project) /project:3'), './CLAUDE.md, "." (.) .:3');
+  assert.equal(s('/projects/x'), '/projects/x');
+  const home = os.homedir();
+  if (home && home.length >= 4) assert.equal(s(`${home}/notes.md`), '~/notes.md');
+});
