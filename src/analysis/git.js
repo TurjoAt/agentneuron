@@ -106,7 +106,7 @@ export function createGit(root) {
       run(root, ['rev-list', '--left-right', '--count', 'HEAD...@{u}']),
       run(root, ['remote', 'get-url', 'origin']),
       status(),
-      run(root, ['log', '-n', '20', '--relative', '--name-only', `--format=${SEP}%H${US}%h${US}%an${US}%aI${US}%s`]),
+      run(root, ['-c', 'core.quotepath=off', 'log', '-n', '20', '--relative', '--name-only', `--format=${SEP}%H${US}%h${US}%an${US}%aI${US}%s`]),
     ]);
     if (br.ok) info.branch = br.out.trim() || null;
     if (hd.ok) info.head = hd.out.trim() || null;

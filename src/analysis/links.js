@@ -43,6 +43,23 @@ function isUrl(s) {
   return /^[a-z][a-z0-9+.-]*:/i.test(s) || s.startsWith('//');
 }
 
+// Per path-set indexes, built once per graph rebuild instead of once per file (callers never mutate the set).
+const indexes = new WeakMap();
+function indexOf(allPaths) {
+  let x = indexes.get(allPaths);
+  if (x) return x;
+  const base = new Map(), order = new Map(), odd = [];
+  for (const p of [...allPaths].sort()) {
+    const b = posix.basename(p).replace(/\.[^.]+$/, '').toLowerCase();
+    if (!base.has(b)) base.set(b, []);
+    base.get(b).push(p);
+  }
+  for (const p of allPaths) { order.set(p, order.size); if (!/^[\w./-]+$/.test(p)) odd.push(p); }
+  x = { base, order, odd };
+  indexes.set(allPaths, x);
+  return x;
+}
+
 export function extractLinks(path, content, allPaths) {
   const links = [];
   const seen = new Set();
@@ -54,18 +71,7 @@ export function extractLinks(path, content, allPaths) {
   };
   const lines = scanLines(content);
 
-  // basename index for wiki links
-  let baseIdx = null;
-  const getBaseIdx = () => {
-    if (baseIdx) return baseIdx;
-    baseIdx = new Map();
-    for (const p of [...allPaths].sort()) {
-      const b = posix.basename(p).replace(/\.[^.]+$/, '').toLowerCase();
-      if (!baseIdx.has(b)) baseIdx.set(b, []);
-      baseIdx.get(b).push(p);
-    }
-    return baseIdx;
-  };
+  const getBaseIdx = () => indexOf(allPaths).base;
 
   const mdTarget = (raw0, line, raw) => {
     let t = raw0.trim();
@@ -120,9 +126,25 @@ export function extractLinks(path, content, allPaths) {
     }
   }
 
-  // plain mentions of existing paths
+  // plain mentions of existing paths. A mention starts a maximal run of [\w./-] chars, so only
+  // run prefixes are looked up (O(text) per file instead of scanning the text once per path).
+  const idx = indexOf(allPaths);
+  const hits = new Map(); // path -> line numbers (first qualifying occurrence per line)
+  const hit = (p, n) => { const l = hits.get(p); if (!l) hits.set(p, [n]); else if (l[l.length - 1] !== n) l.push(n); };
   const text = String(content);
-  for (const p of allPaths) {
+  for (const { n, text: lt, inFence } of lines) {
+    if (inFence) continue;
+    for (const m of lt.matchAll(/[\w./-]+/g)) {
+      const R = m[0], i = m.index;
+      if (R !== path && allPaths.has(R)) hit(R, n);
+      for (let k = R.indexOf('.'); k > 0; k = R.indexOf('.', k + 1)) {
+        if (/\w/.test(lt[i + k + 1] || '')) continue;
+        const p = R.slice(0, k);
+        if (p !== path && allPaths.has(p)) hit(p, n);
+      }
+    }
+  }
+  for (const p of idx.odd) { // paths with other characters (spaces, non-ASCII): direct scan
     if (p === path || !text.includes(p)) continue;
     for (const { n, text: lt, inFence } of lines) {
       if (inFence) continue;
@@ -136,10 +158,13 @@ export function extractLinks(path, content, allPaths) {
         if (before !== undefined && /[\w/.\-]/.test(before)) continue;
         if (after !== undefined && /[\w/\-]/.test(after)) continue;
         if (after === '.' && /\w/.test(lt[i + p.length + 1] || '')) continue;
-        add(p, 'mention', n, p, false);
+        hit(p, n);
         break;
       }
     }
+  }
+  for (const p of [...hits.keys()].sort((a, b) => idx.order.get(a) - idx.order.get(b))) {
+    for (const n of hits.get(p).sort((a, b) => a - b)) add(p, 'mention', n, p, false);
   }
   return links;
 }

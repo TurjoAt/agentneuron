@@ -4,6 +4,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { loadConfig } from '../core/config.js';
 import { createStore } from '../core/store.js';
+import { VERSION } from '../server/version.js';
 import { createWatcher } from '../core/watcher.js';
 import { buildGraph } from '../analysis/graph.js';
 import { effectiveContext, contextDirs } from '../analysis/context.js';
@@ -209,7 +210,7 @@ export async function runMcpServer(root, config = {}, io = {}) {
         return rpcResult(msg.id, {
           protocolVersion: SUPPORTED.has(want) ? want : PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'agentneuron', version: globalThis.__AGENTNEURON_VERSION__ || '0.2.1' },
+          serverInfo: { name: 'agentneuron', version: VERSION },
           instructions: 'agentneuron exposes the AI-context markdown of this project (CLAUDE.md, AGENTS.md, rules, skills, docs). Read-only.',
         });
       }

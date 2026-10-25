@@ -88,7 +88,7 @@ export async function detectProject(root, opts = {}) {
   if (!opts.refresh && c?.value && Date.now() - c.ts < TTL && c.sig === sig) return c.value;
   if (!opts.refresh && c?.pending && c.sig === sig) return c.pending;
   const entry = { ts: Date.now(), sig, value: c?.value || null, pending: null };
-  entry.pending = compute(key, opts).then((v) => { entry.value = v; entry.ts = Date.now(); entry.pending = null; return v; }, (e) => { cache.delete(key); throw e; });
+  entry.pending = compute(key, opts).then((v) => { entry.value = v; entry.ts = Date.now(); entry.pending = null; return v; }, (e) => { if (cache.get(key) === entry) cache.delete(key); throw e; });
   cache.set(key, entry);
   return entry.pending;
 }

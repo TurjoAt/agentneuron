@@ -156,7 +156,9 @@ export function createBoard(ctx) {
     if (patch.status !== undefined) opts.char = statusToChar(patch.status);
     for (const k of SYNC_KEYS) if (patch[k] !== undefined) opts[k] = patch[k];
     lines[li] = editLine(base, opts) + (cr ? '\r' : '');
-    if (patch.checklist && patch.checklist.length === t.checklist.length) {
+    // items can only be edited in place; adding/removing ones is kept in the overlay instead
+    const checklistSynced = !!patch.checklist && patch.checklist.length === t.checklist.length;
+    if (checklistSynced) {
       patch.checklist.forEach((c, i) => {
         const ci = t.checklist[i].line - 1;
         const ccr = lines[ci].endsWith('\r');
@@ -169,7 +171,7 @@ export function createBoard(ctx) {
       try { await getOps(ctx).writeTracked(task.path, next); } catch (e) { return { ok: false, reason: String(e.message || e) }; }
     }
     const after = parseMdTasks(task.path, next).find((x) => x.line === t.line);
-    return { ok: true, newId: after?.id || task.id, newChar: after?.mdChar };
+    return { ok: true, newId: after?.id || task.id, newChar: after?.mdChar, checklistSynced };
   }
 
   async function update(id, rawPatch, role) {
@@ -201,7 +203,9 @@ export function createBoard(ctx) {
     if (res?.ok && res.newId !== id) { delete s.overlay[id]; key = res.newId; }
     ov.fields = ov.fields || {};
     if (res?.ok) {
-      for (const k of [...SYNC_KEYS, 'checklist']) delete ov.fields[k];
+      for (const k of SYNC_KEYS) delete ov.fields[k];
+      if (res.checklistSynced) delete ov.fields.checklist;
+      else if (patch.checklist) ov.fields.checklist = patch.checklist;
       if (patch.status !== undefined) {
         const plain = charToStatus(res.newChar);
         if (patch.status === plain) { delete ov.status; delete ov.mdBase; } else { ov.status = patch.status; ov.mdBase = res.newChar; }
@@ -249,7 +253,8 @@ export function createBoard(ctx) {
     const rel = cleanRel(mdPath);
     const content = ops.readFresh(rel);
     if (content == null) throw new FileError(404, 'file not found');
-    const lines = content.split('\n');
+    const eol = /\r\n/.test(content) && !/(^|[^\r])\n/.test(content) ? '\r\n' : '\n'; // keep a CRLF file CRLF
+    const lines = content.split(eol);
     const newLines = buildTaskLines({ ...patch, status: patch.status || 'todo', checklist: patch.checklist || [] });
     const sec = typeof input.section === 'string' ? input.section.trim() : '';
     let at = -1;
@@ -266,8 +271,8 @@ export function createBoard(ctx) {
     }
     if (at < 0) { while (lines.length && lines[lines.length - 1] === '') lines.pop(); at = lines.length; }
     lines.splice(at, 0, ...newLines);
-    let next = lines.join('\n');
-    if (!next.endsWith('\n')) next += '\n';
+    let next = lines.join(eol);
+    if (!next.endsWith(eol)) next += eol;
     await ops.writeTracked(rel, next);
     const created = parseMdTasks(rel, next).find((t) => t.line === at + 1);
     const s = load();

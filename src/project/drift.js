@@ -10,7 +10,7 @@ const CODE_EXT = new Set(['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'svelte', 'vue
 
 function gitLog(root) {
   return new Promise((resolve) => {
-    execFile('git', ['log', '--relative', '--name-only', '--no-renames', '--format=%x1e%ct', '-n', '3000'], { cwd: root, timeout: 15000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' } },
+    execFile('git', ['-c', 'core.quotepath=off', 'log', '--relative', '--name-only', '--no-renames', '--format=%x1e%ct', '-n', '3000'], { cwd: root, timeout: 15000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' } },
       (err, out) => resolve(err ? null : out));
   });
 }

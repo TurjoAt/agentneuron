@@ -1,18 +1,15 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { createStore } from '../core/store.js';
+import { createAnalyzer } from '../core/analyze.js';
 import { createWatcher } from '../core/watcher.js';
 import { lineDiff } from '../core/diff.js';
 import { ensureAgentneuronDir } from '../core/config.js';
 import { createGit } from '../analysis/git.js';
-import { buildGraph } from '../analysis/graph.js';
 import { effectiveContext, contextDirs } from '../analysis/context.js';
-import { extractTasks } from '../analysis/tasks.js';
-import { extractDecisions } from '../analysis/decisions.js';
-import { lint } from '../health/lint.js';
-import { healthScore } from '../health/score.js';
 import { readAgentConfig } from '../health/configview.js';
 import { createSessions } from '../agents/sessions.js';
 import { createConflictRadar } from '../agents/conflicts.js';
@@ -68,7 +65,7 @@ function isLoopback(h) {
 function loadUi() {
   if (typeof globalThis.__AGENTNEURON_UI__ === 'string' && globalThis.__AGENTNEURON_UI__.length) return globalThis.__AGENTNEURON_UI__;
   try {
-    const here = path.dirname(new URL(import.meta.url).pathname);
+    const here = path.dirname(fileURLToPath(import.meta.url));
     return fs.readFileSync(path.resolve(here, '../../ui/dist/index.html'), 'utf8');
   } catch { return FALLBACK_HTML; }
 }
@@ -98,40 +95,12 @@ export async function startServer(config) {
   const html = loadUi();
 
   // ---- analysis cache -------------------------------------------------
-  let dirty = true;
-  let cache = null;
   let recomputeTimer = null;
   const clients = new Set();
-
   const allFiles = () => [...store.files.values()];
+  const analyzer = createAnalyzer({ root, store, git, warn });
+  const analysis = analyzer.analysis;
 
-  async function compute() {
-    const files = allFiles();
-    const contents = store.contents;
-    let graph = { nodes: [], edges: [] };
-    try { graph = buildGraph(files, contents); } catch (e) { warn('graph', e); }
-    let issues = [];
-    try { issues = lint({ root, files, contents, links: graph.edges }) || []; } catch (e) { warn('lint', e); }
-    let health = { score: 100, grade: 'A', counts: { error: 0, warn: 0, info: 0 }, byRule: {} };
-    try { health = healthScore(issues, files); } catch (e) { warn('score', e); }
-    let gitStatus = new Map(); let gitAvail = false;
-    try { gitAvail = await git.available(); if (gitAvail) gitStatus = await git.status(); } catch (e) { warn('git', e); }
-    let tasks = [], decisions = [];
-    for (const f of files) {
-      const c = contents.get(f.path); if (c == null) continue;
-      try { tasks.push(...extractTasks(f.path, c)); } catch (e) { warn('tasks', e); }
-      try { decisions.push(...extractDecisions(f.path, c, f.kind)); } catch (e) { warn('decisions', e); }
-    }
-    cache = { graph, issues, health, gitStatus, gitAvail, tasks, decisions };
-    dirty = false;
-    return cache;
-  }
-  let computing = null;
-  async function analysis() {
-    if (!dirty && cache) return cache;
-    if (!computing) computing = compute().finally(() => { computing = null; });
-    return computing;
-  }
   // repoInfo shells out to git several times (~1-2s on big repos): serve the last
   // value immediately and refresh in the background when it is older than REPO_TTL.
   const REPO_TTL = 10000;
@@ -162,7 +131,7 @@ export async function startServer(config) {
   }
 
   function scheduleRecompute() {
-    dirty = true;
+    analyzer.invalidate();
     clearTimeout(recomputeTimer);
     recomputeTimer = setTimeout(async () => {
       try {
@@ -176,7 +145,6 @@ export async function startServer(config) {
   }
 
   // ---- event pipeline -------------------------------------------------
-  const pending = new Map(); // event id -> Promise for attribution
   store.on('event', (ev) => {
     scheduleRecompute();
     repo.ts = 0;
@@ -615,10 +583,17 @@ export async function startServer(config) {
   server.headersTimeout = 20000;
   server.on('clientError', (_e, socket) => { try { socket.end('HTTP/1.1 400 Bad Request\r\nconnection: close\r\n\r\n'); } catch { /* gone */ } });
 
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(config.port ?? 4747, config.host, resolve);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(config.port ?? 4747, config.host, resolve);
+    });
+  } catch (e) { // e.g. EADDRINUSE: release the watcher, timers and jobs so the process can exit
+    clearInterval(ping); clearTimeout(recomputeTimer);
+    try { ctx.actions.cancelAll(); ctx.persist.stop(); } catch {}
+    try { await watcher.close(); } catch {}
+    throw e;
+  }
   const addr = server.address();
   const shown = config.host === '0.0.0.0' || config.host === '::' ? 'localhost' : config.host;
   const base = `http://${shown.includes(':') ? `[${shown}]` : shown}:${addr.port}`;

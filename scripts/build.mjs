@@ -39,6 +39,7 @@ await build({
   define: {
     'globalThis.__AGENTNEURON_UI__': JSON.stringify(html),
     'globalThis.__AGENTNEURON_VERSION__': JSON.stringify(pkg.version),
+    'globalThis.__AGENTNEURON_NODE_ENGINE__': JSON.stringify(pkg.engines?.node || ''),
   },
   banner: {
     js: '#!/usr/bin/env node\nimport { createRequire as __cr } from "node:module";\nconst require = __cr(import.meta.url);',

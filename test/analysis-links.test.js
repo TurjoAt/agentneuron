@@ -111,3 +111,52 @@ test('decisions: heading in plain doc and DECISIONS.md log', () => {
   const l = extractDecisions('DECISIONS.md', '# Log\n## 2024-03-01 Pick A\nStatus: accepted\n## Pick B', 'decision');
   assert.deepEqual(l.map((x) => [x.title, x.status, x.date]), [['2024-03-01 Pick A', 'accepted', '2024-03-01'], ['Pick B', undefined, undefined]]);
 });
+
+// reference: the original per-path scan for plain mentions
+function slowMentions(path, content, allPaths) {
+  const lines = String(content).split(/\r?\n/); const out = []; const seen = new Set();
+  let fence = null; const fl = lines.map((t) => { const m = /^\s{0,3}(`{3,}|~{3,})/.exec(t); let inF = fence !== null; if (m) { if (fence === null) { fence = m[1][0]; inF = true; } else if (m[1][0] === fence) { fence = null; inF = true; } } return inF; });
+  for (const p of allPaths) {
+    if (p === path || !content.includes(p)) continue;
+    lines.forEach((lt, li) => {
+      if (fl[li]) return;
+      let from = 0;
+      for (;;) {
+        const i = lt.indexOf(p, from); if (i === -1) break; from = i + p.length;
+        const b = lt[i - 1], a = lt[i + p.length];
+        if (b !== undefined && /[\w/.\-]/.test(b)) continue;
+        if (a !== undefined && /[\w/\-]/.test(a)) continue;
+        if (a === '.' && /\w/.test(lt[i + p.length + 1] || '')) continue;
+        const k = `${li + 1}|${p}`; if (!seen.has(k)) { seen.add(k); out.push(k); } break;
+      }
+    });
+  }
+  return out;
+}
+
+test('mentions: indexed lookup matches the per-path scan (randomised)', () => {
+  let seed = 7; const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const words = ['a', 'b', 'docs', 'x.y', 'src', 'ü', 'my file', 'plan', 'v1.2'];
+  const exts = ['.md', '.js', '.json', '', '.test.js'];
+  for (let round = 0; round < 40; round++) {
+    const paths = new Set();
+    while (paths.size < 12) paths.add(Array.from({ length: 1 + rnd(3) }, () => words[rnd(words.length)]).join('/') + exts[rnd(exts.length)]);
+    const list = [...paths];
+    const seps = [' ', '.', '..', '/', '-', '(', ')', '`', ',', '\n', '.x', 'z', ':', '\n```\n'];
+    let text = '';
+    for (let i = 0; i < 60; i++) text += (rnd(2) ? list[rnd(list.length)] : words[rnd(words.length)]) + seps[rnd(seps.length)];
+    const fast = extractLinks(list[0], text, paths).filter((l) => l.type === 'mention').map((l) => `${l.line}|${l.to}`);
+    const slow = slowMentions(list[0], text, paths);
+    assert.deepEqual(fast.slice().sort(), slow.slice().sort(), text);
+  }
+});
+
+test('mentions: large path sets stay fast', () => {
+  const paths = new Set(Array.from({ length: 4000 }, (_, i) => `notes/n${i}.md`));
+  const files = [...paths].map((p, i) => [p, `# N\n\nsee notes/n${(i * 7) % 4000}.md and [[n${(i * 3) % 4000}]] ${'lorem ipsum '.repeat(40)}\n`]);
+  const t = Date.now();
+  let n = 0;
+  for (const [p, c] of files) n += extractLinks(p, c, paths).length;
+  assert.ok(n >= 4000);
+  assert.ok(Date.now() - t < 5000, `took ${Date.now() - t} ms`);
+});

@@ -124,3 +124,30 @@ test('tasks.export writes native tasks to markdown; not re-parsed as md tasks', 
   assert.equal((await api('GET', '/api/board')).body.tasks.length, 1);
   await assert.rejects(getBoard(ctx).exportMd('../x.md'));
 });
+
+test('board: adding a checklist item to an md task is kept (overlay), not dropped', async () => {
+  const r = tmp();
+  put(r, 'PLAN.md', MD);
+  const { api } = await makeApi(r, { edit: true });
+  const t0 = (await api('GET', '/api/board')).body.tasks.find((t) => t.checklist.length === 2);
+  const list = [...t0.checklist, { text: 'new item', done: false }];
+  const u = await api('POST', '/api/board/update', { id: t0.id, patch: { checklist: list } });
+  assert.equal(u.status, 200);
+  const again = (await api('GET', '/api/board')).body.tasks.find((t) => t.id === t0.id);
+  assert.deepEqual(again.checklist.map((c) => c.text), list.map((c) => c.text));
+});
+
+test('board: creating a task in a CRLF file keeps CRLF line endings', async () => {
+  const r = tmp();
+  put(r, 'PLAN.md', MD.replace(/\n/g, '\r\n'));
+  const { api } = await makeApi(r, { edit: true });
+  const c = await api('POST', '/api/board/task', { task: { title: 'Added' }, path: 'PLAN.md' });
+  assert.equal(c.status, 200);
+  const after = read(r, 'PLAN.md');
+  assert.match(after, /- \[ \] Added\r\n$/);
+  assert.doesNotMatch(after, /(^|[^\r])\n/, 'no bare LF');
+  const c2 = await api('POST', '/api/board/task', { task: { title: 'InNow', section: 'Now' }, path: 'PLAN.md' });
+  assert.equal(c2.status, 200, JSON.stringify(c2.body));
+  assert.doesNotMatch(read(r, 'PLAN.md'), /(^|[^\r])\n/);
+  assert.match(read(r, 'PLAN.md'), /- \[ \] InNow\r\n/);
+});

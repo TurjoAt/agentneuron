@@ -141,7 +141,8 @@ export function createRegistry(ctx) {
       await Promise.all([...defs.values()].map(async (def) => {
         if (def.available) {
           let ok = true;
-          try { ok = await Promise.race([Promise.resolve(def.available(ctx)), new Promise((r) => setTimeout(() => r(false), 3000))]); } catch { ok = false; }
+          let t;
+          try { ok = await Promise.race([Promise.resolve(def.available(ctx)), new Promise((r) => { t = setTimeout(() => r(false), 3000); })]); } catch { ok = false; } finally { clearTimeout(t); }
           if (!ok) return;
         }
         out.push({
@@ -261,8 +262,9 @@ export function createRegistry(ctx) {
       } catch (e) { return reject(e); }
       let stdout = '', stderr = '';
       const cap = (s, d) => (s.length < CAPTURE_CAP ? s + d : s);
-      child.stdout.on('data', (d) => { const t = d.toString('utf8'); stdout = cap(stdout, t); job.log('stdout', t); });
-      child.stderr.on('data', (d) => { const t = d.toString('utf8'); stderr = cap(stderr, t); job.log('stderr', t); });
+      child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8'); // multi-byte chars split across chunks stay intact
+      child.stdout.on('data', (d) => { const t = String(d); stdout = cap(stdout, t); job.log('stdout', t); });
+      child.stderr.on('data', (d) => { const t = String(d); stderr = cap(stderr, t); job.log('stderr', t); });
       let killTimer = null;
       const kill = (why) => {
         if (why) job.log('info', why);
