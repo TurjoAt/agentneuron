@@ -15,6 +15,8 @@ import { maskSecretsInText } from '../health/secrets.js';
 import { scanAgentSetup } from '../agentcenter/setup.js';
 import { exportReport, rangeFromSpec } from '../reports/index.js';
 import { createJsonl, filterRange } from '../persist/jsonl.js';
+import { verifyContext } from '../verify/index.js';
+import { auditAgentConfig } from '../audit/index.js';
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -39,6 +41,10 @@ const TOOLS = [
   { name: 'report_export', description: 'Activity/health report for a time range. format "ai" returns a compact Markdown context pack (KPIs, changes, ranked issues, open tasks, context budget, next actions); "json" returns the agentneuron.report/v1 object. Secrets masked.',
     inputSchema: obj({ range: { type: 'string', description: 'Relative range ending now, e.g. "24h", "7d", "30d" (default "7d")' }, format: { type: 'string', enum: ['ai', 'json'] },
       includeContent: { type: 'boolean', description: 'Append size-capped (~40k tokens) contents of the main context files' } }) },
+  { name: 'verify_context', description: 'Truth check: which commands, scripts, paths, versions, env vars and ports claimed in the context files are false or unverifiable against the real repo, with evidence and a suggested fix. Use before following setup/test instructions.',
+    inputSchema: obj({ status: { type: 'string', enum: ['false', 'unknown', 'ok', 'all'], description: 'Which claims to return (default "false")' }, file: { type: 'string', description: 'Only claims from this project-relative file' }, limit: { type: 'number' } }) },
+  { name: 'audit_agent_config', description: 'Security audit of the agent configuration (MCP servers, permissions, bypass modes, hooks, world-writable files, secrets in context files): 0-100 risk score and findings with severity, location, why and fix. Values are masked.',
+    inputSchema: obj({ minSeverity: { type: 'string', enum: ['high', 'medium', 'low', 'info'], description: 'Lowest severity to include (default "low")' } }) },
 ];
 
 function parseSince(v) {
@@ -197,6 +203,21 @@ export async function runMcpServer(root, config = {}, io = {}) {
       // ai: raw Markdown (not JSON-encoded) so the model reads it directly; json: the v1 object
       return format === 'json' ? JSON.parse(out.body) : { [RAW_TEXT]: out.body };
     },
+  };
+
+  tools.verify_context = ({ status = 'false', file, limit } = {}) => {
+    if (!['false', 'unknown', 'ok', 'all'].includes(status)) throw new Error('invalid status');
+    const rel = file === undefined || file === '' ? null : safeRel(file);
+    if (file && !rel) throw new Error('invalid file');
+    const r = verifyContext({ root: absRoot, files: [...store.files.values()], contents: store.contents });
+    const list = r.claims.filter((c) => (status === 'all' || c.status === status) && (!rel || c.file === rel));
+    return { summary: r.summary, total: list.length, claims: list.slice(0, cap(limit, 100, 1000)).map(({ fixable: _f, ...c }) => c) };
+  };
+  tools.audit_agent_config = ({ minSeverity = 'low' } = {}) => {
+    const order = ['high', 'medium', 'low', 'info'];
+    if (!order.includes(minSeverity)) throw new Error('invalid minSeverity');
+    const r = auditAgentConfig({ root: absRoot, files: [...store.files.values()], contents: store.contents });
+    return { ...r, findings: r.findings.filter((f) => order.indexOf(f.severity) <= order.indexOf(minSeverity)) };
   };
 
   const rpcResult = (id, result) => ({ jsonrpc: '2.0', id, result });

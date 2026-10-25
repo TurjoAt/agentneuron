@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "docs": {
+      "command": "npx",
+      "args": ["-y", "docs-mcp@latest"]
+    },
+    "internal-search": {
+      "type": "http",
+      "url": "http://mcp.internal.example.com/mcp",
+      "headers": { "Authorization": "Bearer 9f8e7d6c5b4a39281706f5e4d3c2b1a0Zx" }
+    }
+  }
+}
