@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scanSecrets } from './secrets.js';
 import { isIgnored } from '../core/classify.js';
+import { falseClaimIssues } from '../verify/index.js';
 
 const DAY = 86400000;
 const CONTEXT_KINDS = new Set(['context', 'rules']);
@@ -103,6 +104,7 @@ export function lint({ root, files = [], contents = new Map(), links = [], now =
   }
 
   issues.push(...duplicateRules(files, contents));
+  try { issues.push(...falseClaimIssues({ root, files, contents })); } catch { /* truth check is best-effort */ }
   return issues;
 }
 
