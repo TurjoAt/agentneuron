@@ -13,6 +13,7 @@
   const BLIP_MS = 1700;
   let blips = $state([]);
   let seq = 0;
+  const timers = new Set();
 
   function hash(s) {
     let h = 2166136261;
@@ -28,9 +29,11 @@
       const r = 0.3 + ((h >>> 9) % 55) / 100; // 0.30 … 0.84 of the radius
       const b = { id: ++seq, x: 50 + Math.cos(a) * r * 50, y: 50 + Math.sin(a) * r * 50, kind: ev.type === 'unlink' ? 'del' : ev.type === 'add' ? 'add' : 'chg' };
       blips = [...blips.slice(-(MAX_BLIPS - 1)), b];
-      setTimeout(() => (blips = blips.filter((x) => x.id !== b.id)), BLIP_MS);
+      const t = setTimeout(() => { timers.delete(t); blips = blips.filter((x) => x.id !== b.id); }, BLIP_MS);
+      timers.add(t);
     })
   );
+  $effect(() => () => { for (const t of timers) clearTimeout(t); timers.clear(); });
 
   // live → sweeping; first connect → slow amber sweep; reconnecting/offline → stopped, red.
   const mode = $derived(app.conn === 'live' ? 'live' : app.conn === 'connecting' ? 'wait' : 'off');
