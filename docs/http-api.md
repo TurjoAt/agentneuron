@@ -120,6 +120,22 @@ Writing to git is done through [actions](actions.md) (`git.commit`, `git.push`, 
 | `GET /api/agents/session` | `id` : timeline of one session |
 | `GET /api/agents/costs` | `from`, `to` (ms epoch or date) : estimated cost |
 
+## Rules compiler
+
+Source rules in `.agentneuron/rules/` compiled into every tool's files. See [rules compiler](compiler.md) and [generate](generate.md). Writes need the `edit` level.
+
+| Path | Level | Parameters / result |
+|---|---|---|
+| `GET /api/compiler/rules` | read | `{ dir, rules: [{ slug, file, title, description, scope, tools, priority, alwaysApply, body, text, hash, errors, warnings }], invalid }` |
+| `GET /api/compiler/preview` | read | `tools` (comma list). Plan with per-output `action` (`create`/`update`/`delete`/`skip`/`none`), `regions[].status` (`ok`/`stale`/`edited`/`new`/`rehash`/`orphan`), `diff`, `content`; plus `mergeBack`, `edited`, `stale`, `ok` |
+| `POST /api/compiler/compile` | edit | `{ tools?, force? }` → `{ written, deleted, errors, plan }` |
+| `POST /api/compiler/merge-back` | edit | `{ slugs?, pick?: { slug: path }, tools?, compile? = true }` → `{ merged, skipped, compiled }` |
+| `GET /api/compiler/import/preview` | read | `{ dir, rules: [{ slug, title, tools, scope, from, content }], duplicates, skipped }` |
+| `POST /api/compiler/import` | edit | `{ slugs? }` → `{ created, errors }` (never overwrites) |
+| `POST /api/compiler/rule` | edit | `{ slug, content, baseHash? }` creates a rule, or replaces it when `baseHash` matches (409 otherwise). Invalid rules are 400 |
+| `GET /api/compiler/generate` | read | `tool` → `{ path, content, items: [{ section, text, source }], exists, currentHash }` |
+| `POST /api/compiler/generate/write` | edit | `{ tool, overwrite?, baseHash? }`; 409 if the file exists and `overwrite` is not set |
+
 ## Project intelligence (read)
 
 `GET /api/project` (`refresh=1`), `/api/project/stats`, `/api/project/deps` (`manager`), `/api/project/outdated`, `/api/project/routes`, `/api/project/migrations`, `/api/project/models` (Laravel), `/api/project/drift` (docs older than the code they mention). See [project intelligence](project-intelligence.md).

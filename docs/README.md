@@ -11,6 +11,8 @@ AgentNeuron is an open-source Node.js CLI, local web dashboard and read-only MCP
 | [Security overview](security.md) | One-page summary |
 | [HTTP API](http-api.md) | Endpoints grouped by area, with required level |
 | [Actions](actions.md) | Action ids, levels and parameters |
+| [Rules compiler](compiler.md) | Write rules once in `.agentneuron/rules/`, compile them into every tool's format, import and merge back |
+| [Generate](generate.md) | Starter AGENTS.md / CLAUDE.md from the code, every line cited |
 | [MCP](mcp.md) | Run the MCP server; Claude Code and Cursor configuration |
 | [Supported tools](supported-tools.md) | Which files are detected for which AI tool |
 | [Project intelligence](project-intelligence.md) | Stacks, dependencies, CI, env, Laravel, doc drift |

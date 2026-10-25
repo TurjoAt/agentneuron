@@ -27,6 +27,7 @@ agentneuron mcp [dir]
 | `recent_changes` | `since?` (ISO date, epoch ms, or `2h`, `3d`, `1w`; default 24 h), `limit?` | Changed files and recent events |
 | `get_tasks` | `status?` (`open`, `done`, `all`), `limit?` | Checkbox and TODO/FIXME tasks |
 | `get_links` | `path` | Incoming and outgoing links, with broken ones flagged |
+| `compile_preview` | `tools?` (comma list), `diff?` | Read-only plan for compiling `.agentneuron/rules/` into each tool's files: stale outputs, hand-edited regions, merge-back candidates. See [rules compiler](compiler.md) |
 | `report_export` | `range?` (`24h`, `7d`, `30d`, `2w`...; default `7d`), `format?` (`ai` default, `json`), `includeContent?` | Report for the period ending now. `ai` returns the Markdown context pack as plain text; `json` returns the `agentneuron.report/v1` object (see [HTTP API](http-api.md#exports)) |
 
 ## Claude Code
