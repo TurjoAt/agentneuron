@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-25
+
+### Added
+
+- **AI-ready report export.** `ai` format: a compact Markdown context pack with YAML front-matter, summary, KPI deltas, what changed, ranked health issues, open tasks, per-tool budget and suggested next actions (optionally with size-capped file contents). `json` format with the versioned schema `agentneuron.report/v1`. Secrets are masked and absolute paths removed in every format.
+- `report_export` MCP tool, and Export menu with "Copy for AI" on the Reports page.
+- CLI: `agentneuron update [--check] [--yes]` (global npm install, or verified, atomic update of an `init` copy), `agentneuron doctor [--json]`, `agentneuron export [--format ai|json|md|csv|html] [--range 7d] [--out file]`; grouped help and `<command> --help`.
+- Dashboard: animated "Neuron brain" orbit view of the context graph, and a radar indicator in the top bar that sweeps while the live stream is connected and stops when it drops.
+- UI motion: sliding tab indicator, card entrance, sparkline draw-in, loading skeletons. Animations respect reduced-motion and pause in hidden tabs.
+- `llms.txt`, a comparison page, and a rewritten README.
+
+### Changed
+
+- Tasks open in the Table view by default (`#/tasks?tab=board` for the board).
+- One version source for the CLI, server and MCP server.
+
+### Fixed
+
+- File changes that arrived during an analysis were lost, leaving health and lint stale.
+- A failed `listen` (port in use) left watchers and timers keeping the process alive.
+- `lint`, `status` and `export` wrote history snapshots into the project.
+- Multi-byte characters split across process output chunks; leaked timers in the action registry; git-quoted non-ASCII file names never matched; checklist item edits on markdown tasks were silently dropped; new tasks in CRLF files mixed line endings.
+- Several Svelte reactivity bugs (dialogs, rules tester re-running on every keystroke) and accessibility of chart legends.
+
+### Performance
+
+- Link extraction is no longer O(files × paths) (4000 notes: ~9 s to ~0.2 s); startup reads each file once; the costs route walks Codex sessions once per request.
+
 ## [0.2.1] - 2026-10-24
 
 First release on npm (0.2.0 was tagged on GitHub but not published to npm).
@@ -67,7 +95,8 @@ Initial release, developed as `mdctl`: a live monitor for AI-context Markdown.
 - Agent session discovery and a concurrent-edit conflict radar.
 - Server-Sent Events live updates, text search, token authentication, `init` and `status` commands.
 
-[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/TurjoAt/agentneuron/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/TurjoAt/agentneuron/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/TurjoAt/agentneuron/releases/tag/v0.1.0

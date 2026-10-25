@@ -142,12 +142,13 @@ export async function cmdUpdate(flags, deps = {}) {
     return 1;
   }
   const cmp = compareVersions(current, latest);
+  const upToDate = () => `agentneuron ${current} is ${cmp > 0 ? 'newer than' : 'up to date with'} the latest release (${latest})`;
   if (flags.check) {
     if (cmp < 0) log.log(`update available: ${current} -> ${latest}  (run: agentneuron update)`);
-    else log.log(`agentneuron ${current} is up to date (latest ${latest})`);
+    else log.log(upToDate());
     return 0;
   }
-  if (cmp >= 0) { log.log(`agentneuron ${current} is up to date (latest ${latest})`); return 0; }
+  if (cmp >= 0) { log.log(upToDate()); return 0; }
 
   const self = deps.selfPath || fileURLToPath(import.meta.url);
   let mode = detectInstall(self);

@@ -18,7 +18,7 @@ npx agentneuron ./my-project     # a specific directory
 The banner shows the URL, number of tracked files, and which action levels are enabled:
 
 ```
-  AgentNeuron 0.2.1  -  AI context control center
+  AgentNeuron 0.3.0  -  AI context control center
   project : /home/me/my-project
   files   : 42
   open    : http://127.0.0.1:4747/
@@ -78,7 +78,7 @@ Keys `1` to `9` jump to the first nine pages; `/` focuses search; `?` lists shor
 | Git | Overview, changes, history, branches, tags, stash, remotes, blame, stats, generated changelog |
 | Agents | Matrix of tools vs capabilities, per-tool setup, rules that apply to a file, templates, sync and drift between instruction files, MCP servers, sessions and cost, conflict radar, time travel |
 | Project | Detected stacks, dependencies and outdated packages, scripts, CI, Docker, env keys, Laravel routes/models/migrations, doc drift, code statistics |
-| Reports | KPIs, time series, heatmap, top tables, export to CSV, Markdown or HTML; an AI context pack and JSON export with a "Copy for AI" button <!-- verify-0.3.0 --> |
+| Reports | KPIs, time series, heatmap, top tables, export to CSV, Markdown or HTML; an AI context pack and JSON export with a "Copy for AI" button |
 | Settings | Permissions (what is on and how to enable it), role and auth, audit log, notifications, trash, jobs, appearance, about |
 
 Sessions and cost read Claude Code and Codex transcripts from `~/.claude/projects` and `~/.codex/sessions`. Cost is an estimate from token counts; override prices with the `pricing` key.

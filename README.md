@@ -46,7 +46,7 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 **Plan and report**
 - Tasks from Markdown (`- [ ]`, `- [/]`, `- [x]`, `TODO:`) as board, list, table, calendar and timeline, plus decision records (ADRs).
 - Reports: KPIs, activity series, heatmap, top files (most changed, most linked, stalest, heaviest), export to CSV, Markdown or HTML.
-- AI-ready report export: a compact context pack to paste into an assistant, and JSON with the schema `agentneuron.report/v1`. <!-- verify-0.3.0 -->
+- AI-ready report export: a compact context pack to paste into an assistant, and JSON with the schema `agentneuron.report/v1`.
 
 **Act** (opt-in, see the [security model](#security-model))
 - Edit files in the browser, rename with link rewriting, find and replace, soft delete to trash, one-click fixes for lint issues.
@@ -138,7 +138,7 @@ Any other Markdown in the project (README, TODO, ROADMAP, ADRs, `docs/`) is trac
 
 ## Use it from your AI agent (MCP)
 
-`agentneuron mcp` is a read-only MCP server on stdio. Its tools: `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`. Full reference: [docs/mcp.md](docs/mcp.md).
+`agentneuron mcp` is a read-only MCP server on stdio. Its tools: `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`, `report_export`. Full reference: [docs/mcp.md](docs/mcp.md).
 
 **Claude Code** (CLI, or `.mcp.json` at the project root):
 
@@ -196,7 +196,7 @@ Read [docs/permissions-and-security.md](docs/permissions-and-security.md) before
 | `agentneuron status [dir]` | Files, tokens and health summary |
 | `agentneuron init [dir]` | Create `.agentneuron/` with config and a copy of the bundle |
 
-Flags, exit codes and newer commands (`update`, `doctor`, `export`) are in the [CLI reference](docs/cli.md). <!-- verify-0.3.0 -->
+Flags, exit codes and newer commands (`update`, `doctor`, `export`) are in the [CLI reference](docs/cli.md).
 
 ## FAQ
 
@@ -247,7 +247,6 @@ The table compares categories of tools, not specific products. More detail: [doc
 
 ## Roadmap
 
-- 0.3.0 (in progress): `update`, `doctor` and `export` CLI commands; AI-ready report export (context pack and JSON); `report_export` MCP tool. <!-- verify-0.3.0 -->
 - Ideas and requests are tracked in [GitHub issues](https://github.com/TurjoAt/agentneuron/issues). Released changes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Documentation

@@ -1,6 +1,6 @@
 {
   "name": "agentneuron",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Local dashboard, CLI and MCP server to monitor, lint and manage AI coding agent context: CLAUDE.md, AGENTS.md, GEMINI.md, Cursor rules, Copilot instructions, skills and MCP configs.",
   "keywords": [
     "claude-code",
