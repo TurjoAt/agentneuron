@@ -1,5 +1,6 @@
 <script>
   // New file — blank or from a template (GET /api/agents/templates).
+  import { untrack } from 'svelte';
   import { api, post } from '../api.js';
   import { app, openFile, toast, loadFiles, fileIndex } from '../store.svelte.js';
   import { canRun, levelReason } from '../actions.svelte.js';
@@ -13,7 +14,8 @@
   let templates = $state([]);
   let loading = $state(true);
   let tpl = $state(null); // null = blank
-  let path = $state(dir ? `${dir}/untitled.md` : 'untitled.md');
+  // `dir` only seeds the editable path field.
+  let path = $state(untrack(() => (dir ? `${dir}/untitled.md` : 'untitled.md')));
   let vars = $state({});
   let preview = $state('');
   let busy = $state(false);

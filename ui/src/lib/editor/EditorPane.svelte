@@ -2,7 +2,8 @@
   // Markdown editor tab: CodeMirror + live preview (split), safe save with hash
   // check, 409 merge dialog, autosave, read-only when `edit` is disabled,
   // Ctrl/Cmd+click links, annotations gutter, context menu actions.
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { onMount, onDestroy, tick, untrack } from 'svelte';
+  import { openSearchPanel } from '@codemirror/search';
   import { api, post } from '../api.js';
   import { app, toast, openFile, navigate, saveLocal } from '../store.svelte.js';
   import { canRun, levelReason } from '../actions.svelte.js';
@@ -130,7 +131,8 @@
     }
   });
   // external change on disk
-  let lastPulse = app.pulses[path] || 0;
+  // FileViewer remounts this pane per path ({#key path}), so a snapshot is intended.
+  let lastPulse = untrack(() => app.pulses[path] || 0);
   $effect(() => {
     const t = app.pulses[path];
     if (!t || t === lastPulse || saving) return;
@@ -235,7 +237,7 @@
         info.selection ? { label: 'Find & replace selection in all files', icon: 'replace', run: () => findReplace(info.selection) } : null,
         { sep: true },
         { label: 'Save', icon: 'save', kbd: '⌘S', run: () => save(), disabled: !editable, reason: levelReason('edit') },
-        { label: 'Find in file', icon: 'search', kbd: '⌘F', run: () => { ed.focus(); import('@codemirror/search').then((m) => m.openSearchPanel(ed.view)); } },
+        { label: 'Find in file', icon: 'search', kbd: '⌘F', run: () => { ed.focus(); openSearchPanel(ed.view); } },
       ],
       `${path}:${info.line}`,
     );

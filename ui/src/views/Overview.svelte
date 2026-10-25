@@ -3,6 +3,7 @@
   import { app, openFile, isPulsing, navigate } from '../lib/store.svelte.js';
   import { resource } from '../lib/resource.svelte.js';
   import { KINDS } from '../lib/tools.js';
+  import { TOOL_TOKEN_BUDGET, toolBudget } from '../lib/budget.js';
   import { fmtNum, timeAgo, basename, dirname, toMs } from '../lib/format.js';
   import { openTask, newFile } from '../lib/fileActions.js';
   import HealthRing from '../lib/HealthRing.svelte';
@@ -18,7 +19,6 @@
   let { params: _params } = $props();
 
   const DAY = 86_400_000;
-  const TOOL_BUDGET = 12_000; // suggested instruction-token budget per tool
 
   // ------------------------------------------------------------ data
   const setup = resource(() => api('/api/agents/setup'));
@@ -158,7 +158,7 @@
   <section class="sec">
     <div class="sec-h">
       <h2>AI tools</h2>
-      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_BUDGET)} budget</span>
+      <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_TOKEN_BUDGET)} budget</span>
       <span class="spacer"></span>
       <a class="btn sm ghost" href="#/agents?tab=matrix">Capability matrix <Icon name="chevron" size={13} /></a>
     </div>
@@ -169,7 +169,7 @@
     {:else}
       <div class="tgrid">
         {#each detected as t (t.id)}
-          <ToolCard tool={t} tokens={toolTokens(t)} budget={TOOL_BUDGET} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
+          <ToolCard tool={t} tokens={toolTokens(t)} budget={toolBudget(t.id, setup.data)} issues={issuesByTool[t.id] || { error: 0, warn: 0 }} />
         {:else}
           <div class="card pad faint small">No AI tool configuration found yet. Create a CLAUDE.md or AGENTS.md to get started.</div>
         {/each}

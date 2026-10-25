@@ -11,9 +11,9 @@
   }
 </script>
 
-<div class="vlegend" role="list">
+<ul class="vlegend">
   {#each items as it (it.key)}
-    <button class="li" class:off={hidden.has(it.key)} role="listitem" onclick={() => flip(it.key)} disabled={!toggle} aria-pressed={!hidden.has(it.key)}>
+    <li><button class="li" class:off={hidden.has(it.key)} onclick={() => flip(it.key)} disabled={!toggle} aria-pressed={toggle ? !hidden.has(it.key) : undefined}>
       {#if it.dash}
         <svg width="16" height="8" aria-hidden="true"><line x1="0" y1="4" x2="16" y2="4" style="stroke:{it.color}" stroke-width="2" stroke-dasharray="3 3" /></svg>
       {:else}
@@ -21,12 +21,13 @@
       {/if}
       <span class="lb">{it.label ?? it.key}</span>
       {#if it.value != null}<span class="v tnum">{it.value}</span>{/if}
-    </button>
+    </button></li>
   {/each}
-</div>
+</ul>
 
 <style>
-  .vlegend { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+  .vlegend { display: flex; flex-wrap: wrap; gap: 2px 4px; list-style: none; margin: 0; padding: 0; }
+  .vlegend > li { display: inline-flex; }
   .li { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 3px 6px; border-radius: 6px; font-size: 11.5px; color: var(--text-2); cursor: pointer; }
   .li:disabled { cursor: default; }
   .li:not(:disabled):hover { background: var(--panel-hover); color: var(--text); }

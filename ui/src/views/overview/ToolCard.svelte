@@ -1,11 +1,12 @@
 <script>
   import { navigate, openFile } from '../../lib/store.svelte.js';
   import { fmtNum } from '../../lib/format.js';
+  import { TOOL_TOKEN_BUDGET } from '../../lib/budget.js';
   import Meter from '../../lib/viz/Meter.svelte';
   import Icon from '../../lib/Icon.svelte';
   import { CAPS, toolKey, itemPath } from '../agents/shared.js';
 
-  let { tool, tokens = 0, budget = 12000, issues = { error: 0, warn: 0 } } = $props();
+  let { tool, tokens = 0, budget = TOOL_TOKEN_BUDGET, issues = { error: 0, warn: 0 } } = $props();
   const c = $derived(`var(--tool-${toolKey(tool.id)})`);
   const have = $derived(CAPS.filter((k) => tool.capabilities?.[k.id]?.count > 0));
   const state = $derived(issues.error ? 'err' : issues.warn ? 'warn' : 'ok');

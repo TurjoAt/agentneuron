@@ -40,11 +40,8 @@
     { id: 'time', label: 'Time travel' },
   ]);
   const VALID = new Set(['matrix', 'tools', 'rules', 'templates', 'sync', 'mcp', 'sessions', 'radar', 'time']);
-  let tab = $state(VALID.has(params.tab) ? params.tab : 'matrix');
-  $effect(() => {
-    const t = VALID.has(params.tab) ? params.tab : 'matrix';
-    if (t !== tab) tab = t;
-  });
+  // The URL is the single source of truth for the active tab.
+  const tab = $derived(VALID.has(params.tab) ? params.tab : 'matrix');
   const go = (id) => navigate('agents', { tab: id });
 </script>
 
@@ -56,7 +53,7 @@
     </div>
   </div>
 
-  <div class="tabs"><Tabs tabs={TABS} bind:active={tab} onchange={go} /></div>
+  <div class="tabs"><Tabs tabs={TABS} active={tab} onchange={go} /></div>
 
   <div class="body">
     {#if ['matrix', 'tools', 'mcp'].includes(tab) && setup.error}

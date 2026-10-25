@@ -49,7 +49,7 @@
   const L = 26; // left gutter for weekday labels
   const T = 16;
   const W = $derived(L + grid.weeks * (cell + gap));
-  const H = T + 7 * (cell + gap);
+  const H = $derived(T + 7 * (cell + gap));
 
   onMount(() => {
     if (scroller) scroller.scrollLeft = scroller.scrollWidth;

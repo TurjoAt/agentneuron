@@ -1,11 +1,14 @@
 <script>
+  import { untrack } from 'svelte';
   import { api } from '../api.js';
   import { app, navigate } from '../store.svelte.js';
   import { timeAgo, toMs, fmtDate } from '../format.js';
   import Empty from '../Empty.svelte';
   import { hue } from './gx.svelte.js';
   let { params = {} } = $props();
-  let path = $state(params?.path || '');
+  // Seeded from the URL, editable locally, and re-synced when the URL path changes.
+  let path = $state(untrack(() => params?.path || ''));
+  $effect(() => { const p = params?.path; if (p) untrack(() => (path = p)); });
   const files = $derived([...app.files].map((f) => f.path).sort());
   $effect(() => { if (!path && files.length) path = files.find((p) => !app.files.find((f) => f.path === p)?.gitStatus) || files[0]; });
   let lines = $state([]), text = $state([]), err = $state(null), loading = $state(false);
