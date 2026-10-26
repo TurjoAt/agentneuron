@@ -11,7 +11,6 @@
   import Templates from './agents/Templates.svelte';
   import Sync from './agents/Sync.svelte';
   import Mcp from './agents/Mcp.svelte';
-  import Sessions from './agents/Sessions.svelte';
   import Radar from './agents/Radar.svelte';
   import TimeTravel from './agents/TimeTravel.svelte';
 
@@ -35,11 +34,10 @@
     { id: 'templates', label: 'Templates' },
     { id: 'sync', label: 'Sync & drift' },
     { id: 'mcp', label: 'MCP', count: mcpCount || null },
-    { id: 'sessions', label: 'Sessions & cost', count: list.length || null },
     { id: 'radar', label: 'Radar' },
     { id: 'time', label: 'Time travel' },
   ]);
-  const VALID = new Set(['matrix', 'tools', 'rules', 'templates', 'sync', 'mcp', 'sessions', 'radar', 'time']);
+  const VALID = new Set(['matrix', 'tools', 'rules', 'templates', 'sync', 'mcp', 'radar', 'time']);
   // The URL is the single source of truth for the active tab.
   const tab = $derived(VALID.has(params.tab) ? params.tab : 'matrix');
   const go = (id) => navigate('agents', { tab: id });
@@ -72,8 +70,6 @@
       <Sync />
     {:else if tab === 'mcp'}
       <Mcp {tools} onchange={() => setup.reload()} />
-    {:else if tab === 'sessions'}
-      <Sessions {list} loading={!sessions.data && !sessions.error} error={sessions.error} />
     {:else if tab === 'radar'}
       <Radar {list} />
     {:else if tab === 'time'}

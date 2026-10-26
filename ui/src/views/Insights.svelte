@@ -3,14 +3,12 @@
   import Tabs from '../lib/Tabs.svelte';
   import Lessons from './insights/Lessons.svelte';
   import RuleEffect from './insights/RuleEffect.svelte';
-  import Replay from './insights/Replay.svelte';
   import FeatureCosts from './insights/FeatureCosts.svelte';
 
   let { params = {} } = $props();
   const TABS = [
     { id: 'lessons', label: 'Lessons' },
     { id: 'rules', label: 'Rule effectiveness' },
-    { id: 'replay', label: 'Replay' },
     { id: 'costs', label: 'Cost by feature' },
   ];
   const tab = $derived(TABS.some((t) => t.id === params.tab) ? params.tab : 'lessons');
@@ -28,8 +26,6 @@
     <Lessons />
   {:else if tab === 'rules'}
     <RuleEffect />
-  {:else if tab === 'replay'}
-    <Replay path={params.path || ''} ts={params.ts || ''} session={params.session || ''} />
   {:else}
     <FeatureCosts />
   {/if}

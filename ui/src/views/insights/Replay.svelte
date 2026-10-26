@@ -7,18 +7,21 @@
   import Icon from '../../lib/Icon.svelte';
   import Empty from '../../lib/Empty.svelte';
 
-  let { path = '', ts = '', session = '' } = $props();
+  // picker=false embeds only the "why" panel (used inside the session replay).
+  // onpick overrides where a picked change goes (default: Sessions › Why did it change?).
+  let { path = '', ts = '', session = '', picker = true, onpick = null } = $props();
   const ICON = { prompt: 'message', edit: 'edit', action: 'terminal', change: 'target', 'context-version': 'context' };
-  const recent = resource(() => api('/api/insights/replay'), { live: false });
+  const recent = resource(() => api('/api/insights/replay'), { live: false, enabled: () => picker });
   const picked = $derived(!!(path || session));
   const rep = resource(() => api('/api/insights/replay', { path: path || undefined, session: session || undefined, ts: ts || undefined }), { key: () => [path, ts, session], enabled: () => picked, live: false });
   const changes = $derived(recent.data?.changes || []);
   const r = $derived(rep.data);
   let showText = $state(false);
-  const pick = (c) => navigate('insights', { tab: 'replay', path: c.path, ts: c.ts, session: c.agent?.sessionId });
+  const pick = (c) => (onpick ? onpick(c) : navigate('sessions', { view: 'changes', path: c.path, ts: c.ts, session: c.agent?.sessionId }));
 </script>
 
-<div class="cols">
+<div class="cols" class:solo={!picker}>
+  {#if picker}
   <section class="card pickc">
     <div class="card-h">Recent agent changes</div>
     {#if recent.error}<div class="card-b faint small">{recent.error.message}</div>
@@ -36,6 +39,7 @@
       </div>
     {/if}
   </section>
+  {/if}
 
   <section class="card main">
     {#if !picked}
@@ -91,6 +95,7 @@
 
 <style>
   .cols { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 14px; align-items: start; }
+  .cols.solo { grid-template-columns: minmax(0, 1fr); }
   @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
   .main { min-width: 0; }
   .plist { display: flex; flex-direction: column; max-height: 620px; overflow: auto; padding: 0 8px 8px; }
