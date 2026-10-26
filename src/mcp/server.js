@@ -282,7 +282,7 @@ export async function runMcpServer(root, config = {}, io = {}) {
     const r = auditAgentConfig({ root: absRoot, files: [...store.files.values()], contents: store.contents });
     return { ...r, findings: r.findings.filter((f) => order.indexOf(f.severity) <= order.indexOf(minSeverity)) };
   };
-  const usage = async () => (await import('../usage/index.js')).getUsage({ root: absRoot, config: cfg, store });
+  const usage = async () => (await import('../usage/index.js')).getUsage({ root: absRoot, config: cfg, store, home: io.home });
   tools.get_usage = async ({ range = '30d' } = {}) => redactPrompts(maskDeep(await (await usage()).summary({ range })));
   tools.get_session_replay = async ({ id, limit = 200 } = {}) => {
     if (typeof id !== 'string' || !/^[\w.-]{1,200}$/.test(id)) throw new Error('id must be a session id');
