@@ -29,7 +29,7 @@ The base ref must exist locally: use `actions/checkout` with `fetch-depth: 0` (o
 - uses: actions/checkout@v4
   with:
     fetch-depth: 0
-- uses: TurjoAt/agentneuron@v0.4.0
+- uses: TurjoAt/agentneuron@v1.0.0
   with:
     path: .
     fail-on: error

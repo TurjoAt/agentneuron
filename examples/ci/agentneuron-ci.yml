@@ -22,13 +22,13 @@ jobs:
           node-version: 20
 
       # Pin the action to a release tag; it runs the matching agentneuron version.
-      - uses: TurjoAt/agentneuron@v0.4.0
+      - uses: TurjoAt/agentneuron@v1.0.0
         with:
           path: .
           fail-on: error # or: warn, never
           base: origin/${{ github.base_ref }}
 
       # Without the action:
-      # - run: npx --yes agentneuron@0.4.0 ci . --format github --base "origin/$BASE_REF"
+      # - run: npx --yes agentneuron@1.0.0 ci . --format github --base "origin/$BASE_REF"
       #   env:
       #     BASE_REF: ${{ github.base_ref }}

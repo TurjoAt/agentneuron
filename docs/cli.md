@@ -152,7 +152,7 @@ Print a starter context file built from the code: commands, stack, layout and co
 Check the environment and print one line per check (`✓` ok, `!` warning, `✗` failure). Exit code `1` if any check fails.
 
 ```
-agentneuron 0.4.0 doctor - /path/to/project
+agentneuron 1.0.0 doctor - /path/to/project
   ✓ node         Node 22.11.0 (requires >= 18)
   ✓ git          git version 2.43.0, project is a git repository
   ✓ config       .agentneuron/config.json is valid
