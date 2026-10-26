@@ -95,6 +95,25 @@ export async function codexFiles(home, { minMtime = 0 } = {}) {
   return c.files.filter((f) => f.lastWrite >= minMtime);
 }
 
+const cwdCache = new Map(); // codex rollout -> cwd from its session_meta (never changes)
+
+/** Codex rollouts whose recorded cwd is `root` or inside it (head read once per file, cached). */
+export async function codexInRoot(files, root, home) {
+  const absRoot = path.resolve(root);
+  const out = [];
+  await pool(files, 16, async (f) => {
+    if (!cwdCache.has(f.file)) {
+      const cwd = await headCwd(f.file, home);
+      if (cwd === null) return; // not written yet: check again next time
+      if (cwdCache.size > 20000) cwdCache.clear();
+      cwdCache.set(f.file, cwd);
+    }
+    const r = path.relative(absRoot, path.resolve(cwdCache.get(f.file)));
+    if (r === '' || (!r.startsWith('..') && !path.isAbsolute(r))) out.push(f);
+  });
+  return out;
+}
+
 /** Run fn over items with at most n in flight. */
 export async function pool(items, n, fn) {
   let i = 0;
@@ -102,4 +121,4 @@ export async function pool(items, n, fn) {
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
 }
 
-export function clearLocateCache() { dirCache.clear(); codexCache.clear(); }
+export function clearLocateCache() { dirCache.clear(); codexCache.clear(); cwdCache.clear(); }

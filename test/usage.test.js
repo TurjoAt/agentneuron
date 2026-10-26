@@ -21,9 +21,9 @@ test('digest: tolerant parse, message dedupe, tools, errors, denials, interrupts
   const d = digestClaude(parseLines(text), path.join(fx.dir, 'S1.jsonl'));
   assert.equal(d.sessionId, 'S1');
   assert.equal(d.title, 'Fixture session one');
-  assert.equal(d.msgs.length, 6, 'm1 spans two lines but counts once');
+  assert.equal(d.msgs.length, 7, 'm1 spans two lines but counts once');
   assert.equal(d.msgs[0][3], 1000);
-  assert.deepEqual(d.tools.map((t) => t.name), ['Edit', 'Bash', 'Bash', 'Bash', 'mcp__github__create_issue', 'Agent', 'Skill']);
+  assert.deepEqual(d.tools.map((t) => t.name), ['Edit', 'Bash', 'Bash', 'Bash', 'mcp__github__create_issue', 'Agent', 'Skill', 'AskUserQuestion']);
   assert.equal(d.tools.filter((t) => t.err).length, 3);
   const mcp = d.tools.find((t) => t.kind === 'mcp');
   assert.equal(mcp.server, 'github');
@@ -60,6 +60,7 @@ test('summary: exact cost from cost-state, estimate otherwise, cache stats, cove
   assert.equal(s.coverage.exactCostSessions, 1);
   assert.equal(s.coverage.sessions, 3);
   assert.equal(s.coverage.partial, false);
+  assert.equal(s.coverage.totalTranscripts, 4, 'S1 + subagent + S2 + C1; the foreign Codex rollout is not read');
   assert.equal(s.kpis.tokens.cacheRead, 5000 + 500);
   // cache saved: sonnet input 3 - cache read 0.3 per 1M on 5000 tokens; gpt 1.25 - 0.125 on 500
   near(s.kpis.cacheSavedUsd, (5000 * 2.7 + 500 * 1.125) / 1e6, 1e-4);
@@ -98,6 +99,8 @@ test('scope: other projects only with scope=all', async () => {
   assert.ok(!p.sessions.some((s) => s.sessionId === 'S9'));
   const a = await U().sessions({ range: '30d', scope: 'all' });
   assert.ok(a.sessions.some((s) => s.sessionId === 'S9'));
+  assert.ok(a.sessions.some((s) => s.sessionId === 'C2'), 'foreign Codex rollout with scope=all');
+  assert.ok(!p.sessions.some((s) => s.sessionId === 'C2'));
   assert.equal((await U().session('S9')).session, null, 'replay lookup stays in the project');
   assert.equal((await U().session('S9', { scope: 'all' })).session.sessionId, 'S9');
   const all = await U().summary({ range: '30d', scope: 'all' });
@@ -132,7 +135,11 @@ test('session replay: timeline kinds, thinking text only when prompts are shown,
   assert.equal(th.durationMs, 1200);
   assert.equal(th.thinking, undefined);
   assert.ok(!JSON.stringify(r).includes('secret chain of thought'));
-  assert.equal(r.timeline.find((x) => x.kind === 'subagent').agentId, 'a1');
+  const sub = r.timeline.find((x) => x.kind === 'subagent');
+  assert.deepEqual([sub.agentId, sub.input, sub.title], ['a1', 'general-purpose', 'sub task']);
+  const ask = r.timeline.find((x) => x.kind === 'result' && x.tool === 'AskUserQuestion');
+  assert.match(ask.quote, /USER-ANSWER-POSTGRES/);
+  assert.equal(ask.text, undefined, 'typed answers only under the redacted quote key');
   assert.equal(r.timeline.find((x) => x.kind === 'edit').path, 'src/a.js');
   const shown = await U({ live: { showPrompts: true } }).session('S1');
   assert.equal(shown.timeline.find((x) => x.kind === 'thinking').thinking, 'secret chain of thought');
@@ -179,7 +186,7 @@ test('prompts: outcome, rework, repeated prompts; pastedContents is counted, nev
   assert.ok(!JSON.stringify(p).includes('PASTED-SECRET-CONTENT'));
   const first = p.prompts.find((x) => x.session === 'S1' && x.prompt === 'please add the parser');
   assert.equal(first.pasted, 1);
-  assert.equal(first.outcome.toolCalls, 7);
+  assert.equal(first.outcome.toolCalls, 8);
   assert.equal(first.outcome.errors, 3);
   assert.equal(first.outcome.interrupted, true);
   assert.equal(first.outcome.rework, true);
@@ -240,6 +247,9 @@ test('settings audit: bypass, broad allow, MCP auth, hook errors, permission mod
   assert.equal(s.permissionModes.bypassPermissions, 1);
   assert.deepEqual(s.settings.permissions.allow, ['Bash(*)', 'Read']);
   assert.equal(s.settings.hooks.Stop[0].commands[0], 'echo done');
+  const proj = await U().settings({ home: false });
+  assert.ok(!JSON.stringify(proj).includes('echo done'), 'home settings left out');
+  assert.ok(!proj.findings.some((f) => f.id.startsWith('bypass-default')));
 });
 
 test('entity: session, file, tool, model, agent, task, commit', async () => {

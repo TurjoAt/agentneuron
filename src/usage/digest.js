@@ -14,6 +14,7 @@ const GAP_MS = 5 * 60 * 1000; // a pause longer than this ends an active span
 const MAX_ITEMS = 20000; // per array, per transcript
 const PROMPT_CHARS = 2000;
 const SKIP = ['{"type":"api-request', '{"type":"queue-operation', '{"type":"atis-latch'];
+const USER_TEXT = /the user said:|doesn't want to proceed/i;
 const REWORK = /\b(no|nope|wrong|revert|undo|instead|still|again|didn'?t|doesn'?t|isn'?t|not working|broke|broken|that's not|fix (it|this|that))\b/i;
 
 const push = (a, v) => { if (a.length < MAX_ITEMS) a.push(v); };
@@ -73,10 +74,11 @@ export function digestClaude(lines, file) {
   const addFh = (p, b, ts, messageId) => {
     if (typeof p !== 'string' || !p || !b || typeof b !== 'object') return;
     const version = num(b.version);
-    const key = `${p}@${version}`;
+    const abs = d.cwd && !path.isAbsolute(p) ? path.resolve(d.cwd, p) : p;
+    const key = `${abs}@${version}`;
     if (fh.has(key)) return;
     const backup = typeof b.backupFileName === 'string' && /^[\w.-]{1,200}@v\d+$/.test(b.backupFileName) ? b.backupFileName : null;
-    const e = { path: d.cwd && !path.isAbsolute(p) ? path.resolve(d.cwd, p) : p, backup, version, ts: toMs(b.backupTime) || ts, messageId: typeof messageId === 'string' ? messageId : null };
+    const e = { path: abs, backup, version, ts: toMs(b.backupTime) || ts, messageId: typeof messageId === 'string' ? messageId : null };
     fh.set(key, e);
     push(d.fileHistory, e);
   };
@@ -133,8 +135,9 @@ export function digestClaude(lines, file) {
               push(d.denials, [ts, t.denied, t.name]);
             } else if (r.is_error === true) {
               t.err = true;
-              const first = resultText(r.content).split('\n').map((l) => l.trim()).find(Boolean) || '';
-              t.sample = clip(first, 160);
+              const rt = resultText(r.content);
+              const first = rt.split('\n').map((l) => l.trim()).find(Boolean) || '';
+              t.sample = USER_TEXT.test(rt.slice(0, 4000)) ? null : clip(first, 160); // never quote user feedback
             }
             const tur = o.toolUseResult && typeof o.toolUseResult === 'object' ? o.toolUseResult : null;
             const ed = editById.get(r.tool_use_id);

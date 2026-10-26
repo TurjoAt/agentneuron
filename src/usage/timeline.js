@@ -7,6 +7,9 @@ import { parseLines } from './digest.js';
 import { WRITE_TOOLS, INTERRUPT, toMs, textOf, resultText, isInjected, clip, usageOf, summarizeInput, editPath, relTo } from './records.js';
 
 const MAX_ROWS = 5000;
+// tool results that carry text the user typed (answers, rejection feedback) go under `quote`, which is redacted for viewers
+const USER_TEXT = /the user said:|doesn't want to proceed|user (?:has )?answered/i;
+const USER_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
 
 /**
  * Claude transcript lines -> timeline rows. opts: { root, pricing, thinkingText (bool), scale (exact/estimate factor) }.
@@ -36,7 +39,11 @@ export function claudeTimeline(lines, { root = null, pricing = {}, thinkingText 
           if (!r || r.type !== 'tool_result') continue;
           const tool = names.get(r.tool_use_id) || null;
           if (typeof o.toolDenialKind === 'string') add({ ts, kind: 'denied', tool, text: o.toolDenialKind.slice(0, 40) });
-          else add({ ts, kind: 'result', tool, isError: r.is_error === true, text: clip(resultText(r.content).split('\n').find((l) => l.trim()) || '', 200) });
+          else {
+            const first = clip(resultText(r.content).split('\n').find((l) => l.trim()) || '', 200);
+            const user = USER_TOOLS.has(tool) || USER_TEXT.test(resultText(r.content).slice(0, 4000));
+            add({ ts, kind: 'result', tool, isError: r.is_error === true, ...(user ? { quote: first } : { text: first }) });
+          }
         }
         continue;
       }
@@ -74,7 +81,8 @@ export function claudeTimeline(lines, { root = null, pricing = {}, thinkingText 
         if (typeof b.id === 'string') names.set(b.id, b.name);
         const inp = b.input && typeof b.input === 'object' ? b.input : {};
         if (WRITE_TOOLS.has(b.name)) row = { ts, kind: 'edit', tool: b.name, path: rel(editPath(inp), o.cwd), input: clip(editPath(inp) || '', 300) };
-        else if (b.name === 'Agent' || b.name === 'Task') row = { ts, kind: 'subagent', tool: b.name, input: clip(inp.description || inp.subagent_type || '', 300) };
+        else if (b.name === 'Agent' || b.name === 'Task') row = { ts, kind: 'subagent', tool: b.name, input: clip(inp.subagent_type || '', 100), title: clip(inp.description || '', 300) };
+        else if (USER_TOOLS.has(b.name)) row = { ts, kind: 'tool', tool: b.name, quote: clip(summarizeInput(inp) || JSON.stringify(inp), 300) };
         else {
           row = { ts, kind: 'tool', tool: b.name, input: clip(summarizeInput(inp), 300) };
           const fp = inp.file_path || inp.notebook_path;

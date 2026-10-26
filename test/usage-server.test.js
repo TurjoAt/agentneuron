@@ -26,7 +26,7 @@ const get = (port, p, tok) => new Promise((resolve, reject) => {
   r.on('error', reject); r.end();
 });
 const ADMIN = 'adm-usage-1234', VIEWER = 'view-usage-1234';
-const SECRET_TEXT = ['Fixture session one', 'please add the parser', 'sub task description', 'Build notes body', 'parser lives'];
+const SECRET_TEXT = ['Fixture session one', 'please add the parser', 'sub task', 'USER-ANSWER-POSTGRES', 'Which database', 'parser lives', 'echo done', 'Bash(*)'];
 
 const port = await boot();
 

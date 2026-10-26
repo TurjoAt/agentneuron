@@ -39,7 +39,8 @@ export default async function register(router, ctx) {
   R('/api/usage/impact', ({ q, role }) => U().impact(opts(q, ctx, role)));
   R('/api/usage/activity', ({ q, role }) => U().activity(opts(q, ctx, role)));
   R('/api/usage/memory', () => U().memory());
-  R('/api/usage/settings', () => U().settings());
+  // the home-level ~/.claude/settings.json is admin-only, like global agent config in the agents center
+  R('/api/usage/settings', ({ role }) => U().settings({ home: ctx.can ? ctx.can('state', role) : role === 'admin' }));
   R('/api/usage/entity', ({ q }) => {
     const kind = q.get('kind');
     if (!KINDS.has(kind)) throw new HttpError(400, 'unknown kind');

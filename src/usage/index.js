@@ -74,7 +74,7 @@ export function getUsage(ctx = {}) {
     const cands = await candidates(c, { range: { from: 0, to: Date.now() }, scope: scopeOf(o), tool: 'all' });
     for (const cand of cands) {
       if (cand.tool === 'claude' && cand.sessionId !== id) continue;
-      if (cand.tool === 'codex' && !path.basename(cand.file).endsWith(`${id}.jsonl`)) continue;
+      if (cand.tool === 'codex' && !(path.basename(cand.file) === `${id}.jsonl` || path.basename(cand.file).endsWith(`-${id}.jsonl`))) continue;
       const d = await digestFile(cand, c.home);
       if (!d) continue;
       if (cand.tool === 'codex' && scopeOf(o) !== 'all' && !(d.cwd && (path.resolve(d.cwd) === c.root || relTo(c.root, d.cwd)))) continue;
@@ -294,7 +294,8 @@ export function getUsage(ctx = {}) {
       const slugs = new Set(sessions.flatMap((s) => s.slugs));
       return { memory, plans: await readPlans({ home: c.home, slugs }) };
     },
-    async settings() {
+    /** o.home: include ~/.claude/settings.json (admins only: home agent config is not project data). */
+    async settings(o = {}) {
       const { sessions } = await load({ range: '30d' });
       const permModes = {};
       let hookErrors = 0;
@@ -302,7 +303,7 @@ export function getUsage(ctx = {}) {
         for (const [k, v] of Object.entries(s.permModes || {})) permModes[k] = (Object.hasOwn(permModes, k) ? permModes[k] : 0) + v;
         for (const h of s.hooks) hookErrors += h[2];
       }
-      return auditSettings({ root: c.root, home: c.home, permModes, hookErrors });
+      return auditSettings({ root: c.root, home: c.home, permModes, hookErrors, includeHome: o.home !== false });
     },
     entity,
   };

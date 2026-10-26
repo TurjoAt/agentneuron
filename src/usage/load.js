@@ -2,7 +2,7 @@
 // in the background), and merge each Claude session with its subagent transcripts.
 import path from 'node:path';
 import { priceFor, usdOf } from '../agentcenter/costs.js';
-import { claudeProjectDirs, claudeSessions, codexFiles, pool } from './locate.js';
+import { claudeProjectDirs, claudeSessions, codexFiles, codexInRoot, pool } from './locate.js';
 import { digestFile, cachedDigest } from './digest.js';
 import { safeRead } from './guard.js';
 import { relTo } from './records.js';
@@ -31,7 +31,10 @@ export async function candidates(ctx, { range, scope = 'project', tool = 'all' }
     const dirs = await claudeProjectDirs({ root: ctx.root, home, scope });
     out.push(...await claudeSessions(dirs, home, { minMtime }));
   }
-  if (tool !== 'claude') out.push(...await codexFiles(home, { minMtime }));
+  if (tool !== 'claude') {
+    const cx = await codexFiles(home, { minMtime });
+    out.push(...(scope === 'all' ? cx : await codexInRoot(cx, ctx.root, home)));
+  }
   out.sort((a, b) => b.lastWrite - a.lastWrite);
   return out;
 }

@@ -48,6 +48,8 @@ export function makeHome() {
     U(12, [R('t6')], { toolUseResult: { agentId: 'a1', status: 'completed' } }),
     A(13, 'm6', [{ type: 'tool_use', id: 't7', name: 'Skill', input: { skill: 'review' } }]),
     U(14, [R('t7')]),
+    A(14, 'm7', [{ type: 'tool_use', id: 't8', name: 'AskUserQuestion', input: { questions: [{ question: 'Which database?' }] } }]),
+    U(14, [R('t8', { text: 'User has answered your questions: "Which database?"="USER-ANSWER-POSTGRES"' })]),
     U(15, [{ type: 'text', text: '[Request interrupted by user]' }]),
     { ...common, type: 'system', subtype: 'turn_duration', durationMs: 900000, timestamp: T(15) },
     { ...common, type: 'system', subtype: 'stop_hook_summary', hookCount: 2, hookErrors: [{ e: 1 }], preventedContinuation: true, timestamp: T(15) },
@@ -112,6 +114,11 @@ export function makeHome() {
     { type: 'response_item', timestamp: T(42), payload: { type: 'function_call', name: 'shell', call_id: 'c1', arguments: JSON.stringify({ command: ['bash', '-lc', 'npm test'] }) } },
     { type: 'event_msg', timestamp: T(43), payload: { type: 'exec_command_end', call_id: 'c1', exit_code: 1, stderr: 'Error: boom' } },
     { type: 'event_msg', timestamp: T(44), payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 2000, cached_input_tokens: 500, output_tokens: 100 } } } },
+  ]));
+  // codex rollout of another project: never read under scope=project
+  w(path.join(home, '.codex', 'sessions', '2026', '01', '01', 'rollout-2026-C2.jsonl'), jl([
+    { type: 'session_meta', timestamp: T(50), payload: { id: 'C2', cwd: '/somewhere/else' } },
+    { type: 'event_msg', timestamp: T(51), payload: { type: 'user_message', message: 'foreign codex prompt' } },
   ]));
   return { base, home, root, dir, now };
 }

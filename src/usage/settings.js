@@ -35,11 +35,11 @@ const BROAD = [
 ];
 
 /**
- * @param o { root, home, permModes: {mode: count}, hookErrors: number }
+ * @param o { root, home, permModes: {mode: count}, hookErrors: number, includeHome: read ~/.claude/settings.json }
  */
-export async function auditSettings({ root, home, permModes = {}, hookErrors = 0 }) {
+export async function auditSettings({ root, home, permModes = {}, hookErrors = 0, includeHome = true }) {
   const sources = [
-    { location: '~/.claude/settings.json', file: path.join(home, '.claude', 'settings.json') },
+    ...(includeHome ? [{ location: '~/.claude/settings.json', file: path.join(home, '.claude', 'settings.json') }] : []),
     { location: '.claude/settings.json', file: path.join(root, '.claude', 'settings.json') },
     { location: '.claude/settings.local.json', file: path.join(root, '.claude', 'settings.local.json') },
   ];

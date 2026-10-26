@@ -154,7 +154,7 @@ Common query parameters: `range` (`24h`, `7d`, `30d` default, `90d`, `all`), `to
 | `/api/usage/impact` | common | `exact`, `linesAdded`, `linesRemoved`, `files` edited by agents, `churn` per day |
 | `/api/usage/activity` | common | `heatmap` per day, `hourly` (24) and `weekHour` (7 x 24, Monday first) prompt counts, `turns`, `sessions`, `focusMs`, `awayCount` |
 | `/api/usage/memory` | | `memory` files of this project (frontmatter, `body`, links, stale paths) and `plans` used in this project's sessions |
-| `/api/usage/settings` | | Masked `settings`, `permissionModes` seen in sessions (last 30 days), `mcpNeedsAuth`, `findings` |
+| `/api/usage/settings` | | Masked `settings`, `permissionModes` seen in sessions (last 30 days), `mcpNeedsAuth`, `findings`. `~/.claude/settings.json` is included for admins only. |
 | `/api/usage/entity` | `kind` (`session`, `file`, `commit`, `task`, `tool`, `model`, `agent`), `id` | `{ kind, id, title, subtitle, stats, related: { sessions, files, commits, tasks, tools }, links }` for the side panel (last 90 days) |
 
 ## Insights

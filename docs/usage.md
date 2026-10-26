@@ -19,7 +19,7 @@ The format of these files is not documented by Anthropic or OpenAI and changes b
 | `~/.claude/settings.json`, `<project>/.claude/settings.json`, `<project>/.claude/settings.local.json`, `~/.claude/mcp-needs-auth-cache.json` | Settings audit |
 | `~/.codex/sessions/**/rollout-*.jsonl` | Codex sessions whose working directory is the project (prompts, shell commands and their exit codes, patches, total tokens) |
 
-`<project>` is the project path with every character other than a letter or digit replaced by `-`. If no such directory exists, AgentNeuron looks for a directory whose transcripts record the project path as their working directory. Sessions started in a subdirectory of the project, or in another checkout of it, belong to a different directory and are not counted under `scope: project`.
+`<project>` is the project path with every character other than a letter or digit replaced by `-`. If no such directory exists, AgentNeuron looks for a directory whose transcripts record the project path as their working directory. Claude Code sessions started in a subdirectory of the project, or in another checkout of it, belong to a different directory and are not counted under `scope: project`. Codex sessions are matched by their recorded working directory, so those started in a subdirectory are included.
 
 **Never read**, enforced in the reader for the requested path and for the real path behind a symlink: `~/.claude/.credentials.json`, `~/.claude/sessions/*.key`, `~/.claude/remote/`, `~/.claude/state/`, `~/.claude/paste-cache/`, and `~/.codex/auth.json`.
 
@@ -53,7 +53,7 @@ Days (`series`, `heatmap`, `churn`) use the local time zone of the machine runni
 
 ### Exact and estimated cost
 
-Claude Code writes a `cost-state` record with the session's total cost (`totalCostUSD`). When a session has one, its cost is **exact** (`exact: true`), and it includes subagents and helper calls that do not appear in the transcript. If a session was resumed in a new process, the last record of each process is summed.
+Claude Code writes a `cost-state` record with the session's total cost (`totalCostUSD`). When a session has one, its cost is **exact** (`exact: true`), and it includes subagents and helper calls that do not appear in the transcript. Each Claude Code process writes its own running total; AgentNeuron takes the last record of each process (by `startTime`) and sums them. Summing across resumed processes is an assumption: it has not been checked against a session resumed in a new process.
 
 Without that record the cost is **estimated** (`exact: false`): tokens times the list price of the model family (`opus`, `sonnet`, `haiku`, `gpt`, `other`), overridable with [`pricing`](configuration.md#pricing). Codex sessions are always estimated.
 
@@ -99,11 +99,12 @@ Thinking text is included only when the [live prompt policy](live.md#configurati
 
 Memory files are read from the project's `memory/` directory with their frontmatter (`name`, `description`, `metadata.type`). Backticked project paths in the body that no longer exist are listed under `stale`. Plans live in one global directory, so only plans whose file name matches a plan slug recorded in this project's sessions are returned.
 
-The settings audit merges the user and project settings and reports: `bypassPermissions` as the default mode or used in sessions, broad allow rules such as `Bash(*)`, writes allowed everywhere, a disabled bypass warning, auto-enabled project MCP servers, MCP servers waiting for authentication, failing hooks, and the absence of deny rules. Values are masked; `env` blocks are not returned.
+The settings audit merges the user and project settings and reports: `bypassPermissions` as the default mode or used in sessions, broad allow rules such as `Bash(*)`, writes allowed everywhere, a disabled bypass warning, auto-enabled project MCP servers, MCP servers waiting for authentication, failing hooks, and the absence of deny rules. Values are masked; `env` blocks are not returned. `~/.claude/settings.json` is home-level configuration, not project data: only admins get it and the findings derived from it; viewers see the project settings.
 
 ## Privacy
 
 - Prompt-like text is returned only under the keys `prompt`, `title`, `quote`, `lastPrompt`, `thinking` and `body`, and in timeline rows of kind `prompt` and `thinking`. When the live prompt policy hides prompts from a role (by default: viewers, and everyone on a non-loopback bind unless `live.showPrompts` is set), these are blanked or removed. Session titles count as prompt text, because Claude Code often derives them from the first prompt.
+- Tool results that carry text you typed (answers to `AskUserQuestion`, rejection feedback) are returned under `quote`, and subagent task descriptions under `title`, so they are redacted the same way.
 - Every response goes through the secret masker.
 - `pastedContents` from `history.jsonl` is never returned; prompts carry only `pasted`, the number of pasted items.
 - The MCP tool `get_usage` returns no prompt text; `get_session_replay` follows the MCP prompt policy (included, masked).
