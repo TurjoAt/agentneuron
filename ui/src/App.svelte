@@ -41,14 +41,28 @@
   import Sessions from './views/Sessions.svelte';
   import Memory from './views/Memory.svelte';
   import EntityDrawer from './lib/EntityDrawer.svelte';
+  import BootScreen from './lib/boot/BootScreen.svelte';
+  import { entity, closeEntity } from './lib/entity.svelte.js';
 
   const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights, rules: Rules, usage: Usage, sessions: Sessions, memory: Memory };
   const MODALS = { confirm: ConfirmDialog, 'new-file': NewFileDialog, rename: RenameDialog, replace: ReplaceDialog, task: TaskModal, shortcuts: ShortcutsDialog };
   const View = $derived(COMPONENTS[app.route.view] || Overview);
   const ModalC = $derived(app.modal ? MODALS[app.modal.kind] : null);
 
+  // Boot overlay: shown until boot() finishes and its exit animation completes. Auth / fatal outcomes skip the animation.
+  let bootVisible = $state(true);
+  const shellReady = $derived(app.ready && !app.authRequired && !app.fatal);
+  $effect(() => {
+    if (!app.ready) bootVisible = true;
+    else if (app.authRequired || app.fatal) bootVisible = false;
+  });
+
   onMount(() => {
     boot();
+  });
+  // fallback: never leave the pre-JS splash behind once the boot overlay is gone
+  $effect(() => {
+    if (!bootVisible) document.getElementById('splash')?.remove();
   });
 
   function isTyping(e) {
@@ -83,6 +97,8 @@
     }
     if (e.key === 'Escape') {
       if (app.palette) app.palette = false;
+      else if (app.modal) return;
+      else if (entity.current) closeEntity();
       else if (app.drawer) app.drawer = null;
       else if (jobs.dock && !app.modal) jobs.dock = false;
       return;
@@ -133,16 +149,17 @@
 
 <svelte:window {onkeydown} {onbeforeunload} />
 
-{#if !app.ready}
-  <div class="splash">
-    <div class="logo-pulse"></div>
-    <div class="faint">Loading context…</div>
-  </div>
-{:else if app.authRequired}
+{#if app.ready && app.authRequired}
   <Login />
-{:else if app.fatal}
-  <div class="splash"><div class="auth card"><h1>Something went wrong</h1><p class="muted">{app.fatal}</p></div></div>
-{:else}
+{:else if app.ready && app.fatal}
+  <div class="splash">
+    <div class="auth card" role="alert">
+      <h1>Something went wrong</h1>
+      <p class="muted">{app.fatal}</p>
+      <button class="btn primary" onclick={() => location.reload()}>Reload</button>
+    </div>
+  </div>
+{:else if shellReady}
   <div class="shell" class:dock-open={jobs.dockVisible && jobs.dock}>
     <Sidebar />
     <main class="main" class:bleed={fullBleed} bind:this={mainEl}>
@@ -166,6 +183,9 @@
   <ContextMenu />
   <PeekCard />
 {/if}
+{#if bootVisible}
+  <BootScreen ready={shellReady} onexit={() => (bootVisible = false)} />
+{/if}
 <Toasts />
 
 <style>
@@ -175,6 +195,8 @@
     height: 100vh;
     height: 100dvh;
   }
+  .shell { animation: shell-in 0.6s var(--ease) both; }
+  @keyframes shell-in { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
   .main {
     overflow: auto;
     min-width: 0;
@@ -190,18 +212,6 @@
     gap: 18px;
     padding: 16px;
   }
-  .logo-pulse {
-    width: 46px;
-    height: 46px;
-    border-radius: 13px;
-    background: linear-gradient(135deg, #ff8a4c, #c07bff 55%, #4f8dff);
-    animation: breathe 1.4s var(--ease) infinite alternate;
-    box-shadow: 0 10px 40px -8px #c07bff;
-  }
-  @keyframes breathe {
-    from { transform: scale(0.9) rotate(-4deg); opacity: 0.7; }
-    to { transform: scale(1.05) rotate(4deg); opacity: 1; }
-  }
   .auth {
     padding: 26px;
     width: min(420px, calc(100vw - 32px));
@@ -211,6 +221,7 @@
   }
   .auth h1 { margin: 0; font-size: 18px; }
   .auth p { margin: 0; font-size: 13px; }
+  .auth .btn { align-self: flex-start; }
   @media (max-width: 760px) {
     .shell {
       grid-template-columns: minmax(0, 1fr);

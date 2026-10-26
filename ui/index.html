@@ -16,8 +16,46 @@
         if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
       } catch (e) {}
     </script>
+    <style>
+      /* Pre-JS splash: mirrors ui/src/lib/boot/BootScreen.svelte (same mark size and position) so the hand-over is seamless. */
+      #splash { --vs: 260px; --vy: clamp(150px, 31vh, 290px); --bg: #07080d; --fg: #e8eaf1; --fg2: #a4aabb; --ring: rgba(164, 170, 187, 0.3); --a1: rgba(139, 125, 255, 0.16); --a2: rgba(255, 138, 76, 0.1);
+        position: fixed; inset: 0; z-index: 210; background: var(--bg); color: var(--fg); overflow: hidden; transition: opacity 0.3s ease;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'Inter', 'SF Pro Text', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif; }
+      [data-theme='light'] #splash { --bg: #f4f5f9; --fg: #12141c; --fg2: #4b5163; --ring: rgba(75, 81, 99, 0.25); --a1: rgba(91, 78, 224, 0.1); --a2: rgba(217, 98, 43, 0.07); }
+      #splash.out { opacity: 0; pointer-events: none; }
+      #splash::before { content: ''; position: absolute; inset: 0; background: radial-gradient(60vmax 40vmax at 50% var(--vy), var(--a1), transparent 70%), radial-gradient(40vmax 30vmax at 90% 100%, var(--a2), transparent 70%); }
+      #splash .sv { position: absolute; left: 50%; top: var(--vy); width: var(--vs); height: var(--vs); transform: translate(-50%, -50%); }
+      #splash .rg { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px solid var(--ring); transform: translate(-50%, -50%); }
+      #splash .r1 { width: 40%; height: 40%; }
+      #splash .r2 { width: 67.5%; height: 67.5%; border-style: dashed; animation: sp-spin-c 40s linear infinite; }
+      #splash .r3 { width: 91%; height: 91%; opacity: 0.5; border-style: dotted; animation: sp-spin-c 64s linear infinite reverse; }
+      #splash .orb { position: absolute; inset: 16.25%; animation: sp-spin 3.6s cubic-bezier(0.6, 0.1, 0.4, 0.9) infinite; }
+      #splash .orb i { position: absolute; left: 50%; top: -4px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #8b7dff; box-shadow: 0 0 14px #8b7dff; }
+      #splash .orb.b { animation-duration: 5.2s; animation-direction: reverse; inset: 30%; }
+      #splash .orb.b i { background: #ff8a4c; box-shadow: 0 0 14px #ff8a4c; width: 6px; height: 6px; margin-left: -3px; top: -3px; }
+      #splash .mk { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 16px; box-shadow: 0 12px 40px -8px rgba(192, 123, 255, 0.55); animation: sp-breathe 2.4s ease-in-out infinite alternate; }
+      #splash .mk svg { display: block; }
+      #splash .tt { position: absolute; left: 0; right: 0; top: calc(var(--vy) + var(--vs) / 2 + 6px); text-align: center; padding: 0 16px; }
+      #splash h1 { margin: 0; font-size: 20px; font-weight: 680; letter-spacing: -0.02em; line-height: 28px; }
+      #splash p { margin: 2px 0 0; color: var(--fg2); font-size: 13px; line-height: 20px; }
+      @media (max-width: 600px), (max-height: 700px) { #splash { --vs: 210px; --vy: clamp(130px, 28vh, 240px); } }
+      @media (max-height: 560px) { #splash { --vs: 150px; --vy: 100px; } }
+      @media (prefers-reduced-motion: reduce) { #splash * { animation: none !important; } }
+      @keyframes sp-spin { to { transform: rotate(360deg); } }
+      @keyframes sp-breathe { from { transform: scale(0.97); } to { transform: scale(1.03); } }
+      @keyframes sp-spin-c { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+    </style>
   </head>
   <body>
+    <div id="splash" role="status" aria-label="Loading AgentNeuron">
+      <div class="sv" aria-hidden="true">
+        <span class="rg r1"></span><span class="rg r2"></span><span class="rg r3"></span>
+        <span class="orb"><i></i></span><span class="orb b"><i></i></span>
+        <span class="mk"><svg viewBox="0 0 32 32" width="56" height="56"><defs><linearGradient id="sp-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a4c" /><stop offset="0.55" stop-color="#c07bff" /><stop offset="1" stop-color="#4f8dff" /></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#sp-g)" /><path d="M8 22V10l4 5 4-5v12M20 10v8m0 0-3-3m3 3 3-3M19 22h6" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+      </div>
+      <div class="tt"><h1>AgentNeuron</h1><p>Waking up your context</p></div>
+      <noscript><p style="position:absolute;bottom:24px;left:0;right:0;text-align:center">AgentNeuron needs JavaScript to run.</p></noscript>
+    </div>
     <div id="app"></div>
     <script type="module" src="./src/main.js"></script>
   </body>
