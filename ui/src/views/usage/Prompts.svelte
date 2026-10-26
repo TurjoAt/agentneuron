@@ -89,7 +89,7 @@
                 <span class="faint tiny">·</span>
                 <EntityLink kind="session" id={p.session} label={shortId(p.session)} class="tiny mono" />
                 <span class="spacer"></span>
-                <button class="btn ghost sm" onclick={() => navigate('sessions', { id: p.session, at: p.id })} aria-label="Open this prompt in the session replay"><Icon name="play" size={11} /> Replay</button>
+                <button class="btn ghost sm" onclick={() => navigate('sessions', { id: p.session, at: p.id ?? undefined, ts: p.ts ?? undefined })} aria-label="Open this prompt in the session replay"><Icon name="play" size={11} /> Replay</button>
               </div>
               {#if blank(p.prompt)}<div class="pt hidden"><Icon name="lock" size={11} /> hidden ({fmtNum(p.length)} chars)</div>
               {:else}<div class="pt">{p.prompt}</div>{/if}
@@ -116,7 +116,7 @@
         <Empty icon="copy" title="No repeats yet" compact>Prompts you type 3+ times show up here with a command or skill suggestion.</Empty>
       {:else}
         <ul class="rlist">
-          {#each d.repeated as r (r.id)}
+          {#each d.repeated as r, i (r.id ?? i)}
             {@const snip = snippet(r)}
             <li class="rr">
               <div class="rh">

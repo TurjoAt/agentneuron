@@ -21,7 +21,8 @@
   const res = resource(() => api('/api/usage/session', { id }), { key: () => id });
   const d = $derived(res.data);
   const s = $derived(d?.session || null);
-  const timeline = $derived(Array.isArray(d?.timeline) ? d.timeline.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0)) : []);
+  // row ids may be missing or shared (tool + result); make them unique, keep the raw id for &at=
+  const timeline = $derived(Array.isArray(d?.timeline) ? d.timeline.map((r, i) => ({ ...r, rawId: r.id, id: r.id != null ? `${r.id}:${r.kind}:${i}` : `row${i}` })).sort((a, b) => (a.ts || 0) - (b.ts || 0)) : []);
   const agents = $derived(Array.isArray(d?.agents) ? d.agents : []);
   const files = $derived(Array.isArray(d?.files) ? d.files : []);
 
@@ -72,15 +73,20 @@
   const selRow = $derived(timeline.find((r) => r.id === sel) || null);
   const nearest = (list, ts) => list.reduce((b, r) => (!b || Math.abs((r.ts || 0) - ts) < Math.abs((b.ts || 0) - ts) ? r : b), null);
 
+  let lastLink = '';
   $effect(() => {
-    if (!timeline.length || inited) return;
+    const link = `${params.at ?? ''}|${params.ts ?? ''}`;
+    if (!timeline.length || (inited && link === lastLink)) return;
+    const first = !inited;
     inited = true;
+    lastLink = link;
     untrack(() => {
-      const at = params.at && timeline.find((r) => r.id === params.at);
+      const at = params.at && timeline.find((r) => r.rawId === params.at || r.id === params.at);
+      if (!first && !at && !params.ts) return;
       const ts = Number(params.ts);
       const r = at || (Number.isFinite(ts) && ts > 0 ? nearest(timeline, ts) : null);
       if (r) select(r.id, true);
-      if (params.path) why = { path: params.path, ts: Number.isFinite(ts) && ts > 0 ? ts : null };
+      if (first && params.path) why = { path: params.path, ts: Number.isFinite(ts) && ts > 0 ? ts : null };
     });
   });
 
@@ -97,7 +103,9 @@
     clearTimeout(urlTimer);
     if (!at) return;
     urlTimer = setTimeout(() => {
-      const h = href('sessions', { id, at });
+      const raw = timeline.find((r) => r.id === at)?.rawId;
+      if (raw == null) return;
+      const h = href('sessions', { id, at: raw });
       if (location.hash !== h) history.replaceState(history.state, '', h);
     }, 400);
     return () => clearTimeout(urlTimer);
@@ -272,7 +280,7 @@
         <section class="card">
           <div class="card-h">Agents <span class="sub">{tree.length - 1} subagent{tree.length === 2 ? '' : 's'}</span></div>
           <ul class="tree">
-            {#each tree as { a, depth } (a.agentId)}
+            {#each tree as { a, depth }, i (a.agentId ?? `a${i}`)}
               <li style="--d:{depth}">
                 <button class="tn" onclick={() => jumpAgent(a)} disabled={depth === 0} title={depth ? 'Jump to where it was spawned' : ''}>
                   <span class="dot" class:main={depth === 0}></span>
@@ -291,7 +299,7 @@
           <div class="card-b faint tiny">No file edits in this session.</div>
         {:else}
           <ul class="files">
-            {#each files as f (f.path)}
+            {#each files as f, i (f.path ?? i)}
               <li class:on={fileSel?.path === f.path}>
                 <div class="fh">
                   <EntityLink kind="file" id={f.path} title={f.path}><span class="mono">{basename(f.path)}</span></EntityLink>
@@ -301,7 +309,7 @@
                 </div>
                 {#if f.versions?.length}
                   <div class="vers" role="group" aria-label="Versions of {f.path}">
-                    {#each f.versions as v, i (v.backup)}
+                    {#each f.versions as v, i (v.backup ?? i)}
                       <button class="chip vchip" class:on={fileSel?.path === f.path && fileSel.backup === v.backup} onclick={() => (fileSel = fileSel?.backup === v.backup && fileSel.path === f.path ? null : { path: f.path, backup: v.backup })} title={fmtDate(v.ts)}>v{i + 1} <span class="n">{fmtTime(v.ts).slice(0, 5)}</span></button>
                     {/each}
                   </div>

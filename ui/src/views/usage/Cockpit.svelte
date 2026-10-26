@@ -79,7 +79,7 @@
   {/if}
 
   <div class="kpis stagger">
-    <Kpi label="Cost" value={k.usd != null ? Math.round(k.usd * 100) : null} format={(c) => money(c / 100, { est: !allExact && exactUsd == null })} spark={col('usd')} invert color="var(--accent-2)"
+    <Kpi label="Cost" value={k.usd != null ? Math.round(k.usd * 100) : null} format={(c) => money(c / 100, { est: exactUsd == null || exactUsd < 0.005 })} spark={col('usd')} invert color="var(--accent-2)"
       hint="Exact cost comes from Claude Code's cost-state; the rest is estimated from token usage at list prices.">
       {#snippet badge()}{#if allExact}<span class="badge ok tiny-b" title="All cost in this range is exact">exact</span>{:else}<span class="badge warn tiny-b" title="Part of this cost is estimated from token usage">incl. estimate</span>{/if}{/snippet}
       {#snippet detail()}
@@ -203,7 +203,7 @@
       <div class="card-h">Anomalies <span class="sub">{anomalies.length || 'none'}</span></div>
       {#if anomalies.length}
         <ul class="anoms">
-          {#each anomalies as a (a.id)}
+          {#each anomalies as a, i (a.id ?? i)}
             {@const sv = SEVERITY[a.severity] || SEVERITY.low}
             <li class="anom sev-{sv.cls}">
               <span class="aic"><Icon name={ANOMALY_ICON[a.kind] || 'alert'} size={14} /></span>
@@ -223,7 +223,7 @@
 
     {#if d.tips?.length}
       <section class="tips wide">
-        {#each d.tips as t (t.id)}
+        {#each d.tips as t, i (t.id ?? i)}
           <div class="card tip lift">
             <span class="tic"><Icon name={TIP_ICON[t.kind] || 'sparkles'} size={14} /></span>
             <div><div class="eyebrow">{t.kind || 'tip'}</div><div class="tm">{t.message}</div></div>

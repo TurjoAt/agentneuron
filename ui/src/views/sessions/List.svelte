@@ -67,7 +67,7 @@
 </script>
 
 <div class="bar">
-  <div class="search"><Icon name="search" size={14} /><input class="input" type="search" placeholder="Search sessions by title or id" aria-label="Search sessions" bind:value={q} /></div>
+  <div class="search"><Icon name="search" size={14} /><input class="input" type="search" placeholder="Search session titles" aria-label="Search sessions" bind:value={q} /></div>
   <div class="segc" role="group" aria-label="Agent">
     {#each AGENTS as a (a)}<button class:on={agent === a} aria-pressed={agent === a} onclick={() => set({ agent: a === 'all' ? undefined : a })}>{#if a !== 'all'}<ToolBadge tool={a} compact />{/if}{a === 'all' ? 'All' : a === 'claude' ? 'Claude' : 'Codex'}</button>{/each}
   </div>
