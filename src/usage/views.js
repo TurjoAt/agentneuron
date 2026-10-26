@@ -257,7 +257,6 @@ export function tools(sessions, r, { needsAuth = [] } = {}) {
     for (const l of loopsOf(s)) if (inRange(l.ts)) loops.push(l);
   }
   const auth = new Set(needsAuth);
-  for (const n of auth) if (!servers.has(n)) servers.set(n, { server: n, calls: 0, errors: 0 });
   return {
     tools: [...byName.values()].map(({ ms, ...a }) => {
       const sm = sortNum(ms);

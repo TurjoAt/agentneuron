@@ -30,6 +30,31 @@ export function parseLines(text, partial = false) {
   return out;
 }
 
+const YIELD_BYTES = 1 << 20;
+const yieldNow = () => new Promise((r) => setImmediate(r));
+
+/**
+ * parseLines for request paths: walks the text line by line and yields to the event loop about every
+ * megabyte, so a large transcript does not stall other requests and the SSE stream while it is parsed.
+ */
+export async function parseLinesAsync(text, partial = false) {
+  const out = [];
+  let i = partial ? text.indexOf('\n') + 1 : 0;
+  let budget = YIELD_BYTES;
+  while (i < text.length) {
+    let j = text.indexOf('\n', i);
+    if (j < 0) j = text.length;
+    const line = text.slice(i, j);
+    budget -= j - i + 1;
+    i = j + 1;
+    if (line && !SKIP.some((p) => line.startsWith(p))) {
+      try { const o = JSON.parse(line); if (o && typeof o === 'object') out.push(o); } catch { /* malformed or truncated line */ }
+    }
+    if (budget <= 0) { budget = YIELD_BYTES; await yieldNow(); }
+  }
+  return out;
+}
+
 function newDigest(file, tool) {
   return {
     v: 1, file, tool, sessionId: tool === 'claude' ? path.basename(file, '.jsonl') : null, agentId: null, cwd: null,
@@ -268,7 +293,7 @@ export async function digestFile(f, home) {
     try {
       const r = await safeRead(f.file, home, { tail: MAX_TRANSCRIPT_BYTES });
       if (r) {
-        const lines = parseLines(r.buf.toString('utf8'), r.st.size > r.buf.length);
+        const lines = await parseLinesAsync(r.buf.toString('utf8'), r.st.size > r.buf.length);
         d = f.tool === 'codex' ? digestCodex(lines, f.file) : digestClaude(lines, f.file);
       }
     } catch { d = null; }

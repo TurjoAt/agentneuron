@@ -215,7 +215,8 @@ export function getUsage(ctx = {}) {
     async sessions(o = {}) {
       const L = await load(o);
       const needle = String(o.q || '').toLowerCase();
-      const rows = L.sessions.map((s) => V.sessionRow(s, c.root)).filter((r) => !needle || String(r.title).toLowerCase().includes(needle) || r.sessionId.includes(needle));
+      const byTitle = o.titleSearch !== false;
+      const rows = L.sessions.map((s) => V.sessionRow(s, c.root)).filter((r) => !needle || (byTitle && String(r.title).toLowerCase().includes(needle)) || r.sessionId.includes(needle));
       return { range: L.range, coverage: L.coverage, generatedAt: L.generatedAt, sessions: rows.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0)) };
     },
     /** o.scope 'all' searches every project dir (the route passes it only for admins with usage.scope "all"). */
@@ -241,7 +242,10 @@ export function getUsage(ctx = {}) {
       if (!file) throw new FileError(404, 'version not found');
       const i = file.versions.findIndex((v) => v.backup === backup);
       const v = file.versions[i], next = file.versions[i + 1];
-      const dir = path.join(c.home, '.claude', 'file-history', hit.s.sessionId);
+      // the directory comes from the transcript file name, never from record content
+      const sessDir = hit.cand?.sessionId || hit.s.sessionId;
+      if (!/^[\w-]{1,200}$/.test(String(sessDir))) throw new FileError(404, 'version not found');
+      const dir = path.join(c.home, '.claude', 'file-history', sessDir);
       let truncated = false;
       const readBackup = async (name) => {
         if (!name || name.startsWith('new@') || !/^[\w.-]{1,200}@v\d+$/.test(name)) return null;
@@ -265,7 +269,8 @@ export function getUsage(ctx = {}) {
     },
     async tools(o = {}) {
       const L = await load(o);
-      const s = await auditSettings({ root: c.root, home: c.home });
+      // home-level MCP servers needing login are listed only for admins (o.home)
+      const s = await auditSettings({ root: c.root, home: c.home, includeHome: o.home !== false });
       return { range: L.range, coverage: L.coverage, generatedAt: L.generatedAt, ...V.tools(L.sessions, L.range, { needsAuth: s.mcpNeedsAuth }) };
     },
     async prompts(o = {}) {
@@ -290,7 +295,7 @@ export function getUsage(ctx = {}) {
       const dirs = await claudeProjectDirs({ root: c.root, home: c.home, scope: 'project' });
       const memory = await readMemory({ dirs, home: c.home, root: c.root });
       // plans are global files: only those whose name matches a plan slug seen in this project's sessions
-      const { sessions } = await load({ range: 'all' });
+      const { sessions } = await load({ range: 'all' }, SUMMARY_BUDGET_MS); // bounded: plans are a side panel
       const slugs = new Set(sessions.flatMap((s) => s.slugs));
       return { memory, plans: await readPlans({ home: c.home, slugs }) };
     },

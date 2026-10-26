@@ -3,7 +3,7 @@ import { MAX_TRANSCRIPT_BYTES } from '../agents/sessions.js';
 import { codexTimeline } from '../agentcenter/transcript.js';
 import { usdOf } from '../agentcenter/costs.js';
 import { safeRead } from './guard.js';
-import { parseLines } from './digest.js';
+import { parseLinesAsync } from './digest.js';
 import { WRITE_TOOLS, INTERRUPT, toMs, textOf, resultText, isInjected, clip, usageOf, summarizeInput, editPath, relTo } from './records.js';
 
 const MAX_ROWS = 5000;
@@ -80,7 +80,7 @@ export function claudeTimeline(lines, { root = null, pricing = {}, thinkingText 
       } else if (b.type === 'tool_use' && typeof b.name === 'string') {
         if (typeof b.id === 'string') names.set(b.id, b.name);
         const inp = b.input && typeof b.input === 'object' ? b.input : {};
-        if (WRITE_TOOLS.has(b.name)) row = { ts, kind: 'edit', tool: b.name, path: rel(editPath(inp), o.cwd), input: clip(editPath(inp) || '', 300) };
+        if (WRITE_TOOLS.has(b.name)) row = { ts, kind: 'edit', tool: b.name, path: rel(editPath(inp), o.cwd), input: clip(rel(editPath(inp), o.cwd) || '', 300) };
         else if (b.name === 'Agent' || b.name === 'Task') row = { ts, kind: 'subagent', tool: b.name, input: clip(inp.subagent_type || '', 100), title: clip(inp.description || '', 300) };
         else if (USER_TOOLS.has(b.name)) row = { ts, kind: 'tool', tool: b.name, quote: clip(summarizeInput(inp) || JSON.stringify(inp), 300) };
         else {
@@ -110,6 +110,6 @@ export function codexRows(lines, root) {
 export async function readTimeline(file, tool, home, opts) {
   const r = await safeRead(file, home, { tail: MAX_TRANSCRIPT_BYTES });
   if (!r) return [];
-  const lines = parseLines(r.buf.toString('utf8'), r.st.size > r.buf.length);
+  const lines = await parseLinesAsync(r.buf.toString('utf8'), r.st.size > r.buf.length);
   return tool === 'codex' ? codexRows(lines, opts.root) : claudeTimeline(lines, opts);
 }

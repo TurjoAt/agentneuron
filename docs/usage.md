@@ -104,6 +104,7 @@ The settings audit merges the user and project settings and reports: `bypassPerm
 ## Privacy
 
 - Prompt-like text is returned only under the keys `prompt`, `title`, `quote`, `lastPrompt`, `thinking` and `body`, and in timeline rows of kind `prompt` and `thinking`. When the live prompt policy hides prompts from a role (by default: viewers, and everyone on a non-loopback bind unless `live.showPrompts` is set), these are blanked or removed. Session titles count as prompt text, because Claude Code often derives them from the first prompt.
+- For such a role the replay also drops assistant reply text (only its length is kept), tool output and error text, and tool inputs such as shell commands, keeping only project-relative file paths; failure-loop samples, repeated-prompt suggestions and memory names, descriptions and links are hidden too, and `?q=` on the session list matches session ids only.
 - Tool results that carry text you typed (answers to `AskUserQuestion`, rejection feedback) are returned under `quote`, and subagent task descriptions under `title`, so they are redacted the same way.
 - Every response goes through the secret masker.
 - `pastedContents` from `history.jsonl` is never returned; prompts carry only `pasted`, the number of pasted items.

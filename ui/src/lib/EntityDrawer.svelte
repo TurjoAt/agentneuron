@@ -105,7 +105,7 @@
 {#if cur}
   <div class="scrim" transition:fade={{ duration: dur(160) }} onclick={closeEntity} aria-hidden="true"></div>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <aside
+  <div
     class="edrawer"
     bind:this={panel}
     tabindex="-1"
@@ -241,7 +241,7 @@
         <a class="btn sm primary" href={entityHref(cur.kind, cur.id)} onclick={closeEntity}>Open {meta.label.toLowerCase()}<Icon name="arrowRight" size={12} /></a>
       {/if}
     </footer>
-  </aside>
+  </div>
 {/if}
 
 <style>

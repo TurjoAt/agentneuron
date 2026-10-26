@@ -24,6 +24,12 @@
       anomaly: anomalies[0] || null,
     };
   });
+  // a cold summary can be partial (server still indexing): refresh until it is complete
+  $effect(() => {
+    if (!r.data?.coverage?.partial) return;
+    const t = setTimeout(() => r.reload(), 3000);
+    return () => clearTimeout(t);
+  });
   const tone = $derived(!d ? '' : d.over || d.anomaly?.severity === 'high' ? 'err' : d.anomaly ? 'warn' : 'ok');
 </script>
 
@@ -37,7 +43,7 @@
       {:else if !d}
         <span class="faint small">No usage data yet</span>
       {:else}
-        <span class="small"><b class="tnum">{fmtUsd(d.today)}</b> today · <b class="tnum">{fmtUsd(d.week)}</b> 7d{#if d.cache != null} · cache <b class="tnum">{fmtPct(d.cache)}</b>{/if}</span>
+        <span class="small"><b class="tnum">{fmtUsd(d.today)}</b> today · <b class="tnum">{fmtUsd(d.week)}</b> 7d{#if r.data?.coverage?.partial} <span class="faint">(indexing…)</span>{/if}{#if d.cache != null} · cache <b class="tnum">{fmtPct(d.cache)}</b>{/if}</span>
       {/if}
     </span>
     <span class="spacer"></span>

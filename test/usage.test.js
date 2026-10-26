@@ -341,3 +341,16 @@ test('MCP: get_usage, get_session_replay and get_tool_health read the same data'
     assert.equal(t.tools.find((x) => x.name === 'Bash').errors, 3);
   } finally { child.kill(); }
 });
+
+test('parseLinesAsync matches parseLines and yields on large input', async () => {
+  const { parseLines, parseLinesAsync } = await import('../src/usage/digest.js');
+  const line = JSON.stringify({ type: 'assistant', message: { content: 'x'.repeat(500) } });
+  const text = `partial-first-line\n${Array.from({ length: 5000 }, () => line).join('\n')}\nnot json\n{"type":"user"}`;
+  let ticks = 0;
+  const t = setInterval(() => ticks++, 0);
+  const a = await parseLinesAsync(text, true);
+  clearInterval(t);
+  assert.deepEqual(a, parseLines(text, true));
+  assert.equal(a.length, 5001);
+  assert.ok(ticks > 0, 'the event loop ran while parsing');
+});

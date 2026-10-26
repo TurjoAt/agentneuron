@@ -22,23 +22,52 @@ function opts(q, ctx, role) {
 const lookup = (ctx, role) => ({ scope: ctx.config?.usage?.scope === 'all' && role === 'admin' ? 'all' : 'project' });
 const sid = (v, what) => { if (!v || !/^[\w.@-]{1,200}$/.test(v)) throw new HttpError(400, `invalid ${what}`); return v; };
 
+const isRel = (p) => typeof p === 'string' && p !== '' && !/^([/\\~]|[A-Za-z]:)/.test(p);
+
+/**
+ * Replay rows for roles that may not see prompts: no assistant text, tool output, error text or command
+ * lines (they restate prompts and quote files); only project-relative paths survive.
+ */
+function viewerRow(r) {
+  const { text, input, path: p, ...rest } = r;
+  const rp = isRel(p) ? p : undefined;
+  switch (r.kind) {
+    case 'text': return { ...rest, length: typeof text === 'string' ? text.length : 0 };
+    case 'result': case 'error': return rest;
+    case 'tool': case 'edit': return rp ? { ...rest, path: rp, input: rp } : rest;
+    case 'subagent': return { ...rest, input }; // the subagent type, e.g. "general-purpose"
+    default: return { ...rest, ...(text !== undefined && { text }), ...(rp && { path: rp }) }; // hook / compact / denied: generated text
+  }
+}
+const VIEWER = {
+  session: (v) => ({ ...v, timeline: (v.timeline || []).map(viewerRow), files: (v.files || []).filter((f) => isRel(f.path)) }),
+  tools: (v) => ({ ...v, loops: (v.loops || []).map(({ sample: _s, ...l }) => l) }),
+  prompts: (v) => ({ ...v, repeated: [] }),
+  memory: (v) => ({
+    memory: (v.memory || []).map((m, i) => ({ project: '', file: `memory-${i + 1}`, name: `Memory ${i + 1}`, description: '', type: m.type, updatedAt: m.updatedAt, links: [], stale: (m.stale || []).map(() => ({ claim: '', reason: 'hidden' })), body: '' })),
+    plans: (v.plans || []).map((p, i) => ({ file: `plan-${i + 1}`, title: '', updatedAt: p.updatedAt, body: '' })),
+  }),
+};
+
 export default async function register(router, ctx) {
   const U = () => getUsage(ctx);
   // Prompts, titles, thinking and memory bodies follow the live prompt policy (config.live).
-  const R = (p, fn) => router.get(p, guard(async (a) => {
+  const R = (p, fn, viewer) => router.get(p, guard(async (a) => {
     const v = maskDeep(await fn(a));
-    return liveAccess(ctx.config).prompts(a.role) ? v : redactPrompts(v);
+    return liveAccess(ctx.config).prompts(a.role) ? v : redactPrompts(viewer ? viewer(v) : v);
   }), { level: 'read' });
+  const textOk = (role) => liveAccess(ctx.config).prompts(role);
 
   R('/api/usage/summary', ({ q, role }) => U().summary(opts(q, ctx, role)));
-  R('/api/usage/sessions', ({ q, role }) => U().sessions({ ...opts(q, ctx, role), q: (q.get('q') || '').slice(0, 200) }));
-  R('/api/usage/session', ({ q, role }) => U().session(sid(q.get('id'), 'id'), lookup(ctx, role)));
-  R('/api/usage/tools', ({ q, role }) => U().tools(opts(q, ctx, role)));
-  R('/api/usage/prompts', ({ q, role }) => U().prompts({ ...opts(q, ctx, role), q: (q.get('q') || '').slice(0, 200), limit: Math.min(500, Number(q.get('limit')) || 100) }));
+  // without prompt access, ?q= matches session ids only (title matching would reveal prompt words)
+  R('/api/usage/sessions', ({ q, role }) => U().sessions({ ...opts(q, ctx, role), q: (q.get('q') || '').slice(0, 200), titleSearch: textOk(role) }));
+  R('/api/usage/session', ({ q, role }) => U().session(sid(q.get('id'), 'id'), lookup(ctx, role)), VIEWER.session);
+  R('/api/usage/tools', ({ q, role }) => U().tools({ ...opts(q, ctx, role), home: role === 'admin' }), VIEWER.tools);
+  R('/api/usage/prompts', ({ q, role }) => U().prompts({ ...opts(q, ctx, role), q: textOk(role) ? (q.get('q') || '').slice(0, 200) : '', limit: Math.min(500, Number(q.get('limit')) || 100) }), VIEWER.prompts);
   R('/api/usage/fleet', ({ q, role }) => U().fleet(opts(q, ctx, role)));
   R('/api/usage/impact', ({ q, role }) => U().impact(opts(q, ctx, role)));
   R('/api/usage/activity', ({ q, role }) => U().activity(opts(q, ctx, role)));
-  R('/api/usage/memory', () => U().memory());
+  R('/api/usage/memory', () => U().memory(), VIEWER.memory);
   // the home-level ~/.claude/settings.json is admin-only, like global agent config in the agents center
   R('/api/usage/settings', ({ role }) => U().settings({ home: ctx.can ? ctx.can('state', role) : role === 'admin' }));
   R('/api/usage/entity', ({ q }) => {

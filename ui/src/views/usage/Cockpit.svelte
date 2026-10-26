@@ -45,6 +45,12 @@
   const allExact = $derived(k.usd != null && exactUsd != null && estUsd < 0.005);
   const errRate = $derived(k.toolCalls ? (k.toolErrors || 0) / k.toolCalls : null);
   const cov = $derived(d?.coverage || {});
+  // the server answers a cold summary within a time budget and keeps indexing: show it and refresh until complete
+  $effect(() => {
+    if (!cov.partial) return;
+    const t = setTimeout(() => sum.reload(), 2500);
+    return () => clearTimeout(t);
+  });
   const tokens = $derived(tokTotal(k.tokens));
 
   const models = $derived((d?.byModel || []).map((m) => ({ key: m.model || 'unknown', label: modelLabel(m.model), value: m.usd ?? 0, sub: m.tokens != null ? `${fmtNum(m.tokens)} tok` : null })));
@@ -233,6 +239,9 @@
     {/if}
   </div>
 
+  {#if cov.partial}
+    <p class="cov warn-note" role="status"><Icon name="refresh" size={12} /> Still indexing your sessions{#if cov.totalTranscripts} ({fmtNum(cov.transcripts)} of {fmtNum(cov.totalTranscripts)} transcripts read){/if}. Totals so far are incomplete and update automatically.</p>
+  {/if}
   <p class="cov faint">
     <Icon name="info" size={12} />
     Based on {fmtNum(cov.transcripts ?? cov.sessions)} transcript{(cov.transcripts ?? cov.sessions) === 1 ? '' : 's'}.
@@ -245,6 +254,7 @@
 {/if}
 
 <style>
+  .warn-note { color: var(--warn); }
   .mt { margin-top: 10px; }
   .card-h { flex-wrap: wrap; row-gap: 8px; }
   .filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }

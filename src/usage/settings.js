@@ -65,7 +65,7 @@ export async function auditSettings({ root, home, permModes = {}, hookErrors = 0
     if (j.skipDangerousModePermissionPrompt === true) add({ id: 'skip-danger-prompt', severity: 'medium', title: 'The bypass-mode warning is disabled', why: 'skipDangerousModePermissionPrompt hides the confirmation before entering bypassPermissions mode.', fix: 'Remove skipDangerousModePermissionPrompt.', location });
     if (j.enableAllProjectMcpServers === true) add({ id: 'all-project-mcp', severity: 'medium', title: 'All project MCP servers are enabled automatically', why: 'Any MCP server added to a cloned repo\'s .mcp.json starts without review.', fix: 'Remove enableAllProjectMcpServers and approve servers one by one (enabledMcpjsonServers).', location });
   }
-  const auth = await readJson(path.join(home, '.claude', 'mcp-needs-auth-cache.json'), home);
+  const auth = includeHome ? await readJson(path.join(home, '.claude', 'mcp-needs-auth-cache.json'), home) : null; // home-level file
   const mcpNeedsAuth = auth ? Object.keys(auth).filter((k) => /^[\w.@ -]{1,100}$/.test(k)).slice(0, 100) : [];
   if (mcpNeedsAuth.length) add({ id: 'mcp-auth', severity: 'low', title: `${mcpNeedsAuth.length} MCP server(s) need authentication`, why: `Tools of ${mcpNeedsAuth.slice(0, 5).join(', ')}${mcpNeedsAuth.length > 5 ? ', ...' : ''} are unavailable until they are authenticated.`, fix: 'Run /mcp in Claude Code and authenticate, or remove servers you no longer use.', location: '~/.claude/mcp-needs-auth-cache.json' });
   const permissionModes = Object.fromEntries(MODES.map((k) => [k, Object.hasOwn(permModes, k) ? permModes[k] : 0]));

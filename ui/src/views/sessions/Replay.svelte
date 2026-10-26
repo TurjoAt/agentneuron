@@ -94,7 +94,7 @@
     sel = rid;
     const i = rows.findIndex((r) => r.id === rid);
     if (i >= limit) limit = i + 50;
-    if (scroll) tick().then(() => document.getElementById(`row-${CSS.escape(String(rid))}`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+    if (scroll) tick().then(() => document.getElementById(`row-${rid}`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
   }
   // write &at= to the URL without a history entry per keypress
   let urlTimer;
@@ -273,6 +273,8 @@
                   </div>
                 {:else if r.kind === 'subagent'}
                   <div class="et">{r.text || r.agentId}</div>
+                {:else if r.kind === 'text' && blank(r.text)}
+                  {#if r.length}<div class="et hidden"><Icon name="lock" size={11} /> Reply text hidden for your role</div>{/if}
                 {:else if r.kind !== 'result'}
                   {#if r.text || r.input}<div class="et" class:errt={bad}>{r.text || r.input}</div>{/if}
                 {/if}

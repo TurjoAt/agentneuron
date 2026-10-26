@@ -26,7 +26,9 @@ const get = (port, p, tok) => new Promise((resolve, reject) => {
   r.on('error', reject); r.end();
 });
 const ADMIN = 'adm-usage-1234', VIEWER = 'view-usage-1234';
-const SECRET_TEXT = ['Fixture session one', 'please add the parser', 'sub task', 'USER-ANSWER-POSTGRES', 'Which database', 'parser lives', 'echo done', 'Bash(*)'];
+// prompt words, titles, assistant replies, tool commands and output, memory text and derived names
+const SECRET_TEXT = ['Fixture session one', 'please add the parser', 'please-add-the', 'sub task', 'USER-ANSWER-POSTGRES', 'Which database', 'parser lives',
+  'echo done', 'Bash(*)', 'Working on it.', 'npm test', 'Error: tests failed', 'Error: still failing', 'How the build works', 'Build notes', 'Deploy notes', 'src/missing.js'];
 
 const port = await boot();
 
@@ -52,6 +54,12 @@ test('admin sees titles and prompts on loopback; viewers get prompt rows removed
   const a = JSON.parse((await get(port, '/api/usage/session?id=S1', ADMIN)).body);
   assert.equal(a.session.title, 'Fixture session one');
   assert.ok(a.timeline.some((r) => r.kind === 'prompt'));
+  // the strings the viewer checks look for really are in the admin payloads
+  const aBody = (await get(port, '/api/usage/session?id=S1', ADMIN)).body;
+  for (const t of ['Working on it.', 'npm test']) assert.ok(aBody.includes(t), `fixture lacks "${t}"`);
+  assert.ok((await get(port, '/api/usage/tools?range=30d', ADMIN)).body.includes('Error: tests failed'));
+  assert.ok((await get(port, '/api/usage/prompts?range=30d', ADMIN)).body.includes('please-add-the'));
+  assert.ok((await get(port, '/api/usage/memory', ADMIN)).body.includes('How the build works'));
   const v = JSON.parse((await get(port, '/api/usage/session?id=S1', VIEWER)).body);
   assert.equal(v.session.title, '');
   assert.ok(!v.timeline.some((r) => r.kind === 'prompt' || r.kind === 'thinking'));
@@ -61,6 +69,13 @@ test('admin sees titles and prompts on loopback; viewers get prompt rows removed
   assert.ok(p.stats.total > 0);
   const m = JSON.parse((await get(port, '/api/usage/memory', VIEWER)).body);
   assert.equal(m.memory[0].body, '');
+});
+
+test('viewers cannot probe session titles with ?q=', async () => {
+  const hit = JSON.parse((await get(port, '/api/usage/sessions?range=30d&q=fixture', ADMIN)).body);
+  assert.ok(hit.sessions.length > 0);
+  const v = JSON.parse((await get(port, '/api/usage/sessions?range=30d&q=fixture', VIEWER)).body);
+  assert.deepEqual(v.sessions, []);
 });
 
 test('file versions are admin-only', async () => {
