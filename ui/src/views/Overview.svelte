@@ -19,6 +19,8 @@
   import NeuronBrain from './overview/NeuronBrain.svelte';
   import LiveAgents from './overview/LiveAgents.svelte';
   import TruthTeaser from './overview/TruthTeaser.svelte';
+  import UsageTeaser from './overview/UsageTeaser.svelte';
+  import MapTeaser from './overview/MapTeaser.svelte';
   import EntityLink from '../lib/EntityLink.svelte';
 
   let { params: _params } = $props();
@@ -180,7 +182,9 @@
 
     <div class="side stagger">
       <LiveAgents />
+      <UsageTeaser />
       <TruthTeaser />
+      <MapTeaser />
       <section class="card">
         <div class="card-h">Context health <span class="sub">lint + secret scan</span></div>
         <div class="hb">

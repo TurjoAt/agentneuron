@@ -24,7 +24,7 @@
   // short ranges still get a readable calendar: at least 13 weeks, cells sized to fill the card
   const heatDays = $derived(Math.max(91, Math.min(371, heat.length || 30)));
   let calW = $state(0);
-  const heatCell = $derived(Math.max(10, Math.min(20, Math.floor((calW - 62) / Math.ceil((heatDays + 6) / 7)) - 3)));
+  const heatCell = $derived(Math.max(10, Math.min(26, Math.floor((calW - 62) / Math.ceil((heatDays + 6) / 7)) - 3)));
 
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const weekHour = $derived(Array.isArray(d?.weekHour) && d.weekHour.length === 7 ? d.weekHour.map((r) => (Array.isArray(r) ? r : [])) : null);
@@ -89,7 +89,7 @@
         {#each METRICS as m (m.k)}<button class:on={metric === m.k} aria-pressed={metric === m.k} onclick={() => (metric = m.k)}>{m.label}</button>{/each}
       </div>
     </div>
-    <div class="card-b" bind:clientWidth={calW}><CalendarHeatmap data={heat} days={heatDays} cell={heatCell} unit={metric === 'usd' ? 'USD' : metric} /></div>
+    <div class="card-b cal" bind:clientWidth={calW}><CalendarHeatmap data={heat} days={heatDays} cell={heatCell} unit={metric === 'usd' ? 'USD' : metric} /></div>
   </section>
 
   <div class="grid">
@@ -178,6 +178,8 @@
 {/if}
 
 <style>
+  .cal { display: flex; justify-content: center; }
+  .cal > :global(*) { max-width: 100%; }
   .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
   .kpi b { font-size: 21px; font-weight: 650; letter-spacing: -0.02em; color: var(--text); }
