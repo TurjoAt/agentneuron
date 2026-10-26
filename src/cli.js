@@ -23,6 +23,7 @@ Analysis:
   verify [dir]       truth check: are the commands/paths/versions in context files real? exit 1 if any false (--json, --fix-preview)
   audit [dir]        security audit of agent config (MCP, permissions, hooks); exit 1 on high risk (--json)
   ci [dir]           lint + verify + audit + budget for CI (--format github|markdown|json, --fail-on, --base <ref>)
+  usage [dir]        tokens, cost, cache, tools and anomalies from agent sessions (--range 7d, --json)
   lessons [dir]      rules to learn from agent sessions (corrections, reverts, failing commands) (--json)
 
 Rules:
@@ -116,6 +117,9 @@ Write an activity/health report. Default format "ai" (compact, for pasting into 
 
   agentneuron export > context-report.txt
   agentneuron export --format html --range 30d --out report.html`,
+  usage: `Usage: agentneuron usage [dir] [--range 24h|7d|30d|90d|all] [--json] [--scope project|all]
+
+Tokens, cost (exact where Claude Code recorded it), cache hit rate, models, tools and anomalies from local agent sessions.`,
   lessons: `Usage: agentneuron lessons [dir] [--json] [--covered] [--all]
 
 Mine Claude Code and Codex sessions of this project for user corrections, reverted edits, commands
@@ -161,7 +165,7 @@ Asks before replacing anything unless --yes. agentneuron never checks for update
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget', 'tools', 'tool']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget', 'tools', 'tool', 'scope']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -313,7 +317,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons', 'compile', 'rules', 'generate']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons', 'usage', 'compile', 'rules', 'generate']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -343,6 +347,7 @@ export async function main(argv = process.argv.slice(2)) {
     case 'verify': return (await import('./commands/verify.js')).cmdVerify(root, flags);
     case 'audit': return (await import('./commands/audit.js')).cmdAudit(root, flags);
     case 'ci': return (await import('./commands/ci.js')).cmdCi(root, flags);
+    case 'usage': return (await import('./commands/usage.js')).cmdUsage(root, flags);
     case 'lessons': return (await import('./commands/lessons.js')).cmdLessons(root, flags);
     case 'compile': return (await import('./commands/compile.js')).cmdCompile(root, flags);
     case 'rules': return (await import('./commands/compile.js')).cmdRules(root, sub, flags);

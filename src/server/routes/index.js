@@ -11,7 +11,8 @@ import live from './live.js';
 import verify from './verify.js';
 import insights from './insights.js';
 import compiler from './compiler.js';
+import usage from './usage.js';
 
 export async function registerAll(router, ctx) {
-  for (const reg of [system, files, tasks, git, reports, project, agentcenter, workspace, live, verify, insights, compiler]) await reg(router, ctx);
+  for (const reg of [system, files, tasks, git, reports, project, agentcenter, workspace, live, verify, insights, compiler, usage]) await reg(router, ctx);
 }

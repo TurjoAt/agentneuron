@@ -37,8 +37,12 @@
   import Verify from './views/Verify.svelte';
   import Insights from './views/Insights.svelte';
   import Rules from './views/Rules.svelte';
+  import Usage from './views/Usage.svelte';
+  import Sessions from './views/Sessions.svelte';
+  import Memory from './views/Memory.svelte';
+  import EntityDrawer from './lib/EntityDrawer.svelte';
 
-  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights, rules: Rules };
+  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights, rules: Rules, usage: Usage, sessions: Sessions, memory: Memory };
   const MODALS = { confirm: ConfirmDialog, 'new-file': NewFileDialog, rename: RenameDialog, replace: ReplaceDialog, task: TaskModal, shortcuts: ShortcutsDialog };
   const View = $derived(COMPONENTS[app.route.view] || Overview);
   const ModalC = $derived(app.modal ? MODALS[app.modal.kind] : null);
@@ -150,6 +154,7 @@
     </main>
   </div>
   <Drawer />
+  <EntityDrawer />
   <Palette />
   <JobsDock />
   <ActionDialog />

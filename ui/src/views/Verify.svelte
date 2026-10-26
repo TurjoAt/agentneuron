@@ -5,16 +5,18 @@
   import Tabs from '../lib/Tabs.svelte';
   import Truth from './verify/Truth.svelte';
   import Audit from './verify/Audit.svelte';
+  import SettingsAudit from './verify/SettingsAudit.svelte';
 
   let { params = {} } = $props();
 
   const verify = resource(() => api('/api/verify'));
   const audit = resource(() => api('/api/audit/config'));
 
-  const tab = $derived(params.tab === 'audit' ? 'audit' : 'truth');
+  const tab = $derived(['audit', 'settings'].includes(params.tab) ? params.tab : 'truth');
   const TABS = $derived([
     { id: 'truth', label: 'Truth check', count: verify.data?.summary?.false || null },
     { id: 'audit', label: 'Security audit', count: audit.data ? audit.data.counts.high + audit.data.counts.medium || null : null },
+    { id: 'settings', label: 'Agent settings' },
   ]);
 </script>
 
@@ -30,6 +32,8 @@
 
   {#if tab === 'truth'}
     <Truth res={verify} status={params.status || ''} />
+  {:else if tab === 'settings'}
+    <SettingsAudit {params} />
   {:else}
     <Audit res={audit} />
   {/if}

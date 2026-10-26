@@ -18,7 +18,7 @@ import { createJsonl, filterRange } from '../persist/jsonl.js';
 import { getBoard } from '../board/index.js';
 import { createClaims } from '../live/claims.js';
 import { createHandoffs } from '../live/handoffs.js';
-import { claimTask } from '../live/coord.js';
+import { claimTask, redactPrompts } from '../live/coord.js';
 import { verifyContext } from '../verify/index.js';
 import { auditAgentConfig } from '../audit/index.js';
 import { createSessions } from '../agents/sessions.js';
@@ -55,6 +55,12 @@ const TOOLS = [
     inputSchema: obj({ minSeverity: { type: 'string', enum: ['high', 'medium', 'low', 'info'], description: 'Lowest severity to include (default "low")' } }) },
   { name: 'suggest_rules', description: 'Lessons mined from Claude Code / Codex sessions of this project (user corrections, reverted edits, repeatedly failing commands, repeated instructions) as proposed rules with evidence quotes (secrets masked), confidence, target file and whether an existing rule already covers them. Read-only.',
     inputSchema: obj({ limit: { type: 'number', description: 'Max lessons (default 20)' }, includeCovered: { type: 'boolean', description: 'Include lessons an existing rule already covers (default false)' } }) },
+  { name: 'get_usage', description: 'Token, cost (exact where Claude Code recorded it, otherwise estimated), cache hit rate, model mix, tool errors and anomalies from local agent sessions of this project. No prompt text.',
+    inputSchema: obj({ range: { type: 'string', enum: ['24h', '7d', '30d', '90d', 'all'] } }) },
+  { name: 'get_session_replay', description: 'Timeline of one agent session: prompts, tool calls and results, errors, edits, subagents, with durations and cost (secrets masked).',
+    inputSchema: obj({ id: { type: 'string', description: 'Session id (see get_usage / the Sessions view)' }, limit: { type: 'number', description: 'Max timeline rows (default 200)' } }, ['id']) },
+  { name: 'get_tool_health', description: 'Per-tool calls, error rate, denials, slow tools, MCP servers, skills, hooks and repeated-failure loops from local agent sessions.',
+    inputSchema: obj({ range: { type: 'string', enum: ['24h', '7d', '30d', '90d', 'all'] } }) },
   { name: 'compile_preview', description: 'Preview compiling the source rules (.agentneuron/rules/*.md) into each tool\'s files: which outputs are stale, which generated regions were edited by hand, what merge-back would pull in. Read-only.',
     inputSchema: obj({ tools: { type: 'string', description: 'Comma list: claude, codex, gemini, cursor, copilot, windsurf (default all)' }, diff: { type: 'boolean', description: 'Include per-file diffs' } }) },
 ];
@@ -276,6 +282,14 @@ export async function runMcpServer(root, config = {}, io = {}) {
     const r = auditAgentConfig({ root: absRoot, files: [...store.files.values()], contents: store.contents });
     return { ...r, findings: r.findings.filter((f) => order.indexOf(f.severity) <= order.indexOf(minSeverity)) };
   };
+  const usage = async () => (await import('../usage/index.js')).getUsage({ root: absRoot, config: cfg, store });
+  tools.get_usage = async ({ range = '30d' } = {}) => redactPrompts(maskDeep(await (await usage()).summary({ range })));
+  tools.get_session_replay = async ({ id, limit = 200 } = {}) => {
+    if (typeof id !== 'string' || !/^[\w.-]{1,200}$/.test(id)) throw new Error('id must be a session id');
+    const r = maskDeep(await (await usage()).session(id));
+    return { ...r, timeline: (r.timeline || []).slice(-Math.max(1, Math.min(1000, Number(limit) || 200))) };
+  };
+  tools.get_tool_health = async ({ range = '30d' } = {}) => maskDeep(await (await usage()).tools({ range }));
   tools.compile_preview = ({ tools: only, diff = false } = {}) => {
     if (only !== undefined && typeof only !== 'string') throw new Error('tools must be a comma separated string');
     return summarize(planCompile({ root: absRoot, config: cfg, store }, { tools: only }), { content: diff === true });

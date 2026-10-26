@@ -6,6 +6,8 @@
 import { SEED, PROJECT, sessions as seedSessions, gitInfo, AGENT_CONFIG, EDIT_LINES, GIT_SEED, NATIVE_TASKS, MOCK_ACTIONS } from './mock-data.js';
 import { insightRoutes } from './mock-insight.js';
 import { insightsRoutes } from './mock-insights.js';
+import { usageRoutes } from './mock-usage.js';
+import { usageShellRoutes } from './mock-usage-shell.js';
 
 const MIN = 60_000;
 const rand = (n) => Math.floor(Math.random() * n);
@@ -1323,6 +1325,11 @@ export function createMock() {
   // ---- insights (feat/lessons): lessons, rule effectiveness, replay, cost by feature ----
   for (const [k, fn] of Object.entries(insightsRoutes({ need, sessions: () => sessions }))) routes[k] = fn;
   // ---- end insights ----
+
+  // ---- usage analytics (mock-usage.js: agent B, mock-usage-shell.js: agent C) ----
+  for (const [k, fn] of Object.entries(usageRoutes({ sessions: () => sessions }))) routes[k] = fn;
+  for (const [k, fn] of Object.entries(usageShellRoutes({ sessions: () => sessions, files: filesList }))) routes[k] = fn;
+  // ---- end usage ----
 
   // UI-B insight routes (reports, project, agents, workspace, git stats…) — called as fn(q, init)
   const insight = insightRoutes({ graph, files: filesList, sessions: () => sessions, health });
