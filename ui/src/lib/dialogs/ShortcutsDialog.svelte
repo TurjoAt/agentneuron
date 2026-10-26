@@ -5,8 +5,9 @@
   const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const M = mac ? '⌘' : 'Ctrl';
   const groups = [
-    ['General', [[[M, 'K'], 'Command palette — files, content, actions'], [['/'], 'Search'], [[M, '⇧', 'F'], 'Find & replace across files'], [[M, 'J'], 'Toggle jobs dock'], [['?'], 'This help'], [['Esc'], 'Close panel / dialog']]],
-    ['Navigation', [[['Alt', '←'], 'Back'], [['Alt', '→'], 'Forward'], [['1'], `…${VIEWS.length > 9 ? '9' : VIEWS.length}  Jump to view`], [['0'], 'Settings'], [['n'], 'New file']]],
+    ['General', [[[M, 'K'], 'Command palette — pages, files, sessions, tools, actions'], [['/'], 'Search'], [['m'], 'Product map'], [[M, '⇧', 'F'], 'Find & replace across files'], [[M, 'J'], 'Toggle jobs dock'], [['n'], 'New file'], [['?'], 'This help'], [['Esc'], 'Close panel / dialog']]],
+    ['Navigation', [[['Alt', '←'], 'Back'], [['Alt', '→'], 'Forward'], ...VIEWS.slice(0, 9).map((v, i) => [[String(i + 1)], v.label]), [['0'], 'Settings']]],
+    ['Details panel', [[['Click'], 'Open a session, file, commit, task or tool'], [[M, 'Click'], 'Go straight to its page'], [['⌫'], 'Back to the previous item'], [['Esc'], 'Close the panel']]],
     ['Editor', [[[M, 'S'], 'Save'], [[M, 'Click'], 'Follow link under cursor'], [[M, 'F'], 'Find in file'], [[M, 'Z'], 'Undo']]],
     ['Tasks board', [[['Drag'], 'Move card between columns'], [['Enter'], 'Open focused card'], [['c'], 'New card']]],
   ];

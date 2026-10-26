@@ -1,6 +1,10 @@
 <script>
   import { app, saveLocal, logout, fileIndex } from './store.svelte.js';
-  import { VIEWS, href } from './nav.js';
+  import { VIEWS, GROUPS, MOBILE_PRIMARY, href } from './nav.js';
+  import { badgeFor, refreshNavBadges } from './navbadges.svelte.js';
+  import { fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
+  import { dur } from './motion.js';
   import { fileHref } from './links.js';
   import { openMenu } from './menu.svelte.js';
   import { fileMenuItems } from './fileActions.js';
@@ -9,10 +13,39 @@
   import ConnPulse from './ConnPulse.svelte';
   import ToolBadge from './ToolBadge.svelte';
 
-  const badges = $derived({
-    health: app.health?.counts?.error || 0,
-    agents: app.conflicts.length,
+  const keyOf = Object.fromEntries(VIEWS.map((v, i) => [v.id, i < 9 ? String(i + 1) : v.id === 'settings' ? '0' : '']));
+  const sections = GROUPS.map((g) => ({ ...g, views: VIEWS.filter((v) => v.group === g.id) }));
+  const settingsView = VIEWS.find((v) => v.id === 'settings');
+  const primary = MOBILE_PRIMARY.map((id) => VIEWS.find((v) => v.id === id));
+
+  // collapsible groups (remembered per browser)
+  let collapsed = $state(loadCollapsed());
+  function loadCollapsed() {
+    try {
+      return JSON.parse(localStorage.getItem('agentneuron.side.groups') || '[]');
+    } catch {
+      return [];
+    }
+  }
+  function toggleGroup(id) {
+    collapsed = collapsed.includes(id) ? collapsed.filter((x) => x !== id) : [...collapsed, id];
+    saveLocal('agentneuron.side.groups', collapsed);
+  }
+  const groupBadge = (g) => g.views.reduce((a, v) => a + (badgeFor(v.id).n || 0), 0);
+
+  // badges that need data refresh when files change (throttled inside)
+  $effect(() => {
+    void app.dataTick;
+    refreshNavBadges();
   });
+
+  // phones: "More" sheet with every page, grouped
+  let more = $state(false);
+  $effect(() => {
+    void app.route.view;
+    more = false;
+  });
+  const inPrimary = $derived(MOBILE_PRIMARY.includes(app.route.view));
   const curPath = $derived(app.route.view === 'files' ? app.route.params.path : null);
   const pinned = $derived(app.bookmarks.filter((b) => b && b.path));
   const recent = $derived(app.recent.filter((p) => !pinned.some((b) => b.path === p) && fileIndex().set.has(p)).slice(0, 6));
@@ -43,18 +76,43 @@
   </a>
 
   <div class="scroll">
-    <ul class="nav">
-      {#each VIEWS as v, i (v.id)}
-        {#if v.group && v.group !== VIEWS[i - 1]?.group}<li class="sec" aria-hidden="true">{v.group}</li>{/if}
-        <li class:sm-hide={v.id === 'settings'}>
-          <a class="item" class:on={app.route.view === v.id} href={href(v.id)} aria-current={app.route.view === v.id ? 'page' : undefined} title="{v.label}{i < 9 ? ` (${i + 1})` : ''}">
-            <Icon name={v.icon} size={16} />
-            <span class="lbl">{v.label}</span>
-            {#if badges[v.id]}<span class="bdg" class:err={v.id === 'health' || v.id === 'agents'}>{badges[v.id]}</span>{/if}
-            {#if i < 9}<span class="kbd k">{i + 1}</span>{/if}
-          </a>
-        </li>
+    {#snippet item(v)}
+      {@const b = badgeFor(v.id)}
+      <a class="item" class:on={app.route.view === v.id} href={href(v.id)} aria-current={app.route.view === v.id ? 'page' : undefined} title="{v.desc || v.label}{keyOf[v.id] ? ` (${keyOf[v.id]})` : ''}">
+        <Icon name={v.icon} size={16} />
+        <span class="lbl">{v.label}</span>
+        {#if b.n}<span class="bdg {b.tone}" title="{b.n} {b.title}">{b.n}</span>{/if}
+        {#if keyOf[v.id]}<span class="kbd k">{keyOf[v.id]}</span>{/if}
+      </a>
+    {/snippet}
+    <div class="nav">
+      {#each sections as g (g.id)}
+        {@const open = !collapsed.includes(g.id)}
+        {@const nb = open ? 0 : groupBadge(g)}
+        <div class="gsec">
+          <button class="sec" onclick={() => toggleGroup(g.id)} aria-expanded={open} title={g.desc}>
+            <span>{g.id}</span>
+            {#if nb}<span class="gdot" title="{nb} alerts in {g.id}"></span>{/if}
+            <span class="chev" class:open><Icon name="chevron" size={10} /></span>
+          </button>
+          <ul>
+            {#each g.views as v (v.id)}
+              {#if open || app.route.view === v.id}<li>{@render item(v)}</li>{/if}
+            {/each}
+          </ul>
+        </div>
       {/each}
+      <ul class="sm-hide"><li>{@render item(settingsView)}</li></ul>
+    </div>
+
+    <!-- phones: bottom bar -->
+    <ul class="mbar">
+      {#each primary as v (v.id)}<li>{@render item(v)}</li>{/each}
+      <li>
+        <button class="item" class:on={!inPrimary || more} onclick={() => (more = !more)} aria-expanded={more} aria-controls="more-sheet">
+          <Icon name="grid" size={16} /><span class="lbl">More</span>
+        </button>
+      </li>
     </ul>
 
     <section class="grp">
@@ -126,6 +184,32 @@
   </div>
 </nav>
 
+{#if more}
+  <div class="msheet-bg" transition:fade={{ duration: dur(150) }} onclick={() => (more = false)} aria-hidden="true"></div>
+  <div class="msheet" id="more-sheet" role="dialog" aria-label="All pages" transition:fly={{ y: 40, duration: dur(240), easing: cubicOut }}>
+    {#each sections as g (g.id)}
+      <div class="mg">
+        <div class="eyebrow">{g.id}</div>
+        <div class="mgrid">
+          {#each g.views as v (v.id)}
+            {@const b = badgeFor(v.id)}
+            <a class="mtile" class:on={app.route.view === v.id} href={href(v.id)}>
+              <Icon name={v.icon} size={18} /><span>{v.label}</span>
+              {#if b.n}<span class="bdg {b.tone}">{b.n}</span>{/if}
+            </a>
+          {/each}
+        </div>
+      </div>
+    {/each}
+    <div class="mg">
+      <div class="mgrid">
+        <a class="mtile" href={href('settings')}><Icon name="settings" size={18} /><span>Settings</span></a>
+        <button class="mtile" onclick={() => { more = false; app.modal = { kind: 'map', props: {} }; }}><Icon name="map" size={18} /><span>Product map</span></button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .side {
     display: flex;
@@ -144,9 +228,31 @@
   .name { display: flex; flex-direction: column; font-weight: 700; font-size: 15px; letter-spacing: -0.02em; line-height: 1.15; min-width: 0; }
   .sub { font-size: 11.5px; font-weight: 500; color: var(--text-3); letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
   .scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -4px; padding: 0 4px; display: flex; flex-direction: column; gap: 14px; }
-  .nav { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
-  .nav .sec { margin: 12px 0 4px; padding: 0 10px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
-  .nav .sec:first-child { margin-top: 2px; }
+  .nav { display: flex; flex-direction: column; gap: 6px; }
+  .nav ul, .mbar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .mbar { display: none; }
+  .sec {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 2px;
+    padding: 3px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    cursor: pointer;
+    text-align: left;
+  }
+  .sec:hover { color: var(--text-2); }
+  .sec .chev { margin-left: auto; opacity: 0; transition: opacity 0.15s, transform 0.18s var(--ease); }
+  .sec:hover .chev, .sec:focus-visible .chev, .sec[aria-expanded='false'] .chev { opacity: 1; }
+  .gdot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
   .item {
     position: relative;
     display: flex;
@@ -170,6 +276,48 @@
   .item:hover .k { opacity: 1; }
   .bdg { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
   .bdg.err { background: var(--err-soft); color: var(--err); }
+  .bdg.warn { background: var(--warn-soft); color: var(--warn); }
+  button.item { width: 100%; border: 0; background: transparent; cursor: pointer; }
+  .msheet-bg { position: fixed; inset: 0 0 calc(59px + env(safe-area-inset-bottom)); z-index: 70; background: rgba(5, 6, 10, 0.4); }
+  .msheet {
+    position: fixed;
+    z-index: 71;
+    left: 0;
+    right: 0;
+    bottom: calc(59px + env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 120px);
+    overflow: auto;
+    padding: 10px 16px 16px;
+    background: var(--panel-solid);
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .msheet::before { content: ''; align-self: center; width: 36px; height: 4px; border-radius: 4px; background: var(--border-strong); }
+  .mg { display: flex; flex-direction: column; gap: 6px; }
+  .mgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .mtile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--inset);
+    color: var(--text-2);
+    font-size: 11.5px;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .mtile:hover { text-decoration: none; color: var(--text); }
+  .mtile.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
+  .mtile .bdg { position: absolute; top: 4px; right: 4px; }
   .grp { display: flex; flex-direction: column; gap: 1px; }
   .gh { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 4px 8px; font-size: 10.5px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-3); cursor: pointer; text-align: left; }
   .gh:hover { color: var(--text-2); }
@@ -200,11 +348,12 @@
       background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
     }
     .brand, .foot, .grp { display: none; }
-    .scroll { margin: 0; padding: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex-direction: row; }
-    .nav { flex-direction: row; gap: 0; }
-    .nav .sec { display: none; }
-    .nav li { flex: 1 0 auto; }
-    .item { flex-direction: column; gap: 3px; height: 50px; padding: 6px 8px; font-size: 10px; justify-content: center; min-width: 58px; }
+    .scroll { margin: 0; padding: 0; overflow: visible; flex-direction: row; flex: 1; }
+    .nav { display: none; }
+    .mbar { display: flex; flex-direction: row; gap: 0; flex: 1; }
+    .mbar li { flex: 1 1 0; min-width: 0; }
+    .item { flex-direction: column; gap: 3px; height: 50px; padding: 6px 4px; font-size: 10.5px; justify-content: center; min-width: 0; }
+    .item .lbl { flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .item.on { background: transparent; }
     .item.on::before { left: 30%; right: 30%; top: -4px; bottom: auto; width: auto; height: 3px; border-radius: 0 0 3px 3px; }
     .k { display: none; }

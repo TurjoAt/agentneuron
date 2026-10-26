@@ -305,6 +305,8 @@
   .rl li { display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 4px 8px; margin: 0 -8px; border-radius: 8px; font-size: 13px; min-width: 0; }
   .rl li:hover { background: var(--panel-hover); }
   .rl :global(.grow) { flex: 1; min-width: 0; }
+  .rl :global(.elink) { border-bottom-color: transparent; }
+  .rl li:hover :global(.elink) { border-bottom-color: currentColor; }
   .rl :global(.ellipsis) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { font-size: 11.5px; color: var(--text-3); flex-shrink: 0; }
   .tools :global(.tname) { width: 42%; flex-shrink: 0; }

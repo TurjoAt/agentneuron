@@ -42,10 +42,12 @@
   import Memory from './views/Memory.svelte';
   import EntityDrawer from './lib/EntityDrawer.svelte';
   import BootScreen from './lib/boot/BootScreen.svelte';
+  import RelatedStrip from './lib/RelatedStrip.svelte';
+  import ProductMap from './lib/map/ProductMap.svelte';
   import { entity, closeEntity } from './lib/entity.svelte.js';
 
   const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights, rules: Rules, usage: Usage, sessions: Sessions, memory: Memory };
-  const MODALS = { confirm: ConfirmDialog, 'new-file': NewFileDialog, rename: RenameDialog, replace: ReplaceDialog, task: TaskModal, shortcuts: ShortcutsDialog };
+  const MODALS = { confirm: ConfirmDialog, 'new-file': NewFileDialog, rename: RenameDialog, replace: ReplaceDialog, task: TaskModal, shortcuts: ShortcutsDialog, map: ProductMap };
   const View = $derived(COMPONENTS[app.route.view] || Overview);
   const ModalC = $derived(app.modal ? MODALS[app.modal.kind] : null);
 
@@ -114,6 +116,11 @@
       app.modal = { kind: 'shortcuts', props: {} };
       return;
     }
+    if (e.key === 'm') {
+      e.preventDefault();
+      app.modal = { kind: 'map', props: {} };
+      return;
+    }
     if (e.key === 'n' && canRun('edit')) {
       e.preventDefault();
       newFile();
@@ -164,6 +171,7 @@
     <Sidebar />
     <main class="main" class:bleed={fullBleed} bind:this={mainEl}>
       <Topbar />
+      {#if !fullBleed}<RelatedStrip />{/if}
       {#key app.route.view}
         <View params={app.route.params} />
       {/key}
