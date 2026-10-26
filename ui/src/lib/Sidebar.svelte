@@ -170,6 +170,7 @@
             { header: `Signed in as ${app.me?.role || '—'}` },
             { label: 'Permissions & roles', icon: 'shield', run: () => (location.hash = '#/settings?tab=permissions') },
             { label: 'Keyboard shortcuts', icon: 'command', kbd: '?', run: () => (app.modal = { kind: 'shortcuts', props: {} }) },
+            { label: 'Product map', icon: 'map', kbd: 'm', run: () => (app.modal = { kind: 'map', props: {} }) },
             ...(app.me?.tokenRequired ? [{ sep: true }, { label: 'Sign out', icon: 'logout', run: logout }] : []),
           ],
         )}
@@ -177,10 +178,10 @@
       <span class="av" class:admin={app.me?.role === 'admin'}><Icon name={app.me?.role === 'admin' ? 'shield' : 'eye'} size={12} /></span>
       <span class="col" style="gap:0;min-width:0">
         <span class="role">{app.me?.role || 'guest'}</span>
-        <ConnPulse />
+        <span class="version faint">v{app.state?.version || '—'}</span>
       </span>
     </button>
-    <span class="version faint">v{app.state?.version || '—'}</span>
+    <ConnPulse />
   </div>
 </nav>
 
@@ -336,7 +337,8 @@
   .av { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--panel-active); color: var(--text-2); flex-shrink: 0; }
   .av.admin { background: var(--accent-soft); color: var(--accent); }
   .role { font-size: 12px; font-weight: 600; text-transform: capitalize; line-height: 1.2; }
-  .version { font-size: 10.5px; font-family: var(--mono); }
+  .version { font-size: 10.5px; font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .foot :global(.conn) { white-space: nowrap; flex-shrink: 0; }
 
   @media (max-width: 760px) {
     .side {
