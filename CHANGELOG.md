@@ -10,6 +10,9 @@ From watching context to keeping it true. Includes everything prepared for 0.3.0
 
 ### Added
 
+- **Port fallback**: when port 4747 (or `--port`) is busy, `start` moves to the next free port and says so; `--strict-port` restores the old behaviour.
+- **Network links**: with `--host 0.0.0.0` or `::`, the startup output lists a ready-to-open `network` URL for each real network interface (Docker and loopback interfaces are skipped).
+
 - **Live view** (`#/live`): files Claude Code, Codex and other agents edit in real time, from their session transcripts, confirmed by the file watcher. One lane per agent, streaming diffs, "now editing" chips, a heat strip, filters and collision warnings when two sessions touch the same file. New SSE events `agent.session`, `agent.edit`, `agent.command`, `agent.collision`; the Overview, Neuron brain and radar show agent activity in agent colours.
 - **Multi-agent coordination**: advisory file claims with TTL, task claims and handoff notes over HTTP and MCP (`claim_task`, `claim_files`, `release_files`, `handoff_note` at `--level state`; `list_claims`, `get_handoffs` read-only), shown on board cards and in Live.
 - **Truth check** (`agentneuron verify`, `/api/verify`, MCP `verify_context`, new lint rule `false-claim`): commands, scripts, paths, versions, competing libraries, env vars and ports claimed in context files, checked against package.json, lockfiles, Makefile, composer, pyproject and the file tree, with suggested fixes (apply at `edit` level).

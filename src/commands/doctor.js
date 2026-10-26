@@ -47,7 +47,7 @@ export async function runDoctor(root, { port, host } = {}) {
   if (!Number.isInteger(p) || p < 0 || p > 65535) add('port', 'fail', `invalid port ${port}`);
   else if (p === 0) add('port', 'ok', 'port 0: a random free port will be used');
   else if (await portFree(p, h)) add('port', 'ok', `${h}:${p} is free`);
-  else add('port', 'warn', `${h}:${p} is in use (start with --port <n>)`);
+  else add('port', 'warn', `${h}:${p} is in use (start picks the next free port; or use --port <n>)`);
 
   const on = Object.entries(config.actions).filter(([, v]) => v).map(([k]) => k);
   if (!on.length) add('permissions', 'ok', 'read-only (no action levels enabled)');

@@ -38,7 +38,8 @@ Setup & maintenance:
   help [command]     show help for a command
 
 Common options:
-  --port, -p <n>     port (default 4747; 0 = random)
+  --port, -p <n>     port (default 4747; if busy, the next free port is used; 0 = random)
+  --strict-port      exit instead of moving to another port when the port is busy
   --host <h>         bind host (default 127.0.0.1; non-loopback requires/auto-creates a token)
   --token <t>        require a token (login screen, ?token=<t> or Authorization: Bearer <t>)
   --admin-token <t>  admin token; then --token becomes the read-only viewer token
@@ -83,9 +84,9 @@ Run lint, the truth check, the security audit and a context-size budget in one p
   --base     only report issues that are new since this git revision (e.g. origin/main); needs the ref
              fetched (actions/checkout fetch-depth: 0)
   --budget   max tokens of root context per tool before a warning (default 20000)`,
-  start: `Usage: agentneuron [start] [dir] [--port n] [--host h] [--token t] [--admin-token t] [--enable levels] [--write] [--open]
+  start: `Usage: agentneuron [start] [dir] [--port n] [--strict-port] [--host h] [--token t] [--admin-token t] [--enable levels] [--write] [--open]
 
-Start the server for one project and print the URL. Read-only unless levels are enabled.
+Start the server for one project and print the URL (plus network URLs when bound to 0.0.0.0). If the port is busy, the next free one is used. Read-only unless levels are enabled.
 
   agentneuron ./app --port 5000 --open
   agentneuron --enable edit,exec
@@ -253,7 +254,12 @@ async function cmdMcp(root, flags) {
 async function cmdStart(root, flags, workspace = false) {
   const overrides = {};
   const port = flags.port ?? flags.p;
-  if (port !== undefined) overrides.port = Number(port);
+  if (port !== undefined) {
+    const n = Number(port);
+    if (port === true || !Number.isInteger(n) || n < 0 || n > 65535) { console.error('agentneuron: --port must be a number from 0 to 65535'); return 2; }
+    overrides.port = n;
+  }
+  if (flags['strict-port']) overrides.strictPort = true;
   if (flags.host) overrides.host = String(flags.host);
   if (flags.token) overrides.token = String(flags.token);
   else if (process.env.AGENTNEURON_TOKEN) overrides.token = String(process.env.AGENTNEURON_TOKEN);
@@ -272,6 +278,10 @@ async function cmdStart(root, flags, workspace = false) {
   console.log(`  files   : ${srv.store.files.size}`);
   const mask = (t) => (String(t).length >= 12 ? `${String(t).slice(0, 4)}****` : "****"); // never reveal short tokens
   console.log(`  open    : ${srv.ctx.url}`);
+  // with an auto-generated token the link carries it (the token is printed once below anyway)
+  const withTok = (u) => (srv.token && config.tokenGenerated ? `${u}?token=${srv.token}` : u);
+  for (const u of srv.networkUrls || []) console.log(`  network : ${withTok(u)}`);
+  if (srv.requestedPort && srv.port !== srv.requestedPort) console.log(`  port    : ${srv.requestedPort} was in use, using ${srv.port} (--strict-port to fail instead)`);
   if (srv.token && config.tokenGenerated) {
     console.log(`  token   : ${srv.token}`);
     console.log('            (auto-generated because the host is not loopback; shown ONCE - it is not stored. Keep it out of logs.)');

@@ -81,7 +81,7 @@ test('jsonl readAll cache is invalidated by appends and rotation', () => {
   assert.deepEqual(ts, [...ts].sort((x, y) => x - y));
 });
 
-test('startServer on a busy port rejects and leaves nothing running', async () => {
+test('startServer with strictPort on a busy port rejects and leaves nothing running', async () => {
   const blocker = net.createServer();
   await new Promise((r) => blocker.listen(0, '127.0.0.1', r));
   const port = blocker.address().port;
@@ -90,7 +90,7 @@ test('startServer on a busy port rejects and leaves nothing running', async () =
   const app = pathToFileURL(path.join(here, '../src/server/app.js')).href;
   const cfg = pathToFileURL(path.join(here, '../src/core/config.js')).href;
   const code = `const { startServer } = await import(${JSON.stringify(app)}); const { loadConfig } = await import(${JSON.stringify(cfg)});
-    try { await startServer(loadConfig(${JSON.stringify(root)}, { port: ${port} })); console.log('started'); } catch (e) { console.log('rejected ' + e.code); }`;
+    try { await startServer(loadConfig(${JSON.stringify(root)}, { port: ${port}, strictPort: true })); console.log('started'); } catch (e) { console.log('rejected ' + e.code); }`;
   // without cleanup the chokidar watcher keeps the child alive and spawnSync times out
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', timeout: 15000 });
   blocker.close();

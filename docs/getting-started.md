@@ -25,7 +25,7 @@ The banner shows the URL, number of tracked files, and which action levels are e
   actions : read-only (enable with --enable edit,exec,...)
 ```
 
-Add `--open` to open the browser automatically, `--port 0` to pick a random free port.
+Add `--open` to open the browser automatically, `--port 0` to pick a random free port. If port 4747 is already taken, AgentNeuron uses the next free port and prints it (`--strict-port` turns that off). With `--host 0.0.0.0` the startup output also lists a `network` link for each of the machine's addresses, so you can open the dashboard from another device.
 
 ### Other ways to install
 

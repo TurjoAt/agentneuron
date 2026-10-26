@@ -27,7 +27,8 @@ Start the server for one project and print the URL.
 
 | Flag | Description |
 |---|---|
-| `--port`, `-p <n>` | Port. Default `4747`. `0` picks a random free port. |
+| `--port`, `-p <n>` | Port. Default `4747`. If it is busy, the next free port (up to 20 higher, then any free port) is used and the startup output says so. `0` picks a random free port. |
+| `--strict-port` | Exit with an error instead of moving to another port when the port is busy. |
 | `--host <h>` | Bind address. Default `127.0.0.1`. A non-loopback host requires a token; one is generated and printed if you give none. |
 | `--token <t>` | Require a token. With `--admin-token` it becomes the read-only viewer token. |
 | `--admin-token <t>` | Admin token. Enables the two-role model. |
@@ -156,7 +157,7 @@ agentneuron 1.0.0 doctor - /path/to/project
   ✓ node         Node 22.11.0 (requires >= 18)
   ✓ git          git version 2.43.0, project is a git repository
   ✓ config       .agentneuron/config.json is valid
-  ! port         127.0.0.1:4747 is in use (start with --port <n>)
+  ! port         127.0.0.1:4747 is in use (start picks the next free port; or use --port <n>)
   ✓ permissions  read-only (no action levels enabled)
   ✓ data-dir     .agentneuron/ is writable
   ✓ ai-tools     detected: claude, codex, cursor

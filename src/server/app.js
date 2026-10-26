@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { createStore } from '../core/store.js';
 import { createAnalyzer } from '../core/analyze.js';
 import { createWatcher } from '../core/watcher.js';
@@ -35,6 +36,23 @@ const FALLBACK_HTML = `<!doctype html><meta charset="utf-8"><title>agentneuron</
 const MAX_SSE_CLIENTS = 100;
 const FAIL_FREE = 5; // wrong-credential attempts per IP before backoff starts
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+const VIRTUAL_IF = /^(lo|docker|br-|veth|virbr|cni|flannel|cali|vmnet|vboxnet|utun|awdl|llw|tailscale|zt)/i;
+
+/** URLs other machines can use when the server listens on every interface (0.0.0.0 / ::). */
+export function networkUrls(host, port, ifaces = os.networkInterfaces()) {
+  if (host !== '0.0.0.0' && host !== '::') return [];
+  const out = [];
+  for (const [name, list] of Object.entries(ifaces || {})) {
+    if (VIRTUAL_IF.test(name)) continue;
+    for (const a of list || []) {
+      const fam = a.family === 4 || a.family === 'IPv4' ? 4 : 6;
+      if (a.internal || (fam === 6 && (host !== '::' || /^fe80:/i.test(a.address)))) continue;
+      out.push(`http://${fam === 6 ? `[${a.address}]` : a.address}:${port}/`);
+    }
+  }
+  return [...new Set(out)];
+}
 
 /** Hostname part of a Host header ("[::1]:80" -> "::1", "Localhost:4747" -> "localhost"). */
 export function hostnameOf(h) {
@@ -603,11 +621,20 @@ export async function startServer(config) {
   server.headersTimeout = 20000;
   server.on('clientError', (_e, socket) => { try { socket.end('HTTP/1.1 400 Bad Request\r\nconnection: close\r\n\r\n'); } catch { /* gone */ } });
 
+  const wanted = config.port ?? 4747;
+  const listenOn = (port) => new Promise((resolve, reject) => {
+    const fail = (e) => { server.off('listening', ok); reject(e); };
+    const ok = () => { server.off('error', fail); resolve(); };
+    server.once('error', fail);
+    server.once('listening', ok);
+    server.listen(port, config.host);
+  });
   try {
-    await new Promise((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(config.port ?? 4747, config.host, resolve);
-    });
+    // A busy port moves on to the next one (up to 20), then to any free port, unless strictPort or port 0.
+    const tries = config.strictPort || !wanted ? [wanted] : [...Array.from({ length: 20 }, (_, i) => wanted + i).filter((p) => p <= 65535), 0];
+    for (let i = 0; ; i++) {
+      try { await listenOn(tries[i]); break; } catch (e) { if (e.code !== 'EADDRINUSE' || i === tries.length - 1) throw e; }
+    }
   } catch (e) { // e.g. EADDRINUSE: release the watcher, timers and jobs so the process can exit
     clearInterval(ping); clearTimeout(recomputeTimer);
     try { ctx.actions.cancelAll(); ctx.persist.stop(); } catch {}
@@ -635,5 +662,5 @@ export async function startServer(config) {
     server.closeAllConnections?.();
     await new Promise((r) => server.close(() => r()));
   }
-  return { url, port: addr.port, token: config.token || null, adminToken: config.adminToken || null, close, store, ctx };
+  return { url, port: addr.port, requestedPort: wanted, networkUrls: networkUrls(config.host, addr.port), token: config.token || null, adminToken: config.adminToken || null, close, store, ctx };
 }
