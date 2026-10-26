@@ -4,6 +4,7 @@
   import { toolOf } from '../../lib/tools.js';
   import ToolBadge from '../../lib/ToolBadge.svelte';
   import Icon from '../../lib/Icon.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   let { list = [], loading = false } = $props();
   const ACTIVE_MS = 10 * 60_000;
@@ -67,7 +68,7 @@
             <div class="grow col" style="gap:3px">
               <button class="lnk mono" onclick={() => openFile(c.path, { drawer: true })}>{c.path}</button>
               <div class="row" style="flex-wrap:wrap;gap:6px">
-                {#each c.agents || [] as a, k (a.sessionId + k)}<ToolBadge tool={a.tool} /><span class="small muted ellipsis">{a.title || a.sessionId?.slice(0, 8)}</span>{/each}
+                {#each c.agents || [] as a, k (a.sessionId + k)}<ToolBadge tool={a.tool} /><span class="small muted ellipsis"><EntityLink kind="session" id={a.sessionId} label={a.title || a.sessionId?.slice(0, 8)} /></span>{/each}
               </div>
             </div>
             <span class="faint tiny">{timeAgo(toMs(c.lastTs), app.now)}</span>
@@ -80,7 +81,7 @@
         {#each touching as t (t.agent.sessionId)}
           <div class="touch">
             <ToolBadge tool={t.agent.tool} compact />
-            <span class="small ellipsis tt">{t.agent.title || t.agent.sessionId?.slice(0, 8)}</span>
+            <span class="small ellipsis tt"><EntityLink kind="session" id={t.agent.sessionId} label={t.agent.title || t.agent.sessionId?.slice(0, 8)} /></span>
             <span class="tfiles">
               {#each [...t.files.keys()].slice(0, 3) as p (p)}
                 <button class="fchip mono" class:hot={conflictPaths.has(p)} onclick={() => openFile(p, { drawer: true })}>{basename(p)}</button>

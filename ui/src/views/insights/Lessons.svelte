@@ -7,6 +7,7 @@
   import ToolBadge from '../../lib/ToolBadge.svelte';
   import Icon from '../../lib/Icon.svelte';
   import Empty from '../../lib/Empty.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   const KIND = { correction: 'User correction', fix: 'Failing command, fixed', failure: 'Failing command', revert: 'Reverted edit', repeated: 'Repeated instruction' };
   const lessons = resource(() => api('/api/insights/lessons'), { live: false });
@@ -71,7 +72,7 @@
           {/if}
           <ul class="ev">
             {#each (open[l.id] ? l.evidence : l.evidence.slice(0, 2)) as e, i (i)}
-              <li><ToolBadge tool={e.tool} /><q>{e.quote}</q><span class="faint tiny">{e.ts ? timeAgo(e.ts, app.now) : ''}</span></li>
+              <li><ToolBadge tool={e.tool} /><q>{e.quote}</q><span class="faint tiny">{#if e.session}<EntityLink kind="session" id={e.session} label={e.ts ? timeAgo(e.ts, app.now) : 'session'} title="Open the session this quote came from" />{:else}{e.ts ? timeAgo(e.ts, app.now) : ''}{/if}</span></li>
             {/each}
           </ul>
           {#if l.evidence.length > 2}<button class="btn ghost sm more" onclick={() => (open[l.id] = !open[l.id])}>{open[l.id] ? 'Less evidence' : `All ${l.evidence.length} quotes`}</button>{/if}

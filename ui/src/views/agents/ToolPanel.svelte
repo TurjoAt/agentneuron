@@ -4,6 +4,7 @@
   import Icon from '../../lib/Icon.svelte';
   import ActionBtn from '../overview/ActionBtn.svelte';
   import { CAPS, toolKey, templateFor, itemPath, permKind } from './shared.js';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   let { tools = [], selected = '' } = $props();
   const list = $derived(tools.filter((t) => t.detected));
@@ -27,6 +28,10 @@
         <span class="d"></span>{t.name}
       </button>
     {/each}
+    {#if tool.id === 'claude' || tool.id === 'codex'}
+      <span class="spacer"></span>
+      <EntityLink kind="agent" id={tool.id} class="small" title="Sessions, cost and files for {tool.name}">{tool.name} sessions &amp; cost</EntityLink>
+    {/if}
   </div>
 
   <div class="cols" style="--c:{c}">
@@ -173,7 +178,7 @@
 {/if}
 
 <style>
-  .pick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
   .pick .chip .d { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
   .pick .chip.on { border-color: color-mix(in srgb, var(--c) 55%, transparent); }
   .cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; align-items: start; }

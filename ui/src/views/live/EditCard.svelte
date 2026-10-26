@@ -4,6 +4,7 @@
   import { timeAgo, basename, dirname, fmtTime } from '../../lib/format.js';
   import Icon from '../../lib/Icon.svelte';
   import DiffView from '../../lib/DiffView.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   let { item, session = null, collide = false } = $props();
   let open = $state(false);
@@ -41,7 +42,7 @@
     <div class="row2">
       <span class="verb">{op[1]}</span>
       {#if item.from}<span class="faint ellipsis" title="from {item.from}">from {basename(item.from)}</span>{/if}
-      <span class="who ellipsis" title={who}>{who}</span>
+      <span class="who ellipsis" title={who}>{#if item.sessionId}<EntityLink kind="session" id={item.sessionId} label={who} />{:else}{who}{/if}</span>
       {#if collide}<span class="badge warn" title="Another session touched this file recently"><Icon name="alert" size={10} />collision</span>{/if}
       <span class="stat {item.status}" role="img" aria-label={item.status} title="{item.status}: {item.status === 'confirmed' ? 'seen on disk' : item.status === 'failed' ? 'the tool reported an error' : item.status === 'pending' ? 'announced in the transcript, not seen on disk yet' : 'from before AgentNeuron started'}"></span>
       <time class="ts tnum" title={fmtTime(item.ts)}>{timeAgo(item.ts, app.now)}</time>

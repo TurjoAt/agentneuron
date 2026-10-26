@@ -4,6 +4,7 @@
   import { resource } from '../../lib/resource.svelte.js';
   import { fmtNum } from '../../lib/format.js';
   import Empty from '../../lib/Empty.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   const TYPE = { 'path-prohibition': 'path', 'command-preference': 'command', 'command-prohibition': 'command', 'run-before': 'before commit' };
   const rules = resource(() => api('/api/insights/rules'), { live: false });
@@ -55,7 +56,7 @@
           <tbody>
             {#each rows as r (r.id)}
               <tr>
-                <td class="rt">{r.rule}{#if r.examples.length}<div class="faint tiny ex">{r.examples[0].kind}: {r.examples[0].text}</div>{/if}</td>
+                <td class="rt">{r.rule}{#if r.examples.length}<div class="faint tiny ex">{r.examples[0].kind}: {r.examples[0].text}{#if r.examples[0].session} · <EntityLink kind="session" id={r.examples[0].session} label="session" title="Open the session behind this example" />{/if}</div>{/if}</td>
                 <td>{#if r.type}<span class="badge">{TYPE[r.type] || r.type}</span>{:else}<span class="faint tiny">not checkable</span>{/if}</td>
                 <td class="tnum">{r.appliesTimes}</td>
                 <td class="tnum"><span class="ok">{r.followed}</span>{#if rate(r) !== null}<div class="meter"><span style="width:{rate(r)}%"></span></div>{/if}</td>

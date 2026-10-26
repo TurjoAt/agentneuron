@@ -4,6 +4,7 @@
   import { fmtNum } from '../../lib/format.js';
   import Empty from '../../lib/Empty.svelte';
   import BarChart from '../../lib/viz/BarChart.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   const data = resource(() => api('/api/insights/costs-by-feature'), { live: false });
   const d = $derived(data.data);
@@ -39,7 +40,7 @@
           <tbody>
             {#each rows as r (r.kind + ':' + (r.taskId || r.branch || r.feature))}
               <tr class="click" onclick={() => (openRow = openRow === r ? null : r)}>
-                <td class="ft"><span class="badge {KIND[r.kind] || ''}">{r.kind}</span> {r.feature}</td>
+                <td class="ft"><span class="badge {KIND[r.kind] || ''}">{r.kind}</span> {#if r.taskId}<EntityLink kind="task" id={r.taskId} label={r.feature} />{:else}{r.feature}{/if}</td>
                 <td class="tnum">{r.sessions}</td>
                 <td class="tnum">{fmtNum(r.tokens)}</td>
                 <td class="tnum"><b>{money(r.cost)}</b></td>
@@ -50,8 +51,8 @@
               </tr>
               {#if openRow === r}
                 <tr><td colspan="8" class="det">
-                  {#each r.sessionList as s (s.sessionId)}<div class="tiny"><span class="mono faint">{s.tool} {s.sessionId.slice(0, 10)}</span> {s.title} · {money(s.usd)} <span class="faint">({s.matchedBy.join(', ') || 'no match'})</span></div>{/each}
-                  {#each r.commitList as c (c.hash)}<div class="tiny"><span class="mono faint">{c.hash.slice(0, 8)}</span> {c.subject}</div>{/each}
+                  {#each r.sessionList as s (s.sessionId)}<div class="tiny"><span class="mono faint">{s.tool} {s.sessionId.slice(0, 10)}</span> <EntityLink kind="session" id={s.sessionId} label={s.title || s.sessionId.slice(0, 8)} /> · {money(s.usd)} <span class="faint">({s.matchedBy.join(', ') || 'no match'})</span></div>{/each}
+                  {#each r.commitList as c (c.hash)}<div class="tiny"><span class="mono faint">{c.hash.slice(0, 8)}</span> <EntityLink kind="commit" id={c.hash} label={c.subject || c.hash.slice(0, 8)} /></div>{/each}
                 </td></tr>
               {/if}
             {/each}

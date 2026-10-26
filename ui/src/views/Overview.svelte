@@ -19,6 +19,7 @@
   import NeuronBrain from './overview/NeuronBrain.svelte';
   import LiveAgents from './overview/LiveAgents.svelte';
   import TruthTeaser from './overview/TruthTeaser.svelte';
+  import EntityLink from '../lib/EntityLink.svelte';
 
   let { params: _params } = $props();
 
@@ -128,7 +129,7 @@
             <button class="lnk mono" onclick={() => openFile(c.path, { drawer: true })}>{c.path}</button>
             is being edited by
             {#each c.agents || [] as a, k (a.sessionId + k)}
-              {#if k}<span class="faint"> & </span>{/if}<ToolBadge tool={a.tool} /> <span class="muted">{a.title || a.sessionId?.slice(0, 8)}</span>
+              {#if k}<span class="faint"> & </span>{/if}<ToolBadge tool={a.tool} /> <span class="muted"><EntityLink kind="session" id={a.sessionId} label={a.title || a.sessionId?.slice(0, 8)} /></span>
             {/each}
           </div>
         {/each}

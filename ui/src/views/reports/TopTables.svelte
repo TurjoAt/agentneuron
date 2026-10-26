@@ -6,6 +6,8 @@
   import Tabs from '../../lib/Tabs.svelte';
   import Empty from '../../lib/Empty.svelte';
   import ToolBadge from '../../lib/ToolBadge.svelte';
+  import { openEntity } from '../../lib/entity.svelte.js';
+  import Icon from '../../lib/Icon.svelte';
 
   let { from, to, by = $bindable('churn'), onby } = $props();
 
@@ -48,6 +50,7 @@
                 <div class="pc">
                   {#if r.tool}<ToolBadge tool={r.tool} compact />{/if}
                   <span class="mono path">{r.path}</span>
+                  <button class="det" onclick={(e) => { e.stopPropagation(); openEntity('file', r.path); }} onkeydown={(e) => e.stopPropagation()} title="Sessions, commits and tasks for {r.path}" aria-label="Details for {r.path}"><Icon name="info" size={13} /></button>
                 </div>
                 <span class="bar"><span style="width:{Math.round(((r[main] || 0) / maxOf(main)) * 100)}%"></span></span>
               </td>
@@ -77,6 +80,10 @@
   tr.click { cursor: pointer; }
   tr.click:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .pc { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pc .det { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 0; background: transparent; cursor: pointer; color: var(--text-3); opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+  tr:hover .pc .det, .pc .det:focus-visible { opacity: 1; }
+  .pc .det:hover { color: var(--accent); background: var(--panel-hover); }
+  @media (hover: none) { .pc .det { opacity: 1; } }
   .path { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
   .bar { display: block; height: 2px; margin-top: 5px; background: var(--panel-active); border-radius: 2px; overflow: hidden; }
   .bar span { display: block; height: 100%; background: var(--accent); opacity: 0.7; }

@@ -4,6 +4,7 @@
   import { live, colorTool, skey } from '../../lib/live.svelte.js';
   import { timeAgo, basename } from '../../lib/format.js';
   import Icon from '../../lib/Icon.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   const sessions = $derived(live.sessions.filter((s) => s.state === 'active' || s.state === 'start' || s.state === 'idle').slice(0, 5));
   const recent = $derived(live.edits.slice(-6).reverse());
@@ -22,7 +23,7 @@
       {@const e = editingOf(s)}
       <div class="srow">
         <span class="sd" class:idle={s.state === 'idle'} style="--c:var(--tool-{colorTool(s.tool)})"></span>
-        <span class="ellipsis grow small" title={s.title || s.promptTitle || s.sessionId}>{s.title || s.promptTitle || s.sessionId.slice(0, 8)}</span>
+        <span class="ellipsis grow small"><EntityLink kind="session" id={s.sessionId} label={s.title || s.promptTitle || s.sessionId.slice(0, 8)} title={s.title || s.promptTitle || s.sessionId} /></span>
         {#if e && app.now - e.ts < 120000}<button class="lnk mono tiny ellipsis" onclick={() => open(e.path)} title={e.path}>{basename(e.path)}</button>{:else}<span class="faint tiny">{s.state}</span>{/if}
       </div>
     {:else}
