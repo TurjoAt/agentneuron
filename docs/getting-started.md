@@ -64,22 +64,33 @@ It writes only inside `<project>/.agentneuron/` (history, cache, event and metri
 
 ## Tour of the pages
 
-Keys `1` to `9` jump to the first nine pages; `/` focuses search; `?` lists shortcuts; the command palette lists everything else.
+The sidebar groups the pages into **Monitor**, **Analytics**, **Context**, **Agents** and **Project** (click a group heading to collapse it). On a phone the bottom bar shows Overview, Live, Sessions and Usage; **More** opens every page, grouped the same way. Each page shows a strip of related pages under the top bar, and the **product map** (`m`, or the map button in the top bar) shows every page and how sessions, files, commits, tasks, tools and memory connect.
 
-| Page | What you get |
-|---|---|
-| Overview | Health ring, token budget, files by tool, live change feed, git status |
-| Graph | Link graph of files, `@imports`, wiki links and path mentions. Layouts, focus on a neighbourhood, find the path between two files |
-| Files | Browse and read tracked files, links in and out, history, annotations, bookmarks. With `edit`: editor, create, rename (rewrites links), delete to trash, find and replace |
-| Diff | Compare any two versions: stored history, `git:HEAD`, or the current file |
-| Context | The effective context an agent gets for a directory and tool (`claude`, `codex`, `cursor`): the merged chain of files, total tokens, rendered text |
-| Health | Score and grade, issues grouped by rule, with suggested fixes. With `edit`, apply a fix in one click |
-| Tasks | Board, list, table, calendar and timeline built from Markdown checkboxes and `TODO:` comments, plus a Decisions tab for ADRs. Moving a card edits the Markdown only with `edit` |
-| Git | Overview, changes, history, branches, tags, stash, remotes, blame, stats, generated changelog |
-| Agents | Matrix of tools vs capabilities, per-tool setup, rules that apply to a file, templates, sync and drift between instruction files, MCP servers, sessions and cost, conflict radar, time travel |
-| Project | Detected stacks, dependencies and outdated packages, scripts, CI, Docker, env keys, Laravel routes/models/migrations, doc drift, code statistics |
-| Reports | KPIs, time series, heatmap, top tables, export to CSV, Markdown or HTML; an AI context pack and JSON export with a "Copy for AI" button |
-| Settings | Permissions (what is on and how to enable it), role and auth, audit log, notifications, trash, jobs, appearance, about |
+Click any session, file, commit, task, tool or model name to open its **details panel**: stats, related sessions, files, commits and tasks (click those to keep exploring, `Backspace` goes back) and buttons to the pages that show it. `Ctrl`/`Cmd`-click goes straight to its page.
+
+Keyboard: `1` Overview, `2` Live, `3` Sessions, `4` Graph, `5` Usage & cost, `6` Insights, `7` Reports, `8` Files, `9` Diff, `0` Settings; `/` or `Ctrl`/`Cmd`+`K` opens the command palette (pages, files, sessions, tools, actions); `m` opens the product map; `?` lists every shortcut.
+
+| Group | Page | What you get |
+|---|---|---|
+| Monitor | Overview | Health ring, token budget, files by tool, live agents, usage and truth teasers, live change feed, tasks, git status |
+| Monitor | Live | What each agent is editing right now, one lane per agent, with collision warnings |
+| Monitor | Sessions | Every Claude Code and Codex session with a step-by-step replay |
+| Monitor | Graph | Link graph of files, `@imports`, wiki links and path mentions. Layouts, focus on a neighbourhood, find the path between two files |
+| Analytics | Usage & cost | Tokens, cost, cache, tools, prompts, agent fleet, code impact and an activity calendar |
+| Analytics | Insights | Lessons from your sessions, cost by feature, rule effects |
+| Analytics | Reports | KPIs, time series, heatmap, top tables, export to CSV, Markdown or HTML; an AI context pack and JSON export with a "Copy for AI" button |
+| Context | Files | Browse and read tracked files, links in and out, history, annotations, bookmarks. With `edit`: editor, create, rename (rewrites links), delete to trash, find and replace |
+| Context | Diff | Compare any two versions: stored history, `git:HEAD`, or the current file |
+| Context | Context | The effective context an agent gets for a directory and tool (`claude`, `codex`, `cursor`): the merged chain of files, total tokens, rendered text |
+| Context | Memory & plans | Claude's saved memory (with links between memories and stale-claim warnings) and plans |
+| Context | Health | Score and grade, issues grouped by rule, with suggested fixes. With `edit`, apply a fix in one click |
+| Context | Truth & safety | False instructions in context files, a security audit of agent config, and an audit of agent settings (permission modes, MCP servers needing auth) |
+| Context | Rules studio | Write, compile and sync rules across tools |
+| Agents | Agents | Matrix of tools vs capabilities, per-tool setup, rules that apply to a file, templates, sync and drift between instruction files, MCP servers, conflict radar, time travel |
+| Agents | Tasks | Board, list, table, calendar and timeline built from Markdown checkboxes and `TODO:` comments, plus a Decisions tab for ADRs. Moving a card edits the Markdown only with `edit` |
+| Project | Git | Overview, changes, history, branches, tags, stash, remotes, blame, stats, generated changelog |
+| Project | Project | Detected stacks, dependencies and outdated packages, scripts, CI, Docker, env keys, Laravel routes/models/migrations, doc drift, code statistics |
+| | Settings | Permissions (what is on and how to enable it), role and auth, audit log, notifications, trash, jobs, appearance, about |
 
 Sessions and cost read Claude Code and Codex transcripts from `~/.claude/projects` and `~/.codex/sessions`. Cost is an estimate from token counts; override prices with the `pricing` key.
 
