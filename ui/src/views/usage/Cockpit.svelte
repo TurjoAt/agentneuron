@@ -14,7 +14,7 @@
   import HBars from '../../lib/viz/HBars.svelte';
   import Skeleton from '../../lib/viz/Skeleton.svelte';
   import Kpi from './Kpi.svelte';
-  import { usageQuery, money, fmtMs, pct, tokTotal, dayMs, modelLabel, SEVERITY, ANOMALY, ANOMALY_ICON } from './shared.js';
+  import { usageQuery, money, fmtMs, pct, tokTotal, dayMs, modelLabel, SEVERITY, ANOMALY, ANOMALY_ICON, shortId } from './shared.js';
 
   let { params = {}, range = '30d', agent = 'all' } = $props();
 
@@ -210,7 +210,7 @@
               <div class="abody">
                 <div class="ah"><span class="badge {sv.cls}">{sv.label}</span><b>{ANOMALY[a.kind] || a.kind}</b><span class="faint tiny">{timeAgo(a.ts, app.now)}</span></div>
                 <div class="am">{a.message}</div>
-                {#if a.session}<div class="as faint tiny">in <EntityLink kind="session" id={a.session} label={a.session.slice(0, 8)} /></div>{/if}
+                {#if a.session}<div class="as faint tiny">in <EntityLink kind="session" id={a.session} label={shortId(a.session)} /></div>{/if}
               </div>
               {#if a.session}<button class="btn sm" onclick={() => replay(a)} aria-label="Replay session at this anomaly"><Icon name="play" size={12} /> Replay</button>{/if}
             </li>

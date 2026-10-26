@@ -69,7 +69,7 @@ export function modelLabel(m) {
   return m;
 }
 
-export const shortId = (id) => (!id ? '—' : id.length > 14 ? `${id.slice(0, 8)}…` : id);
+export const shortId = (id) => (!id ? '—' : /^rollout-/.test(id) ? `rollout…${id.slice(-4)}` : id.length > 14 ? id.slice(0, 8) : id);
 export const sessionLabel = (s) => (s?.title && s.title.trim() ? s.title : `Session ${shortId(s?.sessionId)}`);
 
 export const SEVERITY = { high: { cls: 'err', label: 'High' }, medium: { cls: 'warn', label: 'Medium' }, low: { cls: 'info', label: 'Low' } };
