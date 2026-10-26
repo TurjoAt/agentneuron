@@ -34,9 +34,10 @@
   const groupBadge = (g) => g.views.reduce((a, v) => a + (badgeFor(v.id).n || 0), 0);
 
   // badges that need data refresh when files change (throttled inside)
+  // (the first load happens after boot, in navbadges.svelte.js; this only reacts to later changes)
+  const firstTick = app.dataTick;
   $effect(() => {
-    void app.dataTick;
-    refreshNavBadges();
+    if (app.dataTick !== firstTick) refreshNavBadges();
   });
 
   // phones: "More" sheet with every page, grouped

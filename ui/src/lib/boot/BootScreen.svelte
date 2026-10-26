@@ -314,7 +314,7 @@
 
   @media (max-width: 600px), (max-height: 700px) {
     .boot { --vs: 210px; --vy: clamp(130px, 28vh, 240px); }
-    .det { max-width: 52%; }
+    .det { max-width: 52%; margin-left: auto; }
   }
   @media (max-height: 560px) {
     .boot { --vs: 150px; --vy: 100px; }

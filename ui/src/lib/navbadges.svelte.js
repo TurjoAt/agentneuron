@@ -25,7 +25,7 @@ export function refreshNavBadges() {
 
 onBoot(() => {
   // let the first view load its own data first
-  setTimeout(() => load().catch(() => {}), 1500);
+  setTimeout(() => load().catch(() => {}), 800);
 });
 
 /** Badge counts per view id (reactive). */

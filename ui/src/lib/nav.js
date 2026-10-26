@@ -52,6 +52,11 @@ export function parseHash(hash) {
   const h = (hash || '').replace(/^#\/?/, '');
   const [view, qs] = h.split('?');
   const params = Object.fromEntries(new URLSearchParams(qs || ''));
+  // contract form of commit links (#/git?tab=log&commit=) → what the Git view reads (tab=history&hash=)
+  if (view === 'git' && (params.tab === 'log' || (params.commit && !params.tab))) {
+    const { commit, ...rest } = params;
+    return { view, params: { ...rest, tab: 'history', ...(commit && !rest.hash ? { hash: commit } : {}) } };
+  }
   const moved = MOVED[`${view}:${params.tab}`];
   if (moved) {
     const { tab: _t, session, ...rest } = params;
