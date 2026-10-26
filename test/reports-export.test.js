@@ -133,10 +133,11 @@ test('ai: front-matter, sections, content cap and masking', async () => {
 
 test('scrubber replaces whole absolute paths only, never parts of relative ones', async () => {
   const { makeScrubber } = await import('../src/reports/export.js');
-  const s = makeScrubber('/project');
+  const R = path.resolve('/project').replace(/\\/g, '/'); // D:/project on Windows
+  const s = makeScrubber(R);
   assert.equal(s('docs/project-plan.md and src/project/index.js'), 'docs/project-plan.md and src/project/index.js');
-  assert.equal(s('/project/CLAUDE.md, "/project" (/project) /project:3'), './CLAUDE.md, "." (.) .:3');
-  assert.equal(s('/projects/x'), '/projects/x');
+  assert.equal(s(`${R}/CLAUDE.md, "${R}" (${R}) ${R}:3`), './CLAUDE.md, "." (.) .:3');
+  assert.equal(s(`${R}s/x`), `${R}s/x`);
   const home = os.homedir();
   if (home && home.length >= 4) assert.equal(s(`${home}/notes.md`), '~/notes.md');
 });
