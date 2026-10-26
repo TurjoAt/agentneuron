@@ -1328,7 +1328,7 @@ export function createMock() {
 
   // ---- usage analytics (mock-usage.js: agent B, mock-usage-shell.js: agent C) ----
   for (const [k, fn] of Object.entries(usageRoutes({ sessions: () => sessions }))) routes[k] = fn;
-  for (const [k, fn] of Object.entries(usageShellRoutes({ sessions: () => sessions, files: filesList }))) routes[k] = fn;
+  for (const [k, fn] of Object.entries(usageShellRoutes({ sessions: () => sessions, files: filesList, commits: () => commits, role: () => role }))) routes[k] = fn;
   // ---- end usage ----
 
   // UI-B insight routes (reports, project, agents, workspace, git stats…) — called as fn(q, init)

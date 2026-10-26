@@ -8,6 +8,7 @@
   import ToolBadge from './ToolBadge.svelte';
   import Icon from './Icon.svelte';
   import Empty from './Empty.svelte';
+  import EntityLink from './EntityLink.svelte';
 
   let { limit = 40, filter = null } = $props();
   const items = $derived((filter ? app.events.filter(filter) : app.events).slice(0, limit));
@@ -39,7 +40,7 @@
           {#if ev.agent}
             <div class="agent" title={ev.agent.lastPrompt || ''}>
               <ToolBadge tool={ev.agent.tool} compact />
-              <span class="ellipsis">{ev.agent.title || ev.agent.sessionId?.slice(0, 8)}</span>
+              <span class="ellipsis">{#if ev.agent.sessionId}<EntityLink kind="session" id={ev.agent.sessionId} label={ev.agent.title || ev.agent.sessionId.slice(0, 8)} title={ev.agent.lastPrompt || ''} />{:else}{ev.agent.title || '—'}{/if}</span>
             </div>
           {/if}
         </div>

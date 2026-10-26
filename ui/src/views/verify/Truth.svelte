@@ -4,6 +4,7 @@
   import { canRun, levelReason } from '../../lib/actions.js';
   import Icon from '../../lib/Icon.svelte';
   import Empty from '../../lib/Empty.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   let { res, status = '' } = $props();
 
@@ -72,7 +73,7 @@
     <div class="col" style="gap:12px">
       {#each groups as g (g.file)}
         <section class="card">
-          <div class="card-h"><Icon name="file" size={14} /> <span class="mono">{g.file}</span> <span class="sub">{g.list.length}</span></div>
+          <div class="card-h"><Icon name="file" size={14} /> <EntityLink kind="file" id={g.file} label={g.file} mono title="{g.file}: which agent sessions read or edited it" /> <span class="sub">{g.list.length}</span></div>
           <ul class="claims">
             {#each g.list as c (c.id)}
               <li class="claim">

@@ -13,6 +13,23 @@
   import { LEVELS, CATEGORY_ICON } from './levels.js';
   import { newFile, findReplace, createTask, renameFile, deleteFile, copyPath } from './fileActions.js';
   import { isBookmarked, toggleBookmark, logout } from './store.svelte.js';
+  import { openEntity, entityLabel } from './entity.svelte.js';
+  import { timeAgo } from './format.js';
+
+  // entity index for search (sessions, tools, models), fetched lazily when the palette opens
+  let ents = $state.raw({ sessions: [], tools: [], models: [], at: 0 });
+  function loadEntities() {
+    if (Date.now() - ents.at < 120_000) return;
+    ents = { ...ents, at: Date.now() };
+    Promise.allSettled([api('/api/usage/sessions', { range: '90d' }), api('/api/usage/tools', { range: '90d' })]).then(async ([s, t]) => {
+      let sessions = s.status === 'fulfilled' && Array.isArray(s.value?.sessions) ? s.value.sessions : [];
+      // older servers / scaffolds: fall back to the live session list
+      if (!sessions.length) sessions = await api('/api/sessions').then((l) => (Array.isArray(l) ? l.filter((x) => x?.sessionId) : []), () => []);
+      const tools = t.status === 'fulfilled' && Array.isArray(t.value?.tools) ? t.value.tools : [];
+      const models = [...new Set(sessions.flatMap((x) => x.models || []))];
+      ents = { sessions, tools, models, at: Date.now() };
+    });
+  }
 
   let q = $state('');
   let sel = $state(0);
@@ -25,6 +42,7 @@
     if (app.palette) {
       q = '';
       sel = 0;
+      untrack(loadEntities);
       tick().then(() => inputEl?.focus());
     }
   });
@@ -51,7 +69,8 @@
     const out = [];
     const cur = app.route.view === 'files' ? app.route.params.path : null;
     const cmds = [
-      ...VIEWS.map((v, i) => ({ kind: 'view', label: `Go to ${v.label}`, icon: v.icon, key: i < 9 ? String(i + 1) : '', run: () => navigate(v.id) })),
+      ...VIEWS.map((v, i) => ({ kind: 'view', label: `Go to ${v.label}`, desc: v.desc, icon: v.icon, key: i < 9 ? String(i + 1) : v.id === 'settings' ? '0' : '', run: () => navigate(v.id) })),
+      { kind: 'cmd', label: 'Product map: how pages and data connect', icon: 'map', key: 'm', run: () => (app.modal = { kind: 'map', props: {} }) },
       { kind: 'cmd', label: 'New file…', icon: 'filePlus', key: 'n', run: () => newFile() },
       { kind: 'cmd', label: 'Find & replace in files…', icon: 'replace', run: () => findReplace(query) },
       { kind: 'cmd', label: 'New task…', icon: 'tasks', run: () => createTask({}) },
@@ -71,7 +90,7 @@
       ...(app.me?.tokenRequired ? [{ kind: 'cmd', label: 'Sign out', icon: 'logout', run: logout }] : []),
     ];
     for (const c of cmds) {
-      const m = fuzzy(query, c.label);
+      const m = fuzzy(query, c.label) || (c.desc && query.length > 2 && c.desc.toLowerCase().includes(query.toLowerCase()) ? { score: -20, idx: [] } : null);
       if (m) out.push({ ...c, section: 'Commands', score: m.score + (query ? 0 : 1000), html: highlight(c.label, m.idx) });
     }
     const acts = [];
@@ -100,7 +119,25 @@
       if (m) files.push({ kind: 'file', section: 'Files', path: f.path, tool: f.tool, score: m.score, html: highlight(f.path, m.idx), run: () => openFile(f.path) });
     }
     files.sort((a, b) => b.score - a.score);
-    const res = [...files.slice(0, 10), ...out.slice(0, 4), ...acts.slice(0, 5)];
+    const sess = [];
+    for (const x of ents.sessions) {
+      const label = x.title || entityLabel('session', x.sessionId);
+      const m = fuzzy(query, `${label} ${x.sessionId}`);
+      const mt = fuzzy(query, label);
+      if (m) sess.push({ kind: 'entity', ek: 'session', section: 'Sessions', icon: 'message', tool: x.tool, label, sub: x.lastAt ? timeAgo(x.lastAt, app.now) : '', score: m.score, html: mt ? highlight(label, mt.idx) : escapeHtml(label), run: () => openEntity('session', x.sessionId, label) });
+    }
+    sess.sort((a, b) => b.score - a.score);
+    const tl = [];
+    for (const t of ents.tools) {
+      const m = fuzzy(query, t.name);
+      if (m) tl.push({ kind: 'entity', ek: 'tool', section: 'Tools & models', icon: 'terminal', label: t.name, sub: t.calls != null ? `${t.calls} calls` : '', score: m.score, html: highlight(t.name, m.idx), run: () => openEntity('tool', t.name, t.name) });
+    }
+    for (const id of ents.models) {
+      const m = fuzzy(query, id);
+      if (m) tl.push({ kind: 'entity', ek: 'model', section: 'Tools & models', icon: 'sparkles', label: id, sub: 'model', score: m.score, html: highlight(id, m.idx), run: () => openEntity('model', id, id) });
+    }
+    tl.sort((a, b) => b.score - a.score);
+    const res = [...files.slice(0, 8), ...sess.slice(0, 5), ...tl.slice(0, 4), ...out.slice(0, 4), ...acts.slice(0, 5)];
     const needle = query.toLowerCase();
     for (const r of remote.q === query ? remote.items : []) {
       const t = r.text || '';
@@ -142,7 +179,7 @@
         bind:this={inputEl}
         bind:value={q}
         {onkeydown}
-        placeholder="Search files, content… or type > for commands & actions"
+        placeholder="Search pages, files, sessions, tools… or type > for actions"
         aria-label="Search"
         autocomplete="off"
         spellcheck="false"
@@ -170,9 +207,14 @@
             <span class="lbl" class:dim={!it.enabled}>{@html it.html} <span class="aid mono">{it.id}</span></span>
             {#if !it.enabled}<span class="lock" title={it.reason}><Icon name="lock" size={12} /></span>{/if}
             <span class="lvl {LEVELS[it.level]?.tone}">{LEVELS[it.level]?.label || it.level}</span>
+          {:else if it.kind === 'entity'}
+            {#if it.tool}<ToolBadge tool={it.tool} compact />{:else}<Icon name={it.icon} size={15} />{/if}
+            <span class="lbl" class:mono={it.ek === 'tool' || it.ek === 'model'}>{@html it.html}</span>
+            {#if it.sub}<span class="sub">{it.sub}</span>{/if}
+            <span class="ek">details</span>
           {:else}
             <Icon name={it.icon} size={15} />
-            <span class="lbl">{@html it.html}</span>
+            <span class="lbl">{@html it.html}{#if it.desc}<span class="desc">{it.desc}</span>{/if}</span>
             {#if it.key}<span class="kbd">{it.key}</span>{/if}
           {/if}
         </button>
@@ -232,6 +274,11 @@
   .small { font-size: 11px; }
   .it :global(mark) { background: transparent; color: var(--accent); font-weight: 700; }
   .dim { opacity: 0.55; }
+  .desc { margin-left: 10px; font-size: 12px; color: var(--text-3); }
+  .sub { font-size: 11.5px; color: var(--text-3); flex-shrink: 0; }
+  .ek { font-size: 10px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: var(--panel-active); color: var(--text-3); flex-shrink: 0; }
+  .it.on .ek { background: var(--accent-soft); color: var(--accent); }
+  @media (max-width: 560px) { .desc { display: none; } }
   .aid { font-size: 11px; color: var(--text-3); margin-left: 6px; }
   .lock { color: var(--text-3); display: grid; }
   .lvl { font-size: 10px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: var(--panel-active); color: var(--text-3); }

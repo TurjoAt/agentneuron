@@ -29,6 +29,15 @@
   const board = resource(() => api('/api/board'));
   const decisions = resource(() => api('/api/decisions'), { enabled: () => tab === 'decisions' });
   $effect(() => onStream('board', () => board.reload()));
+  // deep link: #/tasks?task=<id> opens that task (entity panel "Open task")
+  let openedTask = '';
+  $effect(() => {
+    const id = params.task;
+    if (id && id !== openedTask) {
+      openedTask = id;
+      openTask(id);
+    }
+  });
 
   let swimlane = $state(load('agentneuron.tasks.swimlane', 'none'));
   function load(k, d) {

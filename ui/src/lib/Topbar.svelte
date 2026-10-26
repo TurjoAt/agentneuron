@@ -24,6 +24,7 @@
   <nav class="crumbs" aria-label="Breadcrumbs">
     <span class="proj ellipsis">{app.state?.project?.name || 'agentneuron'}</span>
     <span class="slash">/</span>
+    {#if view?.group}<span class="grp hide-md">{view.group}</span><span class="slash hide-md">/</span>{/if}
     <a class="view" href={href(app.route.view)} onclick={(e) => { if (segs.length) { e.preventDefault(); navigate('files', {}); } }}>{view?.label}</a>
     {#each segs as s, i (i)}
       <span class="slash">/</span>
@@ -67,6 +68,10 @@
 
   <Bell />
 
+  <button class="btn icon ghost hide-sm" onclick={() => (app.modal = { kind: 'map', props: {} })} aria-label="Product map" title="Product map: how pages and data connect (m)">
+    <Icon name="map" size={17} />
+  </button>
+
   <button class="btn icon ghost" onclick={toggleTheme} aria-label="Toggle theme" title="Toggle light/dark">
     <Icon name={app.theme === 'dark' ? 'sun' : 'moon'} size={17} />
   </button>
@@ -92,6 +97,7 @@
   .crumbs { display: flex; align-items: center; gap: 6px; font-size: 13.5px; min-width: 0; overflow: hidden; }
   .proj { color: var(--text-3); font-weight: 500; max-width: 160px; }
   .slash { color: var(--text-3); opacity: 0.6; }
+  .grp { color: var(--text-3); font-weight: 500; white-space: nowrap; }
   .view { font-weight: 650; color: var(--text); text-decoration: none; white-space: nowrap; }
   .view:hover { text-decoration: none; color: var(--accent); }
   .seg { border: 0; background: transparent; padding: 2px 4px; margin: 0 -4px; border-radius: 6px; color: var(--text-2); font-size: 12.5px; cursor: pointer; white-space: nowrap; }

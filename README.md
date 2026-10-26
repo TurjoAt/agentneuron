@@ -53,7 +53,9 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 **Understand**
 - Link graph of files, `@imports`, wiki links and path mentions, with several layouts (neural, force, orbit, radial, clusters, timeline, matrix) and path finding.
 - Effective context: the merged instruction chain Claude, Codex or Cursor sees for a given directory, with token counts.
-- Agents center: tool and capability matrix for 13 AI tools, rules that apply to a file, MCP servers, sessions and estimated cost, concurrent-edit radar, context time travel.
+- Agents center: tool and capability matrix for 13 AI tools, rules that apply to a file, MCP servers, concurrent-edit radar, context time travel.
+- Memory & plans: Claude's saved memory and plans for the project, with links between memories and warnings when a memory claims something the repo no longer has.
+- One connected dashboard: pages grouped into Monitor, Analytics, Context, Agents and Project, a product map of how pages and data connect, and a details panel for any session, file, commit, task, tool or model.
 - Project intelligence: stacks, dependencies and outdated packages, scripts, CI, Docker, env keys, Laravel routes/models/migrations, doc drift, code stats.
 - Git: changes, history, branches, tags, stash, blame, stats, generated changelog.
 

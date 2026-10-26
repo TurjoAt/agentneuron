@@ -16,6 +16,7 @@
   import { buildModel, filterModel, neighborhood, shortestPath, syntheticGraph, AGE_BUCKETS, TIERS } from './graph/model.js';
   import { computeLayout, LAYOUTS } from './graph/layouts.js';
   import { GraphRenderer } from './graph/renderer.js';
+  import { openEntity } from '../lib/entity.svelte.js';
 
   let { params = {} } = $props();
 
@@ -270,6 +271,7 @@
               { label: 'Open', icon: 'file', run: () => openFile(p) },
               { label: 'Open in editor', icon: 'edit', run: () => openFile(p, { tab: 'edit' }) },
               { label: 'Peek', icon: 'eye', run: () => (app.drawer = { path: p }) },
+              { label: 'Agent activity', icon: 'activity', run: () => openEntity('file', p) },
             ]),
         { sep: true },
         { label: 'Focus neighborhood', icon: 'target', kbd: '⌥ click', run: () => setFocus(p) },
@@ -563,6 +565,7 @@
             <button class="btn sm primary" onclick={() => openFile(selNode.id)}><Icon name="file" size={13} /> Open</button>
             <button class="btn sm" onclick={() => setFocus(selNode.id)}><Icon name="target" size={13} /> Focus</button>
             <button class="btn sm" onclick={() => startPath(selNode.id)}><Icon name="link" size={13} /> Path</button>
+            <button class="btn sm" onclick={() => openEntity('file', selNode.id)} title="Agent sessions, commits and tasks for this file"><Icon name="activity" size={13} /> Activity</button>
             <button class="btn sm icon" title="More actions" onclick={(e) => nodeMenu(selNode, e)}><Icon name="more" size={14} /></button>
           </div>
         {:else}

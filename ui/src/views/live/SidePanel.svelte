@@ -6,6 +6,7 @@
   import { openTask } from '../../lib/fileActions.js';
   import ToolBadge from '../../lib/ToolBadge.svelte';
   import Icon from '../../lib/Icon.svelte';
+  import EntityLink from '../../lib/EntityLink.svelte';
 
   let { sessionFilter = '', onsession = null } = $props();
   const canState = $derived(!!app.me?.levels?.state);
@@ -58,8 +59,8 @@
       <div class="claim">
         <Icon name="lock" size={11} />
         <code class="mono ellipsis grow" title={c.pattern}>{c.pattern}</code>
-        <span class="faint small ellipsis" title="{c.agent} · {c.sessionId}{c.note ? ' — ' + c.note : ''}">{c.agent}</span>
-        {#if c.taskId}<button class="lnk tiny" onclick={() => openTask(c.taskId)}>task</button>{/if}
+        <span class="faint small ellipsis" title="{c.agent} · {c.sessionId}{c.note ? ' — ' + c.note : ''}">{#if c.sessionId}<EntityLink kind="session" id={c.sessionId} label={c.agent} />{:else}{c.agent}{/if}</span>
+        {#if c.taskId}<EntityLink kind="task" id={c.taskId} label="task" class="tiny" />{/if}
         <span class="faint tiny tnum" title="Expires {fmtTime(c.expiresAt)}">{Math.max(0, Math.round((c.expiresAt - app.now) / 60000))}m</span>
         {#if canState}<button class="btn sm ghost icon" aria-label="Release claim {c.pattern}" title="Release" onclick={() => release(c)}><Icon name="unlock" size={12} /></button>{/if}
       </div>

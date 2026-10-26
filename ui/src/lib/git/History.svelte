@@ -8,6 +8,7 @@
   import PatchView from './PatchView.svelte';
   import { layoutGraph } from './graph.js';
   import { gx, hue, initials, STATUS } from './gx.svelte.js';
+  import EntityLink from '../EntityLink.svelte';
 
   let { params = {} } = $props();
   const PAGE = 60;
@@ -86,11 +87,11 @@
     {:else}
       <div class="card" style="padding:14px 16px;margin-bottom:12px">
         <div class="row" style="gap:10px;margin-bottom:6px"><span class="av" style="--h:{hue(detail.author)}">{initials(detail.author)}</span>
-          <div class="col" style="gap:0"><b>{detail.subject}</b><span class="faint tiny">{detail.author} · {fmtDate(toMs(detail.date))} · <span class="hash">{detail.short}</span></span></div></div>
+          <div class="col" style="gap:0"><b>{detail.subject}</b><span class="faint tiny">{detail.author} · {fmtDate(toMs(detail.date))} · <EntityLink kind="commit" id={detail.hash} label={detail.short} class="hash" title="Sessions, files and tasks linked to this commit" /></span></div></div>
         {#if detail.body}<pre class="body">{detail.body}</pre>{/if}
         <div class="col" style="gap:0;margin-top:8px">
           {#each detail.files || [] as f}
-            <div class="row small" style="padding:3px 0"><span class="st {f.status?.[0]}">{f.status?.[0]}</span><span class="mono grow ellipsis" title={STATUS[f.status?.[0]]}>{f.path}</span>
+            <div class="row small" style="padding:3px 0"><span class="st {f.status?.[0]}">{f.status?.[0]}</span><span class="mono grow ellipsis" title={STATUS[f.status?.[0]]}>{#if f.status?.[0] === 'D'}{f.path}{:else}<EntityLink kind="file" id={f.path} label={f.path} title="{f.path}: agent sessions, commits and tasks" />{/if}</span>
               <span class="tiny mono"><span class="add">+{f.added}</span> <span class="del">−{f.removed}</span></span></div>
           {/each}
         </div>

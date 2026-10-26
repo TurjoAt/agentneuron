@@ -433,12 +433,41 @@ export async function refreshMe() {
   }
 }
 
+// ---------------------------------------------------------------- boot progress
+/** Steps shown by the boot screen, in the order boot() runs them. */
+export const BOOT_STEPS = [
+  { id: 'connect', label: 'Connecting to server' },
+  { id: 'auth', label: 'Authenticating' },
+  { id: 'files', label: 'Reading project files' },
+  { id: 'context', label: 'Analysing context & health' },
+  { id: 'agents', label: 'Finding agent sessions' },
+  { id: 'ready', label: 'Ready' },
+];
+const freshSteps = () => BOOT_STEPS.map((s) => ({ ...s, status: 'pending', detail: '' }));
+/** Reactive boot progress: driven by boot() itself, never by a timer. */
+export const bootProgress = $state({ steps: freshSteps(), log: [], startedAt: Date.now(), readyAt: 0, outcome: '' });
+
+function bootStep(id, status, detail) {
+  const st = bootProgress.steps.find((x) => x.id === id);
+  if (!st) return;
+  st.status = status;
+  if (detail != null) st.detail = detail;
+  if (detail && (status === 'done' || status === 'failed')) bootLog(detail);
+}
+function bootLog(line) {
+  bootProgress.log = [...bootProgress.log.slice(-11), { t: Date.now() - bootProgress.startedAt, line }];
+}
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
 export async function boot(again = false) {
+  Object.assign(bootProgress, { steps: freshSteps(), log: [], startedAt: Date.now(), readyAt: 0, outcome: '' });
   if (mockRequested) enableMock();
   app.mock = isMock();
   if (app.mock) app.mockReason = 'Demo mode (?mock=1)';
+  bootStep('connect', 'running', app.mock ? 'Starting the built-in demo workspace' : `Reaching ${location.host || 'the local server'}`);
   // a ?token= in the URL → exchange for a cookie session and strip it
   if (!again && urlToken && !app.mock) {
+    bootStep('auth', 'running', 'Exchanging the link token for a session');
     try {
       await post('/api/auth/login', { token: urlToken });
       setToken('');
@@ -452,29 +481,71 @@ export async function boot(again = false) {
     await loadState();
   } catch (e) {
     if (e.status === 401 || e.status === 403) {
+      bootStep('connect', 'done', 'Server reachable');
+      bootStep('auth', 'failed', 'Sign-in required');
+      bootProgress.outcome = 'auth';
       app.authRequired = true;
       app.ready = true;
       return;
     }
     if (!isMock()) {
+      bootStep('connect', 'failed', `API unreachable (${e.message}): switching to demo data`);
       enableMock();
       app.mock = true;
       app.mockReason = `API unreachable (${e.message}) — showing demo data`;
       await loadState();
     } else {
+      bootStep('connect', 'failed', e.message);
+      bootProgress.outcome = 'fatal';
       app.fatal = e.message;
       app.ready = true;
       return;
     }
   }
+  const st = app.state || {};
+  if (bootProgress.steps[0].status !== 'failed') bootStep('connect', 'done', `${st.project?.name || 'Project'} · AgentNeuron ${st.version || ''}`.trim());
+  bootStep('auth', 'running');
   try {
     await loadMe();
   } catch (e) {
+    bootStep('auth', 'failed', 'Sign-in required');
+    bootProgress.outcome = 'auth';
     app.authRequired = true;
     app.ready = true;
     return;
   }
-  await Promise.allSettled([loadFiles(), loadEvents(), loadConflicts(), loadBookmarks()]);
+  bootStep('auth', 'done', app.me?.legacy ? 'Open access (legacy server)' : `Signed in as ${app.me?.role || 'guest'}`);
+  const total = st.counts?.files;
+  bootStep('files', 'running', total != null ? `Indexing ${plural(total, 'file')}` : 'Indexing context files');
+  bootStep('context', 'running', st.health?.score != null ? `Health ${st.health.score} (${st.health.grade || '—'})` : 'Scoring context health');
+  bootStep('agents', 'running', 'Scanning recent agent edits');
+  const step = (id, p, done) => p.then(
+    (v) => { bootStep(id, 'done', done(v)); return v; },
+    (e) => { bootStep(id, 'failed', e?.message || 'failed'); throw e; },
+  );
+  await Promise.allSettled([
+    step('files', loadFiles(), () => {
+      const n = app.files.length;
+      const tok = app.files.reduce((a, f) => a + (f.tokens || 0), 0);
+      const names = app.files.slice(0, 3).map((f) => basename(f.path)).join(', ');
+      return `${plural(n, 'file')}${tok ? ` · ${Math.round(tok / 100) / 10}k tokens` : ''}${names ? ` · ${names}${n > 3 ? '…' : ''}` : ''}`;
+    }),
+    step('agents', loadEvents(), () => {
+      const sessions = new Set();
+      const tools = new Set();
+      for (const e of app.events) if (e.agent?.sessionId) { sessions.add(`${e.agent.tool}:${e.agent.sessionId}`); tools.add(e.agent.tool); }
+      return sessions.size ? `${plural(sessions.size, 'session')} (${[...tools].join(', ')}) · ${plural(app.events.length, 'recent edit')}` : `${plural(app.events.length, 'recent edit')}, no agent sessions yet`;
+    }),
+    step('context', loadConflicts(), () => {
+      const h = app.health;
+      const c = app.conflicts.length;
+      return `${h?.score != null ? `Health ${h.score} (${h.grade || '—'})` : 'Health pending'}${h?.counts?.error ? ` · ${plural(h.counts.error, 'error')}` : ''}${c ? ` · ${plural(c, 'conflict')}` : ''}`;
+    }),
+    loadBookmarks(),
+  ]);
+  bootStep('ready', 'done', app.mock ? 'Demo workspace ready' : 'Dashboard ready');
+  bootProgress.readyAt = Date.now();
+  bootProgress.outcome = 'ready';
   app.ready = true;
   startStream();
   for (const fn of bootHooks) fn();

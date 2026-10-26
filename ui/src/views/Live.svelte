@@ -224,7 +224,7 @@
   @keyframes ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 70%, transparent); } 100% { box-shadow: 0 0 0 7px transparent; } }
   @media (max-width: 1500px) { .lanes { grid-template-columns: repeat(min(var(--n), 2), minmax(0, 1fr)); } .lb { max-height: 520px; } }
-  @media (max-width: 1100px) { .main { grid-template-columns: 1fr; } }
-  @media (max-width: 700px) { .lanes { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) { .main { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 700px) { .lanes { grid-template-columns: minmax(0, 1fr); } .filters .segc { max-width: 100%; overflow-x: auto; scrollbar-width: none; } .filters .segc button { flex-shrink: 0; } }
   @media (prefers-reduced-motion: reduce) { .live-dot, .pdot.hot { animation: none; } }
 </style>
