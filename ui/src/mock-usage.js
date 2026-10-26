@@ -40,13 +40,13 @@ const forbidden = (msg) => Object.assign(new Error(msg), { status: 403 });
 
 // list prices per million tokens (synthetic, for the estimate path)
 const PRICE = {
-  'claude-opus-4-5': { in: 5, out: 25, cr: 0.5, cw: 6.25 },
-  'claude-sonnet-4-5': { in: 3, out: 15, cr: 0.3, cw: 3.75 },
-  'claude-haiku-4-5': { in: 1, out: 5, cr: 0.1, cw: 1.25 },
+  'claude-opus-5-5': { in: 5, out: 25, cr: 0.5, cw: 6.25 },
+  'claude-sonnet-5-5': { in: 3, out: 15, cr: 0.3, cw: 3.75 },
+  'claude-haiku-5-5': { in: 1, out: 5, cr: 0.1, cw: 1.25 },
   'gpt-5-codex': { in: 1.25, out: 10, cr: 0.125, cw: 0 },
 };
 const costOf = (t, model) => {
-  const p = PRICE[model] || PRICE['claude-sonnet-4-5'];
+  const p = PRICE[model] || PRICE['claude-sonnet-5-5'];
   return ((t.input || 0) * p.in + (t.output || 0) * p.out + (t.cacheRead || 0) * p.cr + (t.cacheWrite || 0) * p.cw) / 1e6;
 };
 const tokSum = (t) => (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
@@ -137,9 +137,9 @@ export function usageRoutes({ sessions }) {
     if (cached && cached.lastAt === s.lastAt) return cached;
     const r = rng(key);
     const tool = s.tool === 'codex' ? 'codex' : 'claude';
-    const main = tool === 'codex' ? 'gpt-5-codex' : r() < 0.7 ? 'claude-opus-4-5' : 'claude-sonnet-4-5';
+    const main = tool === 'codex' ? 'gpt-5-codex' : r() < 0.7 ? 'claude-opus-5-5' : 'claude-sonnet-5-5';
     const subagents = tool === 'claude' && r() < 0.45 ? intR(r, 1, 4) : 0;
-    const models = subagents ? [main, 'claude-haiku-4-5'] : [main];
+    const models = subagents ? [main, 'claude-haiku-5-5'] : [main];
     const tokens = s.tokens || { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
     const usd = round2(costOf(tokens, main) * (subagents ? 1.12 : 1));
     const prompts = Math.max(1, Math.round(tokSum(tokens) / 160_000) + intR(r, 1, 6));
@@ -223,9 +223,9 @@ export function usageRoutes({ sessions }) {
           const nm = pickR(r, ['Explore', 'code-reviewer', 'test-writer', 'general-purpose']);
           const dur = Math.round(30_000 + r() * 160_000);
           const tk = Math.round(tokSum(s.tokens) * (0.04 + r() * 0.06));
-          const sUsd = round2(costOf({ input: tk * 0.3, output: tk * 0.06, cacheRead: tk * 0.64 }, 'claude-haiku-4-5'));
-          agents.push({ agentId, name: nm, model: 'claude-haiku-4-5', parent: 'main', startedAt: Math.round(t), endedAt: Math.round(t + dur), turns: intR(r, 4, 22), tokens: tk, usd: sUsd, toolCalls: intR(r, 3, 30) });
-          timeline.push({ id: `t${++id}`, ts: Math.round(t), kind: 'subagent', agentId, model: 'claude-haiku-4-5', text: `${nm}: ${pickR(r, ['map the payments module', 'review the diff for regressions', 'write missing tests', 'find stale commands in docs'])}`, durationMs: dur, tokens: tk, usd: sUsd });
+          const sUsd = round2(costOf({ input: tk * 0.3, output: tk * 0.06, cacheRead: tk * 0.64 }, 'claude-haiku-5-5'));
+          agents.push({ agentId, name: nm, model: 'claude-haiku-5-5', parent: 'main', startedAt: Math.round(t), endedAt: Math.round(t + dur), turns: intR(r, 4, 22), tokens: tk, usd: sUsd, toolCalls: intR(r, 3, 30) });
+          timeline.push({ id: `t${++id}`, ts: Math.round(t), kind: 'subagent', agentId, model: 'claude-haiku-5-5', text: `${nm}: ${pickR(r, ['map the payments module', 'review the diff for regressions', 'write missing tests', 'find stale commands in docs'])}`, durationMs: dur, tokens: tk, usd: sUsd });
           t += dur;
           subLeft--;
           calls++;
@@ -443,7 +443,7 @@ export function usageRoutes({ sessions }) {
         const nodes = d.agents.map((a) => ({ id: a.agentId, name: a.agentId === 'main' ? 'main' : a.name, model: a.model, kind: a.agentId === 'main' ? 'main' : 'subagent', turns: a.turns, tokens: a.tokens, usd: a.usd, toolCalls: a.toolCalls, startedAt: a.startedAt, endedAt: a.endedAt }));
         const edges = nodes.filter((n) => n.id !== 'main').map((n) => ({ from: 'main', to: n.id, kind: 'spawn' }));
         if (hashStr(s.sessionId) % 3 === 0) {
-          nodes.push({ id: 'advisor', name: 'advisor', model: 'claude-opus-4-5', kind: 'advisor', turns: 2, tokens: Math.round(tokSum(s.tokens) * 0.03), usd: round2(s.usd * 0.06), toolCalls: 0, startedAt: s.startedAt + 60_000, endedAt: s.lastAt });
+          nodes.push({ id: 'advisor', name: 'advisor', model: 'claude-opus-5-5', kind: 'advisor', turns: 2, tokens: Math.round(tokSum(s.tokens) * 0.03), usd: round2(s.usd * 0.06), toolCalls: 0, startedAt: s.startedAt + 60_000, endedAt: s.lastAt });
           edges.push({ from: 'main', to: 'advisor', kind: 'advice' });
         }
         return { sessionId: s.sessionId, title: s.title, tool: s.tool, startedAt: s.startedAt, usd: s.usd, model: s.models[0], nodes, edges };

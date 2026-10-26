@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Usage & cost** page and `agentneuron usage`: cost per day, model, branch, agent and session from local Claude Code and Codex logs. Cost is exact where Claude Code recorded it (`cost-state`) and marked as an estimate otherwise; every figure reports its coverage. Cache hit rate and savings, tokens, turn times, daily budget with burn rate and projection, alerts (cost spikes, repeated tool failures, context jumps, slow turns, denials) and tips.
+- Usage tabs for tool health (error rate, denials, latency, MCP servers, skills, hooks, failure loops), a prompt library with repeated-prompt suggestions, agent fleet graphs (subagents and advisor), code impact per file and activity patterns.
+- **Sessions** page: every session with filters, and a replay of prompts, thinking (duration), tool calls, results, errors, edits, compactions and subagents on one timeline with a time ruler and before/after file diffs. Replaces the Agents "Sessions & cost" and Insights "Replay" tabs (old links redirect).
+- **Memory & plans** page: Claude's saved memory and plans for the project, links between memories, and warnings for paths a memory mentions that no longer exist.
+- Agent settings audit tab under Truth & safety (permission modes, broad allow rules, MCP servers that need login, hook errors).
+- Details panel for any session, file, commit, task, tool, model or agent, linked from every page; a product map of pages and how their data connects; related-page links on each page; grouped, collapsible sidebar with badges; a bottom bar on phones; entity search in the command palette.
+- Animated first-load screen that shows the real startup steps (connect, sign in, files, analysis, sessions).
+- MCP tools `get_usage`, `get_session_replay` and `get_tool_health`.
+
+### Security
+
+- Usage routes follow the prompt policy (`live.showPrompts`, `live.viewerPrompts`): viewers get no prompt text, titles, thinking or memory bodies, and file versions need `live.viewerDiffs`. Claude's credentials, session keys and pasted prompt content are never read or returned. Other projects' sessions are read only with `"usage": { "scope": "all" }` and the admin role.
+
 ## [1.0.0] - 2026-10-26
 
 From watching context to keeping it true. Includes everything prepared for 0.3.0 below, which was not published separately.

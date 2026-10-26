@@ -21,7 +21,7 @@ const ymd = (t) => {
 const TOOLS = [
   ['Read', 412], ['Edit', 238], ['Bash', 196], ['Grep', 151], ['Write', 64], ['Glob', 58], ['TodoWrite', 41], ['Task', 17], ['WebFetch', 9], ['mcp__github__create_pull_request', 6],
 ];
-const MODELS = { claude: ['claude-opus-4-5', 'claude-sonnet-4-5'], codex: ['gpt-5-codex'] };
+const MODELS = { claude: ['claude-opus-5-5', 'claude-sonnet-5-5'], codex: ['gpt-5-codex'] };
 
 export function usageShellRoutes({ sessions, files, commits = () => [], role = () => 'admin' }) {
   const now = Date.now();
@@ -194,7 +194,7 @@ export function usageShellRoutes({ sessions, files, commits = () => [], role = (
   // ---------------------------------------------------------------- settings audit
   const settings = () => ({
     settings: {
-      model: 'claude-opus-4-5', advisorModel: 'claude-opus-4-5', autoMode: true, theme: 'dark',
+      model: 'claude-opus-5-5', advisorModel: 'claude-opus-5-5', autoMode: true, theme: 'dark',
       hooks: { PreToolUse: 2, PostToolUse: 1, Stop: 1 },
       permissions: { allow: ['Bash(pnpm test:*)', 'Bash(git status)', 'Read(**)', 'Edit(apps/**)'], deny: ['Read(.env*)', 'Bash(rm -rf:*)'], ask: ['Bash(git push:*)'] },
     },

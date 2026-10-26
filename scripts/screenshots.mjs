@@ -48,6 +48,10 @@ const SHOTS = [
   { name: 'verify', query: '?mock=1', hash: '#/verify', theme: 'dark', settle: 1500 },
   { name: 'insights', query: '?mock=1', hash: '#/insights', theme: 'dark', settle: 1500 },
   { name: 'rules', query: '?mock=1', hash: '#/rules', theme: 'dark', settle: 1500 },
+  { name: 'usage', query: '?mock=1', hash: '#/usage', theme: 'dark', settle: 2500 },
+  { name: 'usage-fleet', query: '?mock=1', hash: '#/usage?tab=fleet', theme: 'dark', settle: 2000 },
+  { name: 'session-replay', query: '?mock=1', hash: '#/sessions?id=8f2c1a90-3b7e-4d0e-9a41-2f6c5d8e1b07', theme: 'dark', settle: 2500 },
+  { name: 'memory', query: '?mock=1', hash: '#/memory', theme: 'dark', settle: 1500 },
 ];
 
 async function loadPlaywright() {
