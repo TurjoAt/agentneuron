@@ -127,10 +127,18 @@
 
   // ---- ruler
   const COLORS = ['var(--accent)', 'var(--ok)', 'var(--info)', 'var(--warn)', 'var(--accent-2)'];
+  // The main session is always the first lane; subagents follow (the longest MAX_LANES, in start order).
+  const MAX_LANES = 7;
+  const subLanes = $derived(agents.filter((a) => a.agentId !== 'main'));
   const lanes = $derived.by(() => {
-    if (!agents.length) return t0 ? [{ key: 'main', label: 'main', start: t0, end: t1, color: COLORS[0] }] : [];
-    return agents.map((a, i) => ({ key: a.agentId, label: a.agentId === 'main' || !a.parent ? 'main' : a.name || a.agentId, start: a.startedAt ?? t0, end: a.endedAt ?? t1, color: COLORS[i % COLORS.length] }));
+    if (!t0) return [];
+    const main = { key: 'main', label: 'main', start: t0, end: t1, color: COLORS[0] };
+    const dur = (a) => (a.endedAt ?? t1) - (a.startedAt ?? t0);
+    const shown = subLanes.length > MAX_LANES ? [...subLanes].sort((a, b) => dur(b) - dur(a)).slice(0, MAX_LANES) : subLanes;
+    const sorted = [...shown].sort((a, b) => (a.startedAt ?? t0) - (b.startedAt ?? t0));
+    return [main, ...sorted.map((a, i) => ({ key: a.agentId, label: a.title || a.name || a.agentId, start: a.startedAt ?? t0, end: a.endedAt ?? t1, color: COLORS[(i + 1) % COLORS.length] }))];
   });
+  const hiddenLanes = $derived(Math.max(0, subLanes.length - MAX_LANES));
   const mainKey = $derived(lanes[0]?.key);
   const marks = $derived(timeline.filter((r) => ['prompt', 'edit', 'compact', 'interrupt'].includes(r.kind) || isErr(r)).map((r) => ({
     ts: r.ts, lane: mainKey, tall: r.kind === 'prompt' || isErr(r) || r.kind === 'compact',
@@ -207,6 +215,7 @@
     {#if lanes.length && t1 > t0}
       <div class="ruler">
         <Gantt from={t0} to={t1} {lanes} {marks} cursor={selRow?.ts ?? null} onseek={seek} label="Session time ruler: click or drag to jump; arrow keys step through prompts, edits and errors" />
+        {#if hiddenLanes}<p class="faint tiny lanes-more">Showing the {MAX_LANES} longest of {subLanes.length} subagents; all are listed under Subagents.</p>{/if}
         <div class="rl faint tiny"><span><i class="sw a"></i>prompt</span><span><i class="sw o"></i>edit</span><span><i class="sw e"></i>error</span><span><i class="sw w"></i>compaction / interrupt</span><span class="spacer"></span><span><span class="kbd">j</span> <span class="kbd">k</span> step</span></div>
       </div>
     {/if}

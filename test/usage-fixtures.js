@@ -93,6 +93,7 @@ export function makeHome() {
   ]));
   // memory + plans
   w(path.join(dir, 'memory', 'note.md'), '---\nname: Build notes\ndescription: How the build works\nmetadata:\n  type: project\n---\n\nThe parser lives in `src/a.js`; the old one was `src/missing.js`. See [index](MEMORY.md).\n');
+  w(path.join(dir, 'memory', 'deploy.md'), '---\nname: Deploy notes\ndescription: How deploys work\nmetadata:\n  type: reference\n---\n\nBuild first, see [build](note.md) and [[Build notes]].\n');
   w(path.join(claude, 'plans', 'plan-slug-one.md'), '# Plan one\n\nSteps.\n');
   w(path.join(claude, 'plans', 'unrelated-plan.md'), '# Other project plan\n');
   // settings

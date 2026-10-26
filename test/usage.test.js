@@ -228,8 +228,10 @@ test('fleet, impact, activity', async () => {
 
 test('memory and plans: frontmatter, stale paths, plans only from this project', async () => {
   const m = await U().memory();
-  assert.equal(m.memory.length, 1);
-  const n = m.memory[0];
+  assert.equal(m.memory.length, 2);
+  const n = m.memory.find((x) => x.file === 'note.md');
+  // a file link and a wiki link to the same note both resolve to its name
+  assert.deepEqual(m.memory.find((x) => x.file === 'deploy.md').links, ['Build notes']);
   assert.deepEqual([n.name, n.description, n.type, n.file], ['Build notes', 'How the build works', 'project', 'note.md']);
   assert.match(n.body, /parser lives/);
   assert.deepEqual(n.links, ['MEMORY.md']);

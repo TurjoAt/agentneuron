@@ -12,7 +12,12 @@
   const GAP = 10;
   const nodes = $derived(run?.nodes || []);
   const main = $derived(nodes.find((n) => n.kind === 'main' || n.id === 'main') || nodes[0]);
-  const kids = $derived(nodes.filter((n) => n !== main));
+  // Big runs keep the graph readable: the MAX costliest subagents are drawn, the rest are counted.
+  const MAX = 12;
+  const allKids = $derived(nodes.filter((n) => n !== main));
+  const kids = $derived(allKids.length > MAX ? [...allKids].sort((a, b) => (b.usd || 0) - (a.usd || 0)).slice(0, MAX) : allKids);
+  const more = $derived(allKids.length - kids.length);
+  const nameOf = (n) => n.title || n.name || n.id;
   const H = $derived(Math.max(NH + 16, kids.length * (NH + GAP) - GAP + 16));
   const pos = $derived.by(() => {
     const p = new Map();
@@ -34,7 +39,7 @@
   const maxUsd = $derived(Math.max(0.01, ...nodes.map((n) => n.usd || 0)));
   const narrow = $derived(width < 520);
   const dur = (n) => (n.startedAt && n.endedAt ? fmtMs(n.endedAt - n.startedAt) : null);
-  const summary = $derived(`Run graph: main session ${main ? modelLabel(main.model) : ''} spawned ${kids.filter((k) => k.kind === 'subagent').length} subagents${kids.some((k) => k.kind === 'advisor') ? ' and consulted an advisor' : ''}.`);
+  const summary = $derived(`Run graph: main session ${main ? modelLabel(main.model) : ''} spawned ${allKids.filter((k) => k.kind === 'subagent').length} subagents${allKids.some((k) => k.kind === 'advisor') ? ' and consulted an advisor' : ''}.`);
 </script>
 
 <div class="fg" bind:clientWidth={width}>
@@ -44,7 +49,7 @@
         <li class="tn k-{n.kind}" class:child={n !== main}>
           <span class="dot"></span>
           <div class="grow">
-            <div class="nm"><b>{n.name || n.id}</b>{#if n.kind === 'advisor'}<span class="badge info">advisor</span>{/if}</div>
+            <div class="nm"><b title={n.name || ''}>{nameOf(n)}</b>{#if n.kind === 'advisor'}<span class="badge info">advisor</span>{/if}</div>
             <div class="faint tiny"><EntityLink kind="model" id={n.model} label={modelLabel(n.model)} /> · {fmtNum(n.turns)} turns · {fmtNum(n.tokens)} tok</div>
           </div>
           <b class="tnum">{money(n.usd)}</b>
@@ -61,16 +66,18 @@
       {#each [main, ...kids].filter(Boolean) as n (n.id)}
         {@const p = pos.get(n.id)}
         <div class="node k-{n.kind}" style="left:{p.x}px;top:{p.y}px;width:{NW}px;height:{NH}px">
-          <div class="nh"><span class="dot"></span><b class="ellipsis">{n.name || n.id}</b><span class="spacer"></span><b class="tnum usd">{money(n.usd)}</b></div>
+          <div class="nh"><span class="dot"></span><b class="ellipsis" title={n.name ? `${n.name}: ${nameOf(n)}` : nameOf(n)}>{nameOf(n)}</b><span class="spacer"></span><b class="tnum usd">{money(n.usd)}</b></div>
           <div class="faint tiny ellipsis"><EntityLink kind="model" id={n.model} label={modelLabel(n.model)} /> · {fmtNum(n.turns)} turns{#if dur(n)} · {dur(n)}{/if}</div>
           <div class="cost" aria-hidden="true"><span style="width:{((n.usd || 0) / maxUsd) * 100}%"></span></div>
         </div>
       {/each}
     </div>
   {/if}
+  {#if more}<p class="faint tiny more">Showing the {MAX} costliest of {allKids.length} subagents; the session replay lists all of them.</p>{/if}
 </div>
 
 <style>
+  .more { margin: 8px 0 0; }
   .fg { width: 100%; min-width: 0; }
   .wrap { position: relative; }
   svg { position: absolute; inset: 0; overflow: visible; }

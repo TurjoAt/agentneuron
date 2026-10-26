@@ -50,13 +50,19 @@ export async function readMemory({ dirs, home, root }) {
       const text = r.buf.toString('utf8');
       const { data, body } = frontmatter(text);
       const meta = data.metadata && typeof data.metadata === 'object' ? data.metadata : {};
-      const links = [...new Set([...body.matchAll(/\]\(([^)\s]+\.md)\)/g)].map((m) => m[1]))].slice(0, 50);
+      // Markdown links to other memory files ([x](file.md)) and wiki links ([[name]])
+      const links = [...new Set([...[...body.matchAll(/\]\(([^)\s]+\.md)\)/g)].map((m) => m[1]), ...[...body.matchAll(/\[\[([^\]\n]{1,200})\]\]/g)].map((m) => m[1].trim())])].slice(0, 50);
       memory.push({
         project: name, file: e.name, name: str(data.name, 200) || e.name.replace(/\.md$/, ''), description: str(data.description, 500),
         type: str(meta.type || data.type, 40) || (e.name === 'MEMORY.md' ? 'index' : null),
         body: maskSecretsInText(body.slice(0, MAX_BODY)), updatedAt: r.st.mtimeMs, links, stale: await staleClaims(body, root),
       });
     }
+  }
+  // Point file-name links at the memory `name` they refer to, so the UI can resolve them.
+  for (const m of memory) {
+    const byFile = new Map(memory.filter((x) => x.project === m.project).map((x) => [x.file.replace(/\.md$/, ''), x.name]));
+    m.links = [...new Set(m.links.map((l) => byFile.get(path.basename(l).replace(/\.md$/, '')) || l))];
   }
   return memory.sort((a, b) => b.updatedAt - a.updatedAt);
 }

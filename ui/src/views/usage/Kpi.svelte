@@ -15,7 +15,7 @@
   <div class="top"><span class="eyebrow">{label}</span>{#if badge}{@render badge()}{/if}</div>
   <div class="row">
     <div class="big tnum">{#if value == null}<span class="faint">—</span>{:else}<Counter {value} {format} />{/if}</div>
-    {#if h && value != null}<span title="Second half of the range vs the first half"><Delta now={h.now} prev={h.prev} {invert} /></span>{/if}
+    {#if h && value != null && h.prev > 0}<span title="Second half of the range vs the first half"><Delta now={h.now} prev={h.prev} {invert} {format} /></span>{/if}
   </div>
   {#if detail}<div class="dt">{@render detail()}</div>{/if}
   <div class="sp">{#if spark && spark.length > 1}<Sparkline values={spark} {color} {label} draw />{/if}</div>
