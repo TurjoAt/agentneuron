@@ -29,6 +29,8 @@ export function openEntity(kind, id, label) {
   entity.current = { kind, id: String(id), label };
 }
 export function closeEntity() { entity.current = null; entity.history = []; }
+// leaving the page (sidebar, palette, browser back) closes the panel
+if (typeof window !== 'undefined') window.addEventListener('hashchange', () => entity.current && closeEntity());
 export function backEntity() {
   const prev = entity.history[entity.history.length - 1];
   entity.history = entity.history.slice(0, -1);
@@ -40,7 +42,7 @@ export function entityHref(kind, id) {
   switch (kind) {
     case 'session': return href('sessions', { id });
     case 'file': return href('files', { path: id });
-    case 'commit': return href('git', { tab: 'log', commit: id });
+    case 'commit': return href('git', { tab: 'history', hash: id });
     case 'task': return href('tasks', { task: id });
     case 'tool': return href('usage', { tab: 'tools', tool: id });
     case 'model': return href('usage', { tab: 'overview', model: id });
