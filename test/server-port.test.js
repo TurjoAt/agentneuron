@@ -22,7 +22,10 @@ test('a busy port moves to the next free one, strictPort fails instead', async (
       assert.ok(srv.ctx.url.endsWith(`:${srv.port}/`));
     } finally { await srv.close(); }
     await assert.rejects(startServer(loadConfig(root, { port: busy, strictPort: true })), { code: 'EADDRINUSE' });
-  } finally { blocker.close(); fs.rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    blocker.close();
+    try { fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* Windows may still hold the watcher handle */ }
+  }
 });
 
 test('networkUrls lists real interfaces for 0.0.0.0 only', () => {

@@ -66,15 +66,21 @@ jobs:
           name: dist
           path: dist/
       - run: chmod +x dist/agentneuron.mjs
+      # npm >= 11.5.1 publishes through npm Trusted Publishing (OIDC, no token, no 2FA prompt) when the package
+      # lists this repo + release.yml as a trusted publisher on npmjs.com; otherwise it falls back to NPM_TOKEN.
+      - run: npm install -g npm@11
       - name: Publish (skipped if this version already exists)
         run: |
           V=$(node -p "require('./package.json').version")
           if npm view "agentneuron@$V" version >/dev/null 2>&1; then echo "agentneuron@$V already published"; exit 0; fi
-          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "::error title=npm publish::NPM_TOKEN secret is not set"; exit 1; fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN is not set: publishing with Trusted Publishing (OIDC)"; fi
           # dist/ comes from the build job, so skip prepublishOnly; surface npm's error as a public annotation.
           set -o pipefail
           npm publish --provenance --access public --ignore-scripts 2>&1 | tee publish.log || {
             grep -E 'npm (error|ERR!)' publish.log | head -8 | while IFS= read -r l; do echo "::error title=npm publish::$l"; done
+            if grep -qE 'EOTP|E403|ENEEDAUTH' publish.log; then
+              echo "::error title=npm publish::Add TurjoAt/agentneuron + release.yml as a Trusted Publisher on npmjs.com (package settings), or set NPM_TOKEN to a granular token with 'Bypass 2FA'"
+            fi
             exit 1
           }
         env:
