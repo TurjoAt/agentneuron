@@ -163,6 +163,6 @@ Redirects (in `nav.js`): `agents?tab=sessions` -> `sessions`, `insights?tab=repl
 
 `EntityLink` usage: `<EntityLink kind="session" id={s.sessionId} label={s.title} />`. Plain click opens the side panel; Ctrl/Cmd-click or middle-click follows `entityHref(kind, id)`.
 
-`entityHref(kind, id)`: session -> `#/sessions?id=`, file -> `#/files?path=`, commit -> `#/git?tab=log&commit=`, task -> `#/tasks?task=`, tool -> `#/usage?tab=tools&tool=`, model -> `#/usage?tab=overview&model=`, agent -> `#/usage?tab=overview&tool=`.
+`entityHref(kind, id)`: session -> `#/sessions?id=`, file -> `#/files?path=`, commit -> `#/git?tab=history&hash=` (the old `tab=log&commit=` form is redirected), task -> `#/tasks?task=`, tool -> `#/usage?tab=tools&tool=`, model -> `#/usage?tab=overview&model=`, agent -> `#/usage?tab=overview&tool=`.
 
 Mocks: B owns `ui/src/mock-usage.js`; C owns `ui/src/mock-usage-shell.js` (memory, settings, activity, entity). Both are already merged into `mock.js`. Mock data is synthetic: never copy real numbers from a developer machine.
