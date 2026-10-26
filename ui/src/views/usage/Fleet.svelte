@@ -62,7 +62,7 @@
             <ToolBadge tool={r.tool} compact />
             <EntityLink kind="session" id={r.sessionId} label={sessionLabel(r)} class="ttl ellipsis" />
             <span class="spacer"></span>
-            <span class="faint tiny">{timeAgo(r.startedAt, app.now)}</span>
+            <span class="faint tiny nw">{timeAgo(r.startedAt, app.now)}</span>
             <b class="tnum">{money(r.usd)}</b>
             <button class="btn ghost sm icon" title="Replay session" aria-label="Replay session" onclick={() => navigate('sessions', { id: r.sessionId })}><Icon name="play" size={12} /></button>
           </div>
@@ -95,6 +95,7 @@
   .runs { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .layout > .runs { margin: 0; }
   :global(.ttl) { font-weight: 600; max-width: 60%; }
+  .nw { white-space: nowrap; }
   .side { position: sticky; top: 12px; }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-2); margin: 12px 0 6px; }
   .legend span { display: inline-flex; gap: 5px; align-items: center; }
