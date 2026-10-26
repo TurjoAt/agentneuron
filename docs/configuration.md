@@ -34,6 +34,7 @@ Restart AgentNeuron after editing; the file is read at startup.
 | `allowWrite` | boolean | `false` | Legacy alias for `actions.edit`. Prefer `actions`. |
 | `debounceMs` | number | `150` | Milliseconds the file watcher waits to merge bursts of events for one file. Rarely needs changing. |
 | `live` | object | see [Live view](live.md#configuration) | Live agent view: `enabled`, `showPrompts` (default: on for a loopback bind), `viewerPrompts`, `viewerDiffs`, `idleMs`, `endMs`, `collisionWindowMs`. |
+| `usage` | object | `{ "scope": "project", "dailyBudgetUsd": null }` | [Usage analytics](usage.md): `scope` `"all"` lets admins read every project's sessions; `dailyBudgetUsd` sets the daily budget. See below. |
 | `mcp` | object | `{ "level": "read" }` | `"level": "state"` enables the MCP [coordination](coordination.md) tools (same as `agentneuron mcp --level state`). |
 
 ### `actions`
@@ -98,6 +99,15 @@ Estimated cost uses built-in per-million-token USD prices per model family (`opu
 ```
 
 Treat results as estimates, not billing data.
+
+### `usage`
+
+```json
+{ "usage": { "scope": "project", "dailyBudgetUsd": 20 } }
+```
+
+- `scope`: `"project"` (default) limits the [usage analytics](usage.md) to this project's sessions. `"all"` allows admins to request `scope=all`, which reads every directory under `~/.claude/projects` and every Codex session on the machine. Viewers always get the project scope.
+- `dailyBudgetUsd`: a number, or `null` for no budget. The Usage view shows today's cost against it, and `budget.over` turns true once today's cost reaches it.
 
 ## Generated files in `.agentneuron/`
 

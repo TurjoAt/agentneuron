@@ -136,6 +136,27 @@ Writing to git is done through [actions](actions.md) (`git.commit`, `git.push`, 
 | `GET /api/agents/session` | `id` : timeline of one session |
 | `GET /api/agents/costs` | `from`, `to` (ms epoch or date) : estimated cost |
 
+## Usage analytics
+
+Token, cost, tool and session data from Claude Code and Codex transcripts. See [Usage, cost and sessions](usage.md) for what is read and what each figure means. All routes are `GET`, level `read`, and pass through the secret masker. Prompts, titles, thinking text and memory/plan bodies follow the [live prompt policy](live.md#configuration): roles that may not see prompts get them blanked, and timeline rows of kind `prompt` / `thinking` removed.
+
+Common query parameters: `range` (`24h`, `7d`, `30d` default, `90d`, `all`), `tool` (`claude`, `codex`, `all` default), `scope` (`project` default, `all`: needs `"usage": { "scope": "all" }` in the config and the admin role, else 403). List responses carry `range: { from, to }`, `coverage: { sessions, exactCostSessions, durationTurns, transcripts, totalTranscripts, partial }` and `generatedAt`.
+
+| Path | Parameters | Result |
+|---|---|---|
+| `/api/usage/summary` | common | `kpis` (cost, exact part, sessions, prompts, tool calls/errors, lines, tokens, cache hit rate and savings, active time, median/p90 turn), `series` per day, `byModel`, `byBranch`, `byProject` (scope `all` only), `byAgent`, `budget`, `anomalies`, `tips`. Answers within about 2.5 s on a cold cache with `coverage.partial` set. |
+| `/api/usage/sessions` | common, `q` (title or id filter) | `sessions: [{ sessionId, tool, title, startedAt, lastAt, branch, models, usd, exact, tokens, prompts, toolCalls, errors, subagents, filesTouched, compactions, linesAdded, linesRemoved, activeMs, project, agentName }]` |
+| `/api/usage/session` | `id` | `{ session, timeline, agents, files }`: replay rows (`prompt`, `thinking`, `text`, `tool`, `result`, `edit`, `compact`, `hook`, `interrupt`, `denied`, `subagent`, `error`), subagents, and saved file versions. `session: null` when the id is not in scope. |
+| `/api/usage/file-version` | `session`, `backup`, `path` | `{ path, before, after, ts, truncated }`. Admin only unless `live.viewerDiffs`; 404 for an unknown session or version. |
+| `/api/usage/tools` | common | `tools` (calls, errors, error rate, denied, avg/p90 duration, last use), `mcpServers` (with `needsAuth`), `skills`, `hooks`, `interrupts`, `denials`, `loops` (same tool failing 3+ times in a row) |
+| `/api/usage/prompts` | common, `q`, `limit` (max 500, default 100) | `stats`, `prompts` with `outcome` (tool calls, errors, interrupted, rework, cost, duration) and `pasted` (count only), `repeated` prompts with a command/skill suggestion |
+| `/api/usage/fleet` | common | `runs`: sessions with subagents or advisor calls as `nodes` (main, subagent, advisor) and `edges` (spawn, message, advice) |
+| `/api/usage/impact` | common | `exact`, `linesAdded`, `linesRemoved`, `files` edited by agents, `churn` per day |
+| `/api/usage/activity` | common | `heatmap` per day, `hourly` (24) and `weekHour` (7 x 24, Monday first) prompt counts, `turns`, `sessions`, `focusMs`, `awayCount` |
+| `/api/usage/memory` | | `memory` files of this project (frontmatter, `body`, links, stale paths) and `plans` used in this project's sessions |
+| `/api/usage/settings` | | Masked `settings`, `permissionModes` seen in sessions (last 30 days), `mcpNeedsAuth`, `findings` |
+| `/api/usage/entity` | `kind` (`session`, `file`, `commit`, `task`, `tool`, `model`, `agent`), `id` | `{ kind, id, title, subtitle, stats, related: { sessions, files, commits, tasks, tools }, links }` for the side panel (last 90 days) |
+
 ## Insights
 
 See [Insights](insights.md). Every response is passed through the secret masker.
