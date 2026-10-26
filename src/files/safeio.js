@@ -36,8 +36,11 @@ export function readRegular(abs, { maxBytes = Infinity, follow = false, confine 
   } catch { return null; } finally { try { fs.closeSync(fd); } catch { /* ignore */ } }
 }
 
-/** Async twin of readRegular (no `tail`). */
-export async function readRegularAsync(abs, { maxBytes = Infinity, follow = false, confine = null } = {}) {
+/**
+ * Async twin of readRegular. With `tail` only the last `tail` bytes are read, with `head` only the first `head` bytes
+ * (`maxBytes` still applies to the whole file).
+ */
+export async function readRegularAsync(abs, { maxBytes = Infinity, follow = false, confine = null, tail = 0, head = 0 } = {}) {
   let fh;
   try { fh = await fs.promises.open(abs, BASE | (follow ? 0 : NOFOLLOW)); } catch { return null; }
   try {
@@ -47,6 +50,12 @@ export async function readRegularAsync(abs, { maxBytes = Infinity, follow = fals
     if (confine) {
       const real = await fs.promises.realpath(abs);
       if (!inside(real, await fs.promises.realpath(confine)) || !same(await fs.promises.stat(real), st)) return null;
+    }
+    if ((tail && st.size > tail) || (head && st.size > head)) {
+      const n = tail || head;
+      const buf = Buffer.alloc(n);
+      const { bytesRead } = await fh.read(buf, 0, n, tail ? st.size - tail : 0);
+      return { buf: buf.subarray(0, bytesRead), st };
     }
     return { buf: await fh.readFile(), st };
   } catch { return null; } finally { await fh.close().catch(() => {}); }

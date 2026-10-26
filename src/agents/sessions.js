@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { WRITE_TOOLS, textOf } from '../usage/records.js';
 
-const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const TOLERANCE_MS = 120000;
 /** Only the last MAX_TRANSCRIPT_BYTES of a transcript are parsed (shared with agentcenter/transcript.js). */
 export const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
@@ -18,14 +18,6 @@ function toMs(v) {
   if (v instanceof Date) return v.getTime();
   const n = Date.parse(v);
   return Number.isNaN(n) ? 0 : n;
-}
-
-function textOf(content) {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n');
-  }
-  return '';
 }
 
 function cleanPrompt(t) {
