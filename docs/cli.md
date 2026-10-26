@@ -10,6 +10,7 @@ agentneuron init [dir]
 agentneuron export [dir] [--format ai|json|md|csv|html] [--range 7d] [--out file]
 agentneuron doctor [dir] [--json] [--port n] [--host h]
 agentneuron lessons [dir] [--json] [--covered] [--all]
+agentneuron usage [dir] [--range 30d] [--json] [--scope project|all]
 agentneuron update [--check] [--yes] [--allow-unverified]
 agentneuron help [command] | <command> --help
 agentneuron --version | --help
@@ -127,6 +128,18 @@ Mine this project's Claude Code and Codex sessions for lessons and print them as
          correction · 1x in 1 session(s) · add to AGENTS.md
          "stop, don't edit src/b.js" (codex codex-c)
 ```
+### `usage [dir]`
+
+Print cost, tokens, cache use, top models, top tools, anomalies and tips from this project's Claude Code and Codex sessions. Read-only; it reads every transcript in scope (no time limit). See [Usage, cost and sessions](usage.md).
+
+| Flag | Description |
+|---|---|
+| `--range` | `24h`, `7d`, `30d` (default), `90d` or `all`. |
+| `--scope` | `project` (default) or `all` (every project under `~/.claude/projects` and every Codex session). |
+| `--json` | Print `{ schema: "agentneuron.usage/v1", ...summary }` with the same fields as `GET /api/usage/summary`. |
+
+Cost is exact for sessions where Claude Code recorded it and estimated from tokens and list prices otherwise; the last line says how many sessions had an exact cost. A bad `--range` or `--scope` exits with code 2.
+
 ### `compile [dir]`
 
 Compile the source rules in `.agentneuron/rules/*.md` into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, Copilot instructions and Windsurf rules. Only the `agentneuron:begin/end` regions are rewritten. See [rules compiler](compiler.md).

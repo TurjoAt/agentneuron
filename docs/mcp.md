@@ -34,6 +34,9 @@ agentneuron mcp [dir] [--level state]
 | `list_claims` | `path?` | Active advisory file claims of every agent session (only those covering `path` when given) |
 | `get_handoffs` | `taskId?`, `sessionId?`, `agent?`, `limit?` | Handoff notes, newest first |
 | `suggest_rules` | `limit?` (default 20, max 100), `includeCovered?` | Lessons mined from this project's Claude Code / Codex sessions as proposed rules: `{ id, rule, kinds, target, targets, evidence[{session, tool, ts, quote}], count, sessions, confidence, alreadyCovered }`. Quotes are secret-masked. Read-only: it reads but never writes `.agentneuron/insights.json`. See [Insights](insights.md) |
+| `get_usage` | `range?` (`24h`, `7d`, `30d` default, `90d`, `all`) | Usage summary of this project's Claude Code / Codex sessions: cost (exact where Claude Code recorded it, otherwise estimated), tokens, cache hit rate and savings, models, tool errors, anomalies and tips. No prompt text or titles. See [Usage](usage.md) |
+| `get_session_replay` | `id`, `limit?` (default 200, max 1000) | One session: summary row, the last `limit` timeline rows, subagents and saved file versions. Prompts are included (masked); thinking text only when `live.showPrompts` allows it |
+| `get_tool_health` | `range?` | Tool calls, errors, denials, durations, MCP servers needing auth, skills, hooks and error loops |
 
 ### Coordination tools (`--level state`)
 

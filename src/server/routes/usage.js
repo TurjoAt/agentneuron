@@ -18,6 +18,8 @@ function opts(q, ctx, role) {
   if (scope === 'all' && (ctx.config?.usage?.scope !== 'all' || role !== 'admin')) throw new HttpError(403, 'scope=all needs "usage": { "scope": "all" } in config and the admin role');
   return { range, tool, scope };
 }
+// session lookups by id search every project dir only for admins when usage.scope is "all"
+const lookup = (ctx, role) => ({ scope: ctx.config?.usage?.scope === 'all' && role === 'admin' ? 'all' : 'project' });
 const sid = (v, what) => { if (!v || !/^[\w.@-]{1,200}$/.test(v)) throw new HttpError(400, `invalid ${what}`); return v; };
 
 export default async function register(router, ctx) {
@@ -30,14 +32,15 @@ export default async function register(router, ctx) {
 
   R('/api/usage/summary', ({ q, role }) => U().summary(opts(q, ctx, role)));
   R('/api/usage/sessions', ({ q, role }) => U().sessions({ ...opts(q, ctx, role), q: (q.get('q') || '').slice(0, 200) }));
-  R('/api/usage/session', ({ q }) => U().session(sid(q.get('id'), 'id')));
+  R('/api/usage/session', ({ q, role }) => U().session(sid(q.get('id'), 'id'), lookup(ctx, role)));
   R('/api/usage/tools', ({ q, role }) => U().tools(opts(q, ctx, role)));
   R('/api/usage/prompts', ({ q, role }) => U().prompts({ ...opts(q, ctx, role), q: (q.get('q') || '').slice(0, 200), limit: Math.min(500, Number(q.get('limit')) || 100) }));
   R('/api/usage/fleet', ({ q, role }) => U().fleet(opts(q, ctx, role)));
   R('/api/usage/impact', ({ q, role }) => U().impact(opts(q, ctx, role)));
   R('/api/usage/activity', ({ q, role }) => U().activity(opts(q, ctx, role)));
   R('/api/usage/memory', () => U().memory());
-  R('/api/usage/settings', () => U().settings());
+  // the home-level ~/.claude/settings.json is admin-only, like global agent config in the agents center
+  R('/api/usage/settings', ({ role }) => U().settings({ home: ctx.can ? ctx.can('state', role) : role === 'admin' }));
   R('/api/usage/entity', ({ q }) => {
     const kind = q.get('kind');
     if (!KINDS.has(kind)) throw new HttpError(400, 'unknown kind');
@@ -47,6 +50,6 @@ export default async function register(router, ctx) {
   });
   router.get('/api/usage/file-version', guard(async ({ q, role }) => {
     if (!liveAccess(ctx.config).diffs(role)) throw new HttpError(403, 'file versions are admin-only (live.viewerDiffs)');
-    return maskDeep(await U().fileVersion({ session: sid(q.get('session'), 'session'), backup: sid(q.get('backup'), 'backup'), path: q.get('path') || '' }));
+    return maskDeep(await U().fileVersion({ session: sid(q.get('session'), 'session'), backup: sid(q.get('backup'), 'backup'), path: q.get('path') || '' }, lookup(ctx, role)));
   }), { level: 'read' });
 }

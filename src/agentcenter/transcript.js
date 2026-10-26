@@ -1,26 +1,16 @@
 // Raw transcript access (Claude Code + Codex JSONL) for timelines and cost estimation.
+// Record conventions (timestamps, usage blocks, injected text) are shared with src/usage/records.js.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { maskSecretsInText } from '../health/secrets.js';
 import { projectDirName, MAX_TRANSCRIPT_BYTES, codexPath, firstCwd } from '../agents/sessions.js';
 import { readRegular } from '../files/safeio.js';
+import { WRITE_TOOLS, INJECTED, INTERRUPT, toMs, textOf, usageOf } from '../usage/records.js';
 
-const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const MAX_TIMELINE = 3000;
 
-// always a finite, Date-representable epoch ms (or 0): hostile timestamps must not make toISOString() throw
-const toMs = (v) => {
-  const n = typeof v === 'number' ? v : Date.parse(v);
-  return Number.isFinite(n) && Math.abs(n) <= 8.64e15 ? n : 0;
-};
 const clip = (s, n = 500) => maskSecretsInText(String(s ?? '').replace(/\s+/g, ' ').trim()).slice(0, n);
-
-function textOf(content) {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) return content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n');
-  return '';
-}
 
 function walkJsonl(dir, depth = 0, out = []) {
   if (depth > 5) return out;
@@ -36,6 +26,21 @@ function walkJsonl(dir, depth = 0, out = []) {
 
 /** All Codex rollout files (walk once and pass as codexFiles when locating many sessions). */
 export function listCodexTranscripts(home = os.homedir()) { return walkJsonl(path.join(home, '.codex', 'sessions')); }
+
+async function walkJsonlAsync(dir, depth = 0, out = []) {
+  if (depth > 5) return out;
+  let ents;
+  try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of ents) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) await walkJsonlAsync(p, depth + 1, out);
+    else if (e.isFile() && e.name.endsWith('.jsonl')) out.push(p);
+  }
+  return out;
+}
+
+/** Async twin of listCodexTranscripts, for request paths. */
+export function listCodexTranscriptsAsync(home = os.homedir()) { return walkJsonlAsync(path.join(home, '.codex', 'sessions')); }
 
 /** Find the transcript file for a session id. Returns { file, tool } | null. */
 export function locateTranscript(id, { root, home = os.homedir(), codexFiles = null } = {}) {
@@ -89,7 +94,7 @@ function summarizeInput(name, input) {
 }
 
 function injected(t) {
-  return /^<(?:system-reminder|command-|local-command|environment_context|user_instructions|ide_|task-notification)/i.test(t) || /^\[Request interrupted/i.test(t) || /^Caveat:/.test(t);
+  return INJECTED.test(t) || INTERRUPT.test(t) || /^Caveat:/.test(t);
 }
 
 function claudeTimeline(lines, root) {
@@ -124,7 +129,7 @@ function claudeTimeline(lines, root) {
   return tl;
 }
 
-function codexTimeline(lines, root, cwd = null) {
+export function codexTimeline(lines, root, cwd = null) {
   const tl = [];
   for (const o of lines) {
     if (!o || typeof o !== 'object') continue;
@@ -166,6 +171,22 @@ export async function sessionTimeline(sessionsApi, id, { root, home } = {}) {
 const day = (ts) => new Date(ts).toISOString().slice(0, 10);
 const addU = (t, u) => { for (const k of ['input', 'output', 'cacheRead', 'cacheWrite']) t[k] = (t[k] || 0) + (u[k] || 0); };
 
+/** Codex totals: the last token_count event holds the cumulative usage. { model, ts, usage|null } */
+export function codexTokenUsage(lines) {
+  let model = 'gpt', last = null, lastTs = 0;
+  for (const o of lines) {
+    const p = o?.payload || {};
+    if ((o?.type === 'turn_context' || o?.type === 'session_meta') && typeof p.model === 'string') model = p.model;
+    if (o?.type === 'event_msg' && p.type === 'token_count' && p.info?.total_token_usage) {
+      const t = p.info.total_token_usage;
+      last = { input: +t.input_tokens || 0, output: +t.output_tokens || 0, cacheRead: +t.cached_input_tokens || 0, cacheWrite: 0 };
+      lastTs = toMs(o.timestamp);
+    }
+  }
+  if (last) last.input = Math.max(0, last.input - last.cacheRead);
+  return { model, ts: lastTs, usage: last };
+}
+
 /** Per-model token usage of one transcript: { models: {model: usage}, days: {day: {model: usage}}, tool } */
 export function readTranscriptUsage(file, tool = 'claude') {
   const lines = readLines(file);
@@ -181,18 +202,8 @@ export function readTranscriptUsage(file, tool = 'claude') {
     if (ts) addU(slot(slot(days, day(ts)), model), u);
   };
   if (tool === 'codex') {
-    let model = 'gpt', last = null, lastTs = 0;
-    for (const o of lines) {
-      const p = o?.payload || {};
-      if (o?.type === 'turn_context' && typeof p.model === 'string') model = p.model;
-      if (o?.type === 'session_meta' && typeof p.model === 'string') model = p.model;
-      if (o?.type === 'event_msg' && p.type === 'token_count' && p.info?.total_token_usage) {
-        const t = p.info.total_token_usage;
-        last = { input: +t.input_tokens || 0, output: +t.output_tokens || 0, cacheRead: +t.cached_input_tokens || 0, cacheWrite: 0 };
-        lastTs = toMs(o.timestamp);
-      }
-    }
-    if (last) { last.input = Math.max(0, last.input - last.cacheRead); bump(model, lastTs, last); }
+    const t = codexTokenUsage(lines);
+    if (t.usage) bump(t.model, t.ts, t.usage);
     return { tool, models, days };
   }
   const seen = new Map(); // message id -> { model, ts, u } (last line of a message wins)
@@ -200,8 +211,7 @@ export function readTranscriptUsage(file, tool = 'claude') {
   for (const o of lines) {
     if (o?.type !== 'assistant' || !o.message?.usage) continue;
     const m = o.message, u = m.usage;
-    const rec = { model: typeof m.model === 'string' ? m.model : 'unknown', ts: toMs(o.timestamp),
-      u: { input: +u.input_tokens || 0, output: +u.output_tokens || 0, cacheRead: +u.cache_read_input_tokens || 0, cacheWrite: +u.cache_creation_input_tokens || 0 } };
+    const rec = { model: typeof m.model === 'string' ? m.model : 'unknown', ts: toMs(o.timestamp), u: usageOf(u) || usageOf({}) };
     seen.set(m.id || `anon-${anon++}`, rec);
   }
   for (const r of seen.values()) if (r.model !== '<synthetic>') bump(r.model, r.ts, r.u);
