@@ -2,6 +2,7 @@
 // Findings never contain the matched secret or credential value, only its kind and location.
 // Suppress: `ship-ignore` on the line (or the line above), `ship-ignore-file` in the first 5 lines.
 // ship-ignore-file (this file holds the patterns themselves)
+import crypto from 'node:crypto';
 import { scanSecrets } from '../health/secrets.js';
 import { isTestLike } from './files.js';
 
@@ -42,8 +43,10 @@ export function scanFile(p, text) {
   const test = isTestLike(p);
   const code = CODE.test(p);
   const lines = text.split(/\r?\n/);
-  const R = (rule, severity, category, title, why, fix, line) => !ignored(line) && readiness.push(f({ id: `${rule}:${p}:${line || 0}`, rule, severity, category, title, why, fix, location: { path: p, line: line || null } }));
-  const P = (rule, severity, title, why, fix, line) => !ignored(line) && placeholders.push(f({ id: `${rule}:${p}:${line || 0}`, rule, severity, category: 'placeholder', title, why, fix, location: { path: p, line: line || null } }));
+  // ids are hashed: a readable `secret:<path>` id would itself be caught by the secret masker
+  const fid = (rule, line) => `${rule}-${crypto.createHash('sha1').update(`${rule}\0${p}\0${line || 0}`).digest('hex').slice(0, 12)}`;
+  const R = (rule, severity, category, title, why, fix, line) => !ignored(line) && readiness.push(f({ id: fid(rule, line), rule, severity, category, title, why, fix, location: { path: p, line: line || null } }));
+  const P = (rule, severity, title, why, fix, line) => !ignored(line) && placeholders.push(f({ id: fid(rule, line), rule, severity, category: 'placeholder', title, why, fix, location: { path: p, line: line || null } }));
 
   if (/ship-ignore-file/.test(lines.slice(0, 5).join('\n'))) return { readiness, placeholders, env };
   const ignored = (n) => /ship-ignore\b/.test(lines[n - 1] || '') || /ship-ignore\b/.test(lines[n - 2] || '');

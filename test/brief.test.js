@@ -201,6 +201,19 @@ test('context pack: ranked files with reasons, import neighbours, related tests,
   await assert.rejects(B.buildPack(b, { task: '  ' }), /task is required/);
 });
 
+test('context pack: a top-ranked file too big for the budget stays in as a pointer', async () => {
+  (await import('../src/brief/util.js')).clearIndexCache();
+  w('src/parser/engine.js', `// parser engine for empty input handling\n${'export const parserStep = (s) => s;\n'.repeat(1500)}`);
+  try {
+    const p = await B.buildPack(b, { task: 'fix the parser engine for empty input', budget: 4000 });
+    const big = p.items.find((i) => i.path === 'src/parser/engine.js');
+    assert.ok(big && big.partial, 'kept as a partial item');
+    assert.ok(big.fullTokens > 4000 && big.tokens <= 400);
+    assert.ok(p.tokens <= p.budget);
+    assert.match(p.markdown, /engine\.js`? \(~\d+ tokens, large: read the relevant parts\)/);
+  } finally { fs.rmSync(path.join(fx.root, 'src/parser/engine.js')); (await import('../src/brief/util.js')).clearIndexCache(); }
+});
+
 test('import parsing and resolution, heading sections, identifier pieces', () => {
   assert.deepEqual(B.importsOf('a.js', "import x from './b.js';\nconst y = require('../c');\nimport('./d');\nimport 'e';"), ['./b.js', '../c', './d']);
   const has = (p) => ['src/b.ts', 'c/index.js', 'pkg/mod.py'].includes(p);

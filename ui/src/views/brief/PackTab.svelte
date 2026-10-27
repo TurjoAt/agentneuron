@@ -84,7 +84,7 @@
               <div class="why muted">{it.reason}{#if it.score != null} · score {it.score}{/if}</div>
               {#if it.kind === 'rule' && it.text}<details class="rtext"><summary>Section text</summary><pre>{it.text}</pre></details>{/if}
             </div>
-            <div class="tok"><span>{fmtNum(it.tokens)}</span><TokenBar value={it.tokens} max={maxTok} height={4} /></div>
+            <div class="tok"><span title={it.partial ? `~${fmtNum(it.fullTokens)} tokens in full; budgeted for the relevant part` : undefined}>{fmtNum(it.tokens)}{it.partial ? " (part)" : ""}</span><TokenBar value={it.tokens} max={maxTok} height={4} /></div>
           </li>
         {/each}
       </ol>

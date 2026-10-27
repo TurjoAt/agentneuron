@@ -22,6 +22,7 @@ sh('init', '-q', '-b', 'main'); sh('config', 'user.name', 't'); sh('config', 'us
 put('package.json', JSON.stringify({ name: 'demo', scripts: { test: 'node --test' } }));
 put('TASKS.md', '# Tasks\n\n- [/] Checkout flow\n  - [x] Totals include tax\n  - [ ] Coupon codes apply\n');
 put('src/pay.js', `export const pay = () => fetch('https://api.example.com/pay');\nconst gh = '${FAKE_GH}';\n`);
+put('test/agentcenter-keys.test.js', `const a = '${FAKE_GH}';\nconst b = '${FAKE_GH}';\n`);
 sh('add', '-A'); sh('commit', '-q', '-m', 'init');
 
 const { loadConfig } = await import('../src/core/config.js');
@@ -81,6 +82,7 @@ test('shapes: summary, checks gate, report, scope, readiness, placeholders', asy
   const ready = (await get(url, '/api/ship/readiness', ADMIN)).body;
   assert.equal(ready.ready, false);
   assert.ok(ready.findings.some((f) => f.rule === 'secret' && f.location.path === 'src/pay.js' && f.location.line === 2));
+  assert.equal(new Set(ready.findings.map((f) => f.id)).size, ready.findings.length, 'finding ids stay unique after masking');
   const ph = (await get(url, '/api/ship/placeholders', ADMIN)).body;
   assert.ok(ph.findings.some((f) => f.rule === 'fake-api'));
 });

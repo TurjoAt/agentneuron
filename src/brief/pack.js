@@ -20,6 +20,8 @@ const SKIP = /(^|\/)(node_modules|vendor|dist|build|out|coverage|\.git|\.agentne
 const TEST = /(^|\/)(__tests__|tests?|spec)\/|[._-](test|spec)\.[\w]+$|_test\.(go|py)$|^test_.*\.py$/i;
 const MAX_READ = 128 * 1024;
 const MAX_FILE_TOKENS_SHARE = 0.6; // one file may take at most 60 % of the budget
+const MAX_PARTIALS = 2; // large top-ranked files kept as pointers
+const PARTIAL_SHARE = 0.1; // budget reserved for reading the relevant part of one
 
 /** Lower-case identifier pieces of a path or word: "src/userAuth_service.ts" -> user, auth, service, ts, src. */
 export function pieces(s) {
@@ -235,7 +237,18 @@ export async function buildPack(b, { task, budget = DEFAULT_BUDGET } = {}) {
   all.sort((a, c) => (a.kind === 'fact') !== (c.kind === 'fact') ? (a.kind === 'fact' ? -1 : 1) : c.score - a.score || order[a.kind] - order[c.kind] || String(a.path).localeCompare(String(c.path)) || String(a.heading || '').localeCompare(String(c.heading || '')));
   const items = [], skipped = [];
   let used = 0;
+  let partials = 0;
   for (const it of all) {
+    // a highly ranked file that is too big to include whole is still the place to look: keep it as a pointer
+    if ((it.kind === 'file' || it.kind === 'test') && it.tokens > B * MAX_FILE_TOKENS_SHARE && partials < MAX_PARTIALS && it.score >= (all.find((x) => x.kind === 'file')?.score || 0) * 0.5) {
+      const share = Math.round(B * PARTIAL_SHARE);
+      if (used + share <= B) {
+        partials++;
+        used += share;
+        items.push({ ...it, partial: true, fullTokens: it.tokens, tokens: share, reason: `${it.reason}; large file (~${it.tokens} tokens): read only the parts about the task` });
+        continue;
+      }
+    }
     if (it.tokens > B * MAX_FILE_TOKENS_SHARE || used + it.tokens > B) { skipped.push({ kind: it.kind, path: it.path, tokens: it.tokens, score: it.score, reason: it.tokens > B * MAX_FILE_TOKENS_SHARE ? 'too large for the budget' : 'budget full' }); continue; }
     used += it.tokens;
     items.push(it);

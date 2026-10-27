@@ -67,7 +67,7 @@ export function packMarkdown(p) {
   const files = by('file');
   if (files.length) {
     L.push('## Files', '');
-    for (const i of files) L.push(`- ${code(i.path)} (~${i.tokens} tokens) — ${one(i.reason)}`);
+    for (const i of files) L.push(`- ${code(i.path)} (~${i.partial ? `${i.fullTokens} tokens, large: read the relevant parts` : `${i.tokens} tokens`}) — ${one(i.reason)}`);
     L.push('');
   }
   const tests = by('test');

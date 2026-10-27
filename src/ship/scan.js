@@ -1,5 +1,6 @@
 // Static scan shared by readiness (#2) and placeholders (#15): one bounded pass over the source files,
 // per-file results cached by mtime+size, whole result cached for a few seconds so parallel requests share it.
+import crypto from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { listSourceFiles, readBounded, LIMITS } from './files.js';
@@ -78,7 +79,7 @@ const BUILD_STACKS = ['vite', 'next', 'nuxt', 'astro', 'angular', 'sveltekit', '
 /** Project-level readiness checks (env, lockfiles, scripts, migrations, committed env files). */
 async function projectFindings(root, scan, opts) {
   const out = [];
-  const F = (rule, severity, category, title, why, fix, p = null, line = null) => out.push({ id: `${rule}:${p || ''}:${line || 0}`, rule, severity, category, title, why, fix, location: { path: p, line } });
+  const F = (rule, severity, category, title, why, fix, p = null, line = null) => out.push({ id: `${rule}-${crypto.createHash('sha1').update(`${rule}\0${p || ''}\0${line || 0}`).digest('hex').slice(0, 12)}`, rule, severity, category, title, why, fix, location: { path: p, line } });
   const tracked = scan.tracked;
 
   // committed env files
