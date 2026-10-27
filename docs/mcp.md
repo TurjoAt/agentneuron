@@ -37,6 +37,9 @@ agentneuron mcp [dir] [--level state]
 | `get_usage` | `range?` (`24h`, `7d`, `30d` default, `90d`, `all`) | Usage summary of this project's Claude Code / Codex sessions: cost (exact where Claude Code recorded it, otherwise estimated), tokens, cache hit rate and savings, models, tool errors, anomalies and tips. No prompt text or titles. See [Usage](usage.md) |
 | `get_session_replay` | `id`, `limit?` (default 200, max 1000) | One session: summary row, the last `limit` timeline rows, subagents and saved file versions. Prompts are included (masked); thinking text only when `live.showPrompts` allows it |
 | `get_tool_health` | `range?` | Tool calls, errors, denials, durations, MCP servers needing auth, skills, hooks and error loops |
+| `review_changes` | `base?` | [Change review](changes.md) of the current diff: summary, groups, per-file risk and reasons (hunks as a count, at most 150 files), read-first order |
+| `get_change_impact` | `paths?` (comma list; default the changed files), `base?` | Changed symbols and what may depend on them: importers, callers, routes, tests, contracts with confidence |
+| `check_package` | `manager` (`npm`, `pnpm`, `yarn`, `bun`, `composer`, `pip`, `poetry`), `name`, `version?` | Verdict (`ok`, `warn`, `block`, `unknown`) with reasons before installing. Never goes online; uses cached registry facts when `packages.online` is on |
 
 ### Coordination tools (`--level state`)
 

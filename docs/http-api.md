@@ -199,6 +199,22 @@ Source rules in `.agentneuron/rules/` compiled into every tool's files. See [rul
 | `POST /api/verify/fix` | edit | `{ id }` of a fixable claim: the replacement is recomputed server-side and written with history; `404` if not fixable any more, `409` if the file changed on disk |
 | `GET /api/audit/config` | read | `{ generatedAt, score, level, counts, findings, scanned }`, values masked. See [security audit](audit.md). (`GET /api/audit` is the action audit log.) |
 
+## Change review
+
+See [change review](changes.md). All GET endpoints are level `read`; results are secret-masked.
+
+| Endpoint | Level | Notes |
+|---|---|---|
+| `GET /api/changes/review` | read | `base`, `head` → `{ base, head, summary, groups, files: [{ path, status, kind, group, added, removed, risk, reasons: [{ code, severity, message, line, side }], hunks, tests, missingTest }], readFirst, truncated }`. `400` for an invalid revision |
+| `GET /api/changes/impact` | read | `base`, `paths` (comma list) → `{ changed, nodes, edges, affected: [{ kind, label, path, confidence, via }], stats, truncated }` |
+| `GET /api/changes/checkpoints` | read | `limit` (default 50, max 200) → `{ checkpoints: [{ id, ref, hash, label, createdAt, base, branch, files, source, task, session }] }` |
+| `GET /api/changes/checkpoint` | read | `id` → `{ checkpoint, files: [{ path, status: 'same'\|'changed'\|'deleted'\|'added', added, removed }], truncated }` |
+| `GET /api/changes/checkpoint/diff` | read | `id`, `path` → `{ path, before, after, binary?, truncated? }`; `403` unless the caller may see diffs (admin, or `live.viewerDiffs`) |
+| `GET /api/changes/packages` | read | `{ online, deps, findings: [{ id, severity, manager, name, version, code, message, fix, manifest }], lockfiles }`. Registry lookups only with `packages.online` and an admin caller |
+| `GET /api/changes/package` | read | `manager`, `name`, `version` → `{ manager, name, version, verdict, reasons, known, registry }` |
+
+Checkpoint writes are actions (`POST /api/actions/run`): `changes.checkpoint.create` (edit, `{ label? }`), `changes.checkpoint.restore` (danger, `{ id, paths }`; `/api/actions/preview` adds `files: [{ path, action: 'overwrite'|'create'|'delete'|'skip', reason? }]`), `changes.checkpoint.delete` (edit, `{ id }`), `changes.checkpoint.prune` (edit, `{ keep }`).
+
 ## Reports (read)
 
 All accept `from` and `to` as epoch milliseconds (default: the last 7 days).

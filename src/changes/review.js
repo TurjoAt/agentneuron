@@ -50,7 +50,7 @@ export function classifyFile(f) {
   }
   if (f.status === 'D' && isTest(f.path)) push('deleted-test', 'high', 'Deletes a test file');
   else if (f.status === 'D' && areas.some((a) => HIGH_AREAS.has(a.area))) push('deleted-sensitive', 'high', `Deletes a file in a sensitive area (${areas[0].label})`);
-  if (f.binary) push('binary', isGenerated(f.path) ? 'low' : 'low', 'Binary file: not reviewable as text');
+  if (f.binary) push('binary', 'low', 'Binary file: not reviewable as text');
   if (!isLockfile(f.path) && (isGenerated(f.path) || f.added > 1500)) push('generated-blob', 'medium', isGenerated(f.path) ? 'Generated / build output committed' : `Very large addition (${f.added} lines): likely generated`);
 
   const added = new Set();

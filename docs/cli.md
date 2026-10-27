@@ -211,6 +211,18 @@ Security audit of the project's agent config (MCP servers, permissions, bypass m
 
 Lint + truth check + audit + context budget for CI. `--format github|markdown|json` (default `github` inside GitHub Actions, else `markdown`), `--fail-on error|warn|never` (default `error`), `--base <ref>` (only issues introduced since that revision), `--budget <tokens>` (default 20000). See [context CI](ci.md).
 
+### `review [dir]`
+
+Review guardian for the current diff: per-file risk with reasons (removed checks, secrets, widened permissions, missing tests), groups and a read-first order. `--base <ref>` compares with another revision (`a..b` ranges work), `--json` prints `{ base, head, summary, groups, files, readFirst }`, `--fail-on high|medium|low` exits `1` when any file reaches that risk. See [change review](changes.md).
+
+### `checkpoint list|create|diff|restore|delete [dir]`
+
+Working-tree snapshots under `refs/agentneuron/checkpoints/*` that never touch HEAD, the index or branches. `create [--label x]`, `diff --id <id>` (per-file status vs now), `restore --id <id> --paths a,b` (prints the plan and exits `1`; add `--yes` to restore those paths only, after an automatic undo checkpoint), `delete --id <id>`. `--json` on every subcommand. See [checkpoints](changes.md#checkpoints-and-selective-rollback).
+
+### `packages [dir]`
+
+Package hallucination guard: look-alikes of popular packages, dependencies missing from the lockfile, URL/git sources, unpinned versions, install scripts. Offline unless `--online` or `packages.online` is set. Exit `1` if any finding is high; `--json` prints `{ online, deps, findings, lockfiles }`. See [package guard](changes.md#package-hallucination-guard).
+
 ### `--version`, `--help`
 
 Print the version or the usage text.

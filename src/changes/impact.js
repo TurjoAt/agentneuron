@@ -332,7 +332,10 @@ export async function analyzeImpact(root, { base, paths } = {}) {
   };
   const changedSet = new Set(changed.map((c) => c.path));
   const fileId = (p) => `file:${p}`;
+  const CONTRACT_RE = /(^|\/)(openapi|swagger)[^/]*\.(ya?ml|json)$|\.(graphql|gql|proto|avsc)$|\.d\.ts$|(^|\/)schema\.(json|prisma)$/i;
   for (const c of changed) {
+    // only code (and contract) files are graph nodes; other changed files stay in `changed`
+    if (!GRAPH_EXT.has(path.posix.extname(c.path).toLowerCase()) && !CONTRACT_RE.test(c.path)) continue;
     node(fileId(c.path), isTest(c.path) ? 'test' : 'file', path.posix.basename(c.path), c.path, { changed: true });
     for (const s of c.symbols.slice(0, 12)) if (node(`sym:${c.path}#${s.name}`, 'symbol', s.name, c.path, { symbolKind: s.kind, line: s.line, removed: !!s.removed })) edge(fileId(c.path), `sym:${c.path}#${s.name}`, 'defines');
   }
@@ -428,7 +431,7 @@ export async function analyzeImpact(root, { base, paths } = {}) {
   }
   // contracts: changed spec/schema files, exported types, OpenAPI documents that mention an affected route
   for (const c of changed) {
-    if (/(^|\/)(openapi|swagger)[^/]*\.(ya?ml|json)$|\.(graphql|gql|proto|avsc)$|\.d\.ts$|(^|\/)schema\.(json|prisma)$/i.test(c.path)) {
+    if (CONTRACT_RE.test(c.path)) {
       node(`contract:${c.path}`, 'contract', path.posix.basename(c.path), c.path, { changed: true });
       edge(`contract:${c.path}`, fileId(c.path), 'documents');
       affect('contract', c.path, c.path, 'high', 'API contract file changed');

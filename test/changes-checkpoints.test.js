@@ -81,6 +81,7 @@ test('selective restore after a moved HEAD: only the chosen paths change', async
   fs.unlinkSync(path.join(d, 'untracked.txt'));
   w(d, 'scratch.txt', 'agent scratch\n');
   w(d, 'staged.txt', 's3 staged again\n'); sh(d, 'add', 'staged.txt');
+  w(d, '.agentneuron/state.json', '{}\n'); // tool state is never part of a checkpoint comparison
 
   const cmp = await compareCheckpoint(d, cp.id);
   const st = Object.fromEntries(cmp.files.map((f) => [f.path, f.status]));
@@ -89,6 +90,7 @@ test('selective restore after a moved HEAD: only the chosen paths change', async
   assert.equal(st['scratch.txt'], 'added');
   assert.equal(st['other.txt'], 'added');
   assert.equal(st['bin.dat'], 'changed');
+  assert.ok(!Object.keys(st).some((p) => p.startsWith('.agentneuron')));
 
   const plan = await planRestore(d, cp.id, ['a.txt', 'untracked.txt', 'scratch.txt', 'bin.dat', 'run.sh', 'src/app.js']);
   const act = Object.fromEntries(plan.files.map((f) => [f.path, f.action]));

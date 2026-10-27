@@ -11,6 +11,10 @@ import { repoInfo, hasHead } from './diff.js';
 import { resolveSafe, atomicWrite } from '../files/paths.js';
 import { readRegularAsync } from '../files/safeio.js';
 
+// AgentNeuron's own state directories: never snapshotted, compared or restored.
+const TOOL_DIRS = ['.agentneuron', '.mdctl'];
+const isToolPath = (p) => TOOL_DIRS.some((d) => p === d || p.startsWith(d + '/'));
+
 export const REF_PREFIX = 'refs/agentneuron/checkpoints/';
 const ID_RE = /^[A-Za-z0-9][\w-]{0,63}$/;
 const MAX_UNTRACKED_FILE = 20 * 1024 * 1024;
@@ -131,7 +135,7 @@ export async function createCheckpoint(root, opts = {}) {
       let st; try { st = await fsp.lstat(path.join(root, p)); } catch { continue; }
       if (st.isFile() && st.size > MAX_UNTRACKED_FILE) skipped.push(p);
     }
-    const excludes = skipped.slice(0, 2000).map((p) => `:(exclude,literal)${p}`);
+    const excludes = [...TOOL_DIRS.map((d) => `:(exclude)${d}`), ...skipped.slice(0, 2000).map((p) => `:(exclude,literal)${p}`)];
     await git(root, ['add', '-A', '--', '.', ...excludes], { env, timeout: 120000 });
     const tree = (await git(root, ['write-tree'], { env })).out.trim();
     const dirty = await dirtyPaths(root);
@@ -218,18 +222,19 @@ export async function compareCheckpoint(root, id) {
   const nums = new Map();
   for (const e of diffNum.out.split('\0')) { const m = /^(-|\d+)\t(-|\d+)\t(.*)$/s.exec(e); if (m) nums.set(m[3], { added: m[1] === '-' ? 0 : +m[1], removed: m[2] === '-' ? 0 : +m[2] }); }
   const res = new Map();
+  for (const set of [trackedSet, untrackedSet]) for (const p of set) if (isToolPath(p)) set.delete(p);
   const exists = (p) => fsp.lstat(path.join(root, p)).then(() => true, () => false);
   const parts = diffNs.out.split('\0');
   for (let i = 0; i + 1 < parts.length; i += 2) {
     const st = parts[i][0], p = parts[i + 1];
-    if (!st || !p) continue;
+    if (!st || !p || isToolPath(p)) continue;
     if (!trackedSet.has(p)) continue; // not in the index: decided below from the tree and the untracked list
     if (st === 'A' && !(await exists(p))) continue;
     res.set(p, { path: p, status: st === 'A' ? 'added' : st === 'D' ? 'deleted' : 'changed', ...(nums.get(p) || { added: 0, removed: 0 }) });
   }
   const toHash = [];
   for (const p of tree.keys()) {
-    if (trackedSet.has(p)) continue;
+    if (trackedSet.has(p) || isToolPath(p)) continue;
     if (untrackedSet.has(p)) toHash.push(p);
     else res.set(p, { path: p, status: 'deleted', added: 0, removed: 0 });
   }
