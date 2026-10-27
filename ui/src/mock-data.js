@@ -531,6 +531,7 @@ const MANAGER = { type: 'enum', enum: ['pnpm', 'npm', 'composer'], required: tru
 
 /** Mock action registry (mirrors the server registry shapes). */
 export const MOCK_ACTIONS = [
+  { id: 'brief.save', title: 'Save brief', category: 'brief', level: 'state', description: 'Save a resume brief or debug report to .agentneuron/briefs/ and as a handoff note.', params: { kind: { type: 'enum', enum: ['resume', 'debug'] }, session: { type: 'string', default: '' }, task: { type: 'string', default: '' }, run: { type: 'string', default: '' } } },
   { id: 'ship.verify.run', title: 'Run checks', category: 'ship', level: 'exec', description: 'Run the detected test, build, lint and typecheck commands and record the results.', params: { checks: { type: 'string[]', label: 'Checks' } } },
   { id: 'ship.criterion.set', title: 'Set criterion status', category: 'ship', level: 'state', description: 'Override the status of one acceptance criterion.', params: { task: { type: 'string' }, criterion: { type: 'string' }, status: { type: 'enum', enum: ['auto', 'verified', 'incomplete', 'untested', 'failed'] }, note: { type: 'text', default: '' } } },
   { id: 'agentneuron.rescan', title: 'Rescan project', category: 'agentneuron', level: 'state', description: 'Re-index every tracked file and recompute the graph and health.', params: {} },

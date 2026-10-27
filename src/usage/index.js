@@ -225,7 +225,7 @@ export function getUsage(ctx = {}) {
       if (!hit) return { session: null, timeline: [], agents: [], files: [] };
       const { cand, s } = hit;
       const scale = s.exact && s.estUsd > 0 ? s.cost.usd / s.estUsd : 1;
-      const timeline = await readTimeline(cand.file, cand.tool, c.home, { root: c.root, pricing: config.pricing || {}, thinkingText: liveAccess(config).showPrompts, scale });
+      const timeline = await readTimeline(cand.file, cand.tool, c.home, { root: c.root, pricing: config.pricing || {}, thinkingText: liveAccess(config).showPrompts, scale, todos: o.todos === true });
       const run = V.fleet([s], { from: 0, to: Infinity }).runs[0];
       const parentOf = new Map((run?.edges || []).filter((e) => e.kind === 'spawn').map((e) => [e.to, e.from]));
       const agents = (run?.nodes || []).filter((n) => n.kind === 'subagent').map((n) => ({ agentId: n.id, name: n.name, title: n.title, model: n.model,

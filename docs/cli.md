@@ -11,6 +11,10 @@ agentneuron export [dir] [--format ai|json|md|csv|html] [--range 7d] [--out file
 agentneuron doctor [dir] [--json] [--port n] [--host h]
 agentneuron lessons [dir] [--json] [--covered] [--all]
 agentneuron usage [dir] [--range 30d] [--json] [--scope project|all]
+agentneuron resume [dir] [--session id] [--task id] [--md] [--json]
+agentneuron preflight [dir] [--command "..."] [--paths a,b] [--task "..."] [--json]
+agentneuron pack [dir] --task "..." [--budget 8000] [--md] [--json]
+agentneuron debug [dir] [--error "..."] [--md] [--json]
 agentneuron update [--check] [--yes] [--allow-unverified]
 agentneuron help [command] | <command> --help
 agentneuron --version | --help
@@ -140,6 +144,22 @@ Print cost, tokens, cache use, top models, top tools, anomalies and tips from th
 
 Cost is exact for sessions where Claude Code recorded it and estimated from tokens and list prices otherwise; the last line says how many sessions had an exact cost. A bad `--range` or `--scope` exits with code 2.
 
+### `resume [dir]`
+
+Print a resume brief of the latest session, `--session <id>` or board task `--task <id>`: goal, work done, failed attempts, decisions, files, last test results and next steps, each with its evidence. `--md` prints the Markdown brief to paste into another agent, `--json` the full object. Read-only. See [Agent brief](brief.md).
+
+### `preflight [dir]`
+
+Check an action before an agent takes it: `--command "..."` and/or `--paths a,b` (project-relative), optional `--task`. Prints warnings from repo facts, context rules, accepted lessons, session history and built-in rules. Exits `2` when a warning blocks. Without `--command` / `--paths` it reads a Claude Code `PreToolUse` hook event from stdin and prints warnings to stderr, so it can be used as a hook (see [Agent brief](brief.md#claude-code-hook)); if the check itself fails it exits `0`. `--json` prints `{ command, paths, warnings, blocking, rules }`.
+
+### `pack [dir]`
+
+Build a context pack for `--task "..."` (description or board task id): the files, tests, context-file sections and repo facts most relevant to it, within `--budget` tokens (default 8000, 500 to 200000). `--md` prints the pack as Markdown, `--json` the full object. A missing `--task` exits with code 1. See [Agent brief](brief.md#context-pack).
+
+### `debug [dir]`
+
+Diagnose an error: `--error "..."` or the error text on stdin; with neither, the last failing test/build run. Prints the project frames and ranked hypotheses, each with evidence and a way to confirm it. `--md` prints the Markdown report, `--json` the full object. Nothing is stored. See [Agent brief](brief.md#bug-detective).
+
 ### `compile [dir]`
 
 Compile the source rules in `.agentneuron/rules/*.md` into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, Copilot instructions and Windsurf rules. Only the `agentneuron:begin/end` regions are rewritten. See [rules compiler](compiler.md).
@@ -225,7 +245,7 @@ Print the version or the usage text.
 |---|---|
 | `0` | Success |
 | `1` | `lint` found errors, `verify` found a false claim, `audit` found a high-severity issue, `ci` failed its `--fail-on` threshold, `ship` found a finding at or above `--fail-on` or a failing check, `doctor` found a failure, `update` failed or was declined; or an unexpected runtime error |
-| `2` | Bad usage: not a directory, invalid `--enable` level, bad `export` format or range, bad `ci` flags or unusable `--base`, bad `ship --fail-on` / `--base` |
+| `2` | Bad usage: not a directory, invalid `--enable` level, bad `export` format or range, bad `ci` flags or unusable `--base`, bad `ship --fail-on` / `--base`; or `preflight` found a blocking warning |
 
 ## Environment
 

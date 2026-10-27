@@ -188,6 +188,23 @@ See [Insights](insights.md). Every response is passed through the secret masker.
 | `GET /api/insights/costs-by-feature` | read | `{ features, total, currency, note }`. |
 
 The lesson id is passed in the body (the router has no path parameters), so the routes are `.../lessons/accept` and `.../lessons/dismiss` rather than `.../lessons/:id/accept`.
+## Agent brief
+
+See [Agent brief](brief.md). All routes are level `read` and pass through the secret masker. Session text follows the [live prompt policy](live.md#configuration): for roles that may not see prompts it is blanked, the Markdown export of resume and debug reports is omitted, warnings ignore session history and pasted error text is refused with `403`.
+
+| Method | Path | Parameters | Returns |
+|---|---|---|---|
+| GET | `/api/brief/resume` | `session?`, `task?` | `{ generatedAt, source, title, goal, lastPrompt, sessions, task, done, failed, decisions, files, runs, todos, criteria, checkpoints, next, counts, markdown }` |
+| GET | `/api/brief/sources` | | `{ sessions, tasks }` to pick a brief from |
+| GET | `/api/brief/briefs` | | `{ briefs: [{ id, kind, title, createdAt, source }] }` (saved in `.agentneuron/briefs/`) |
+| GET | `/api/brief/brief` | `id` | One saved brief; `404` when unknown |
+| GET | `/api/brief/warnings` | `command?`, `paths?`, `task?` | `{ command, paths, task, warnings: [{ id, severity, title, why, fix, source, evidence }], blocking, rules }` |
+| GET | `/api/brief/rules` | | `{ rules }`: the active warning rules with their source |
+| GET | `/api/brief/pack` | `task`, `budget?` (500 to 200000, default 8000) | `{ generatedAt, task, budget, tokens, items: [{ kind, path, reason, score, tokens }], skipped, markdown }`; `400` without `task` |
+| POST | `/api/brief/debug` | `{ error?, run?, save? }` (`run`: id or `last`; error text at most 64 KB, else `413`; `save: true` stores the report and needs level `state`) | `{ generatedAt, source, run, error, frames, hypotheses, related: { files, commits, sessions, config, deps, tests }, markdown, saved?: { id, path } }`; `400` with no error and no failing run |
+
+Saving a resume brief, or the debug report of a failing run, is the `brief.save` action (level `state`, params `{ kind, session?, task?, run? }`); a resume brief also adds a handoff note. Pasted error text is saved only through `POST /api/brief/debug` with `save: true`, never as an action parameter (job parameters are listed to every role). For viewers, a saved report of pasted text is withheld.
+
 ## Rules compiler
 
 Source rules in `.agentneuron/rules/` compiled into every tool's files. See [rules compiler](compiler.md) and [generate](generate.md). Writes need the `edit` level.

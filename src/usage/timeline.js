@@ -15,7 +15,7 @@ const USER_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
  * Claude transcript lines -> timeline rows. opts: { root, pricing, thinkingText (bool), scale (exact/estimate factor) }.
  * Thinking text is only included with `thinkingText`; otherwise thinking rows carry durationMs only.
  */
-export function claudeTimeline(lines, { root = null, pricing = {}, thinkingText = false, scale = 1 } = {}) {
+export function claudeTimeline(lines, { root = null, pricing = {}, thinkingText = false, scale = 1, todos = false } = {}) {
   const out = [];
   const names = new Map(); // tool_use id -> name
   const seenMsg = new Set();
@@ -83,6 +83,11 @@ export function claudeTimeline(lines, { root = null, pricing = {}, thinkingText 
         if (WRITE_TOOLS.has(b.name)) row = { ts, kind: 'edit', tool: b.name, path: rel(editPath(inp), o.cwd), input: clip(rel(editPath(inp), o.cwd) || '', 300) };
         else if (b.name === 'Agent' || b.name === 'Task') row = { ts, kind: 'subagent', tool: b.name, input: clip(inp.subagent_type || '', 100), title: clip(inp.description || '', 300) };
         else if (USER_TOOLS.has(b.name)) row = { ts, kind: 'tool', tool: b.name, quote: clip(summarizeInput(inp) || JSON.stringify(inp), 300) };
+        else if (todos && b.name === 'TodoWrite' && Array.isArray(inp.todos)) {
+          // opt-in (agent brief): todo text is agent-written session text, so it sits under `title` (redacted for viewers)
+          row = { ts, kind: 'tool', tool: b.name, input: '', todos: inp.todos.slice(0, 50).filter((t) => t && typeof t === 'object')
+            .map((t) => ({ title: clip(t.content || t.activeForm || '', 200), status: ['pending', 'in_progress', 'completed'].includes(t.status) ? t.status : 'pending' })) };
+        }
         else {
           row = { ts, kind: 'tool', tool: b.name, input: clip(summarizeInput(inp), 300) };
           const fp = inp.file_path || inp.notebook_path;

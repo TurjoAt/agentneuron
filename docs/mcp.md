@@ -39,6 +39,10 @@ agentneuron mcp [dir] [--level state]
 | `get_tool_health` | `range?` | Tool calls, errors, denials, durations, MCP servers needing auth, skills, hooks and error loops |
 | `get_ship_report` | `base?` (git ref, default `HEAD`) | [Ship check](ship.md) completion report: verdict (`verified`/`partial`/`failing`/`unverified`) with reasons, changed files with +/-, each check's last stored run, failures with file:line, acceptance criteria with evidence, readiness blockers and placeholder counts. Never runs commands |
 | `get_task_scope` | `task?` (task id; default all open tasks with criteria) | Acceptance criteria of board tasks with status `verified`/`incomplete`/`untested`/`failed` and evidence (`commit`, `file`, `test`, `run`, `manual`). See [Ship check](ship.md#acceptance-criteria) |
+| `get_resume_brief` | `session?`, `task?`, `brief?` (saved brief id) | Resume brief of the latest session, a session or a board task: goal, done, failed attempts, decisions, files, runs, todos, next steps, each with evidence, plus `markdown`. `brief` loads a saved brief (the id is in its handoff note). See [Agent brief](brief.md) |
+| `preflight_check` | `command?`, `paths?` (comma list) | `{ warnings: [{ id, severity, title, why, fix, source, evidence }], blocking, verdict }` (`verdict`: `block`, `warn` or `ok`) for an action about to be taken |
+| `get_context_pack` | `task` (description or board task id), `budget?` (default 8000) | `{ task, budget, tokens, items: [{ kind, path, reason, score, tokens }], skipped, markdown }` |
+| `get_debug_report` | `error?`, `run?` (failing run id; default the last failing run when `error` is empty) | `{ error, frames, hypotheses: [{ title, confidence, evidence, check }], related, markdown }` |
 
 ### Coordination tools (`--level state`)
 
