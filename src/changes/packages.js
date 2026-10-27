@@ -79,7 +79,21 @@ async function readText(root, rel) {
 }
 
 /** Parse the lockfiles at the project root -> { npm?: Lock, packagist?: Lock, pypi?: Lock }; Lock = { file, names:Set, scripts:[name], sources:[{name, url}] } */
+const LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'composer.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock'];
+const lockCache = new Map(); // root -> { sig, p }
+/** Parsed lockfiles, re-read only when one of them changes (mtime + size). */
 export async function readLockfiles(root) {
+  const sig = (await Promise.all(LOCKFILES.map((f) => fsp.stat(path.join(root, f)).then((st) => `${f}:${st.mtimeMs}:${st.size}`, () => '')))).join('|');
+  const c = lockCache.get(root);
+  if (c && c.sig === sig) return c.p;
+  const p = readLockfilesUncached(root);
+  lockCache.set(root, { sig, p });
+  p.catch(() => lockCache.delete(root));
+  if (lockCache.size > 20) lockCache.delete(lockCache.keys().next().value);
+  return p;
+}
+
+async function readLockfilesUncached(root) {
   const out = {};
   const npmLock = (file) => (out.npm ||= { file, names: new Set(), scripts: [], sources: [] });
   const pl = await readText(root, 'package-lock.json') ?? await readText(root, 'npm-shrinkwrap.json');

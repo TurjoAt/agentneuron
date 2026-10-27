@@ -51,7 +51,7 @@ export async function sessionParts(b, sessionId) {
     if (row.kind !== 'edit') continue;
     const p = row.path || null;
     if (result && (result.isError || result.kind === 'denied')) {
-      failed.push({ kind: 'edit', label: `Edit of ${p || 'a file'} ${result.kind === 'denied' ? 'was denied' : 'failed'}`, path: isRel(p) ? p : null, evidence: [sref(row.ts)] });
+      failed.push({ kind: 'edit', label: `Edit of ${!p ? 'a file' : isRel(p) ? p : 'a file outside the project'} ${result.kind === 'denied' ? 'was denied' : 'failed'}`, path: isRel(p) ? p : null, evidence: [sref(row.ts)] });
       continue;
     }
     if (!p) continue;
@@ -60,7 +60,7 @@ export async function sessionParts(b, sessionId) {
     edits.set(p, e);
   }
   const done = [...edits.values()].sort((a, b2) => a.firstAt - b2.firstAt).map((e) => ({
-    kind: 'edit', label: `Edited ${e.path}${e.edits > 1 ? ` (${e.edits} edits)` : ''}`, path: isRel(e.path) ? e.path : null,
+    kind: 'edit', label: `Edited ${isRel(e.path) ? e.path : 'a file outside the project'}${e.edits > 1 ? ` (${e.edits} edits)` : ''}`, path: isRel(e.path) ? e.path : null,
     evidence: [sref(e.lastAt), ...(isRel(e.path) ? [ev('file', e.path, e.lastAt)] : [])],
   }));
 

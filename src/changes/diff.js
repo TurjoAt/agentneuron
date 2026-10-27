@@ -53,7 +53,7 @@ export async function collectDiff(root, { base, head, maxFiles = MAX_FILES, untr
   if (range.base && !(await runGit(root, ['rev-parse', '--verify', '--quiet', `${range.base}^{commit}`])).ok) throw bad(`unknown revision: ${range.base}`);
   if (range.head && !(await runGit(root, ['rev-parse', '--verify', '--quiet', `${range.head}^{commit}`])).ok) throw bad(`unknown revision: ${range.head}`);
   const sides = range.head ? [left, range.head] : [left];
-  const common = ['-c', 'core.quotepath=off', 'diff', '--no-color', '--no-ext-diff', '-M', '--relative'];
+  const common = ['-c', 'core.quotepath=off', 'diff', '--no-color', '--no-ext-diff', '--no-textconv', '-M', '--relative'];
   const [ns, num, patch] = await Promise.all([
     runGit(root, [...common, '--name-status', '-z', ...sides, '--']),
     runGit(root, [...common, '--numstat', '-z', ...sides, '--']),

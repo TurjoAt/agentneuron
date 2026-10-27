@@ -40,6 +40,7 @@ async function boot(actions = {}) {
 const get = async (url, p, tok) => { const r = await fetch(url + p, { headers: { authorization: `Bearer ${tok}` } }); return { status: r.status, body: await r.json() }; };
 const post = async (url, p, body, tok) => { const r = await fetch(url + p, { method: 'POST', headers: { authorization: `Bearer ${tok}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
 
+const oldFail = await saveRun(root, { check: 'npm:test', kind: 'test', command: 'npm run test', startedAt: Date.now() - 100000, endedAt: Date.now() - 99000, exitCode: 1, failed: 1, failures: [{ name: 'checkout total', file: 'test/a.test.js', message: 'expected row CUSTOMER-ROW-77 to equal' }] }, 'fail\n');
 const stored = await saveRun(root, { check: 'npm:test', kind: 'test', command: 'npm run test', startedAt: Date.now() + 5000, endedAt: Date.now() + 6000, exitCode: 0, passed: 2, tests: [{ name: 'totals include the tax', status: 'passed' }] }, `ok\nTOKEN=${FAKE_GH}\n`);
 const url = await boot({ exec: false });
 
@@ -85,6 +86,16 @@ test('shapes: summary, checks gate, report, scope, readiness, placeholders', asy
   assert.equal(new Set(ready.findings.map((f) => f.id)).size, ready.findings.length, 'finding ids stay unique after masking');
   const ph = (await get(url, '/api/ship/placeholders', ADMIN)).body;
   assert.ok(ph.findings.some((f) => f.rule === 'fake-api'));
+});
+
+test('test-failure excerpts are admin-only', async () => {
+  const pick = (b) => b.runs.find((r) => r.id === oldFail.id);
+  const admin = pick((await get(url, '/api/ship/runs', ADMIN)).body);
+  assert.match(admin.failures[0].message, /CUSTOMER-ROW-77/);
+  const viewer = (await get(url, '/api/ship/runs', VIEWER)).body;
+  assert.ok(!JSON.stringify(viewer).includes('CUSTOMER-ROW-77'));
+  assert.equal(pick(viewer).failures[0].messageHidden, true);
+  assert.ok(!JSON.stringify((await get(url, `/api/ship/run?id=${oldFail.id}`, VIEWER)).body).includes('CUSTOMER-ROW-77'));
 });
 
 test('run log is admin-only; bad ids and refs are 400', async () => {

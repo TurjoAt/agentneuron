@@ -17,9 +17,25 @@ const baseOf = (q) => {
   return b;
 };
 
+// Test-output excerpts (failures[].message) are raw command output: admin-only, like the run log.
+function hideFailureText(v) {
+  if (Array.isArray(v)) return v.map(hideFailureText);
+  if (!v || typeof v !== 'object') return v;
+  const out = {};
+  for (const [k, x] of Object.entries(v)) {
+    out[k] = k === 'failures' && Array.isArray(x)
+      ? x.map((f) => (f && typeof f === 'object' ? (({ message: _m, ...rest }) => ({ ...rest, messageHidden: f.message != null }))(f) : f))
+      : hideFailureText(x);
+  }
+  return out;
+}
+
 export default async function register(router, ctx) {
   const root = ctx.root;
-  const R = (p, fn) => router.get(p, guard(async (a) => maskDeep(await fn(a))), { level: 'read' });
+  const R = (p, fn) => router.get(p, guard(async (a) => {
+    const v = maskDeep(await fn(a));
+    return ctx.can('state', a.role) ? v : hideFailureText(v);
+  }), { level: 'read' });
 
   /** Can this role run checks? (exec level, admin, actions.exec on, and checks detected) */
   async function runGate(role, hasChecks) {

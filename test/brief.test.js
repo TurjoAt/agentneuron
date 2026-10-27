@@ -157,6 +157,11 @@ test('preflight: scripts with the wrong manager only warn; correct manager is cl
   const force = await B.checkAction(empty, { command: 'git push --force origin main' }, { sessionData: false });
   assert.ok(force.warnings.some((x) => x.kind === undefined || x.source.ref === 'destructive'));
   assert.equal((await B.checkAction(empty, { command: 'rm -rf /' }, { sessionData: false })).blocking, true);
+  assert.equal((await B.checkAction(empty, { command: 'rm -fr ~' }, { sessionData: false })).blocking, true);
+  assert.equal((await B.checkAction(empty, { command: 'rm -f /tmp/x' }, { sessionData: false })).blocking, false);
+  const t0 = Date.now();
+  await B.checkAction(empty, { command: 'rm -' + 'r'.repeat(4000) }, { sessionData: false });
+  assert.ok(Date.now() - t0 < 500, 'no catastrophic backtracking on long flag runs');
   const lock = await B.checkAction(empty, { paths: ['pnpm-lock.yaml'] }, { sessionData: false });
   assert.ok(lock.warnings.some((x) => x.id === 'lockfile'));
 });

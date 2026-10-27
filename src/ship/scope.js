@@ -79,7 +79,7 @@ export function readOverrides(root) {
 }
 /** status: one of STATUSES, or 'auto' to remove the override. */
 export function setOverride(root, { task, criterion, status, note = '' }) {
-  if (!/^[\w-]{1,80}$/.test(String(task || '')) || !/^c[0-9a-f]{10}$/.test(String(criterion || ''))) throw Object.assign(new Error('invalid task or criterion id'), { status: 400 });
+  if (!/^[\w-]{1,80}$/.test(String(task || '')) || /^(__proto__|constructor|prototype)$/.test(task) || !/^c[0-9a-f]{10}$/.test(String(criterion || ''))) throw Object.assign(new Error('invalid task or criterion id'), { status: 400 });
   if (status !== 'auto' && !STATUSES.includes(status)) throw Object.assign(new Error('invalid status'), { status: 400 });
   const file = overridesFile(root);
   fs.mkdirSync(path.dirname(file), { recursive: true });

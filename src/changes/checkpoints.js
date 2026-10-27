@@ -137,6 +137,12 @@ export async function createCheckpoint(root, opts = {}) {
     }
     const excludes = [...TOOL_DIRS.map((d) => `:(exclude)${d}`), ...skipped.slice(0, 2000).map((p) => `:(exclude,literal)${p}`)];
     await git(root, ['add', '-A', '--', '.', ...excludes], { env, timeout: 120000 });
+    // paths a restore is about to overwrite or delete go in even when ignored or large, so the undo point really has them
+    const include = [];
+    for (const p of (opts.include || []).slice(0, 1000)) {
+      try { if ((await fsp.lstat(path.join(root, p))).isFile()) include.push(p); } catch { /* absent: nothing to keep */ }
+    }
+    for (let i = 0; i < include.length; i += 200) await git(root, ['add', '-f', '--', ...include.slice(i, i + 200).map((p) => `:(literal)${p}`)], { env, timeout: 120000 });
     const tree = (await git(root, ['write-tree'], { env })).out.trim();
     const dirty = await dirtyPaths(root);
     const meta = {
@@ -215,7 +221,7 @@ export async function compareCheckpoint(root, id) {
     runGit(root, [...q, 'ls-files', '-z', '--cached']),
     runGit(root, [...q, 'ls-files', '-z', '--others', '--exclude-standard']),
     runGit(root, [...q, 'diff', '--no-renames', '--relative', '--name-status', '-z', cp.hash, '--']),
-    runGit(root, [...q, 'diff', '--no-renames', '--relative', '--numstat', '-z', cp.hash, '--']),
+    runGit(root, [...q, 'diff', '--no-renames', '--no-textconv', '--relative', '--numstat', '-z', cp.hash, '--']),
   ]);
   const trackedSet = new Set(tracked.out.split('\0').filter(Boolean));
   const untrackedSet = new Set(untracked.out.split('\0').filter(Boolean));
@@ -235,7 +241,7 @@ export async function compareCheckpoint(root, id) {
   const toHash = [];
   for (const p of tree.keys()) {
     if (trackedSet.has(p) || isToolPath(p)) continue;
-    if (untrackedSet.has(p)) toHash.push(p);
+    if (untrackedSet.has(p) || (await exists(p))) toHash.push(p); // present but ignored now still counts as present
     else res.set(p, { path: p, status: 'deleted', added: 0, removed: 0 });
   }
   const hashes = await hashFiles(root, toHash.slice(0, 5000));
@@ -299,7 +305,9 @@ export async function planRestore(root, id, paths) {
     if (!f || f.status === 'same') { files.push({ path: p, action: 'skip', reason: 'unchanged since the checkpoint' }); continue; }
     if (t && t.mode === '120000') { files.push({ path: p, action: 'skip', reason: 'symlinks are not restored' }); continue; }
     if (t && t.mode === '160000') { files.push({ path: p, action: 'skip', reason: 'submodules are not restored' }); continue; }
-    files.push({ path: p, action: f.status === 'added' ? 'delete' : f.status === 'deleted' ? 'create' : 'overwrite' });
+    let present = false;
+    try { await fsp.lstat(path.join(root, p)); present = true; } catch { /* absent */ }
+    files.push({ path: p, action: f.status === 'added' ? 'delete' : f.status === 'deleted' && !present ? 'create' : 'overwrite' });
   }
   return { checkpoint: cmp.checkpoint, files };
 }
@@ -312,8 +320,17 @@ export async function restoreCheckpoint(root, id, paths, { log } = {}) {
   const plan = await planRestore(root, id, paths);
   const todo = plan.files.filter((f) => f.action !== 'skip');
   if (!todo.length) return { restored: [], skipped: plan.files, undo: null };
-  const undo = await createCheckpoint(root, { label: `before restoring ${todo.length} file(s) from ${id}`, source: 'auto' });
+  const undo = await createCheckpoint(root, { label: `before restoring ${todo.length} file(s) from ${id}`, source: 'auto', include: todo.map((f) => f.path) });
   log?.(`undo point: checkpoint ${undo.id}`);
+  // never write over or delete a file the undo point could not keep
+  const undoTree = await treeMap(root, undo.hash);
+  const unsafe = [];
+  for (const f of todo) {
+    let st = null;
+    try { st = await fsp.lstat(path.join(root, f.path)); } catch { /* absent */ }
+    if (st && !undoTree.has(f.path)) unsafe.push(f.path);
+  }
+  if (unsafe.length) throw fail(409, `not restored: the undo checkpoint could not save ${unsafe.slice(0, 5).join(', ')}${unsafe.length > 5 ? ` and ${unsafe.length - 5} more` : ''}`);
   const tree = await treeMap(root, plan.checkpoint.hash);
   const restored = [];
   for (const f of todo) {

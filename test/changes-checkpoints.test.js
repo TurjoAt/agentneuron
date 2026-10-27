@@ -194,3 +194,24 @@ test('actions: levels, restore preview lists files, run restores', async () => {
   assert.match(defs.get('changes.checkpoint.restore').params.id.pattern, /\^/);
   assert.ok(!new RegExp(defs.get('changes.checkpoint.restore').params.id.pattern).test('../x'));
 });
+
+test('restore never loses a file the undo point would skip (now ignored, or new and over 20 MB)', async () => {
+  const d = repo();
+  const cp = await createCheckpoint(d, { label: 'before env' });
+  w(d, '.env', 'OLD=1\n');
+  const cp2 = await createCheckpoint(d, { label: 'with env' });
+  w(d, '.gitignore', '.env\n');
+  w(d, '.env', 'NEW=valuable\n');
+  const cmp = await compareCheckpoint(d, cp2.id);
+  assert.equal(cmp.files.find((f) => f.path === '.env')?.status, 'changed', 'present but ignored is not "deleted"');
+  const plan = await planRestore(d, cp2.id, ['.env']);
+  assert.equal(plan.files[0].action, 'overwrite');
+  const res = await restoreCheckpoint(d, cp2.id, ['.env']);
+  assert.equal(r(d, '.env').toString(), 'OLD=1\n');
+  assert.ok(sh(d, 'ls-tree', '-r', '--name-only', res.undo.hash).split('\n').includes('.env'), 'undo point keeps the ignored file');
+  fs.writeFileSync(path.join(d, 'big.bin'), Buffer.alloc(21 * 1024 * 1024, 1));
+  const res2 = await restoreCheckpoint(d, cp.id, ['big.bin']);
+  assert.equal(res2.restored[0].action, 'delete');
+  assert.ok(sh(d, 'ls-tree', '-r', '--name-only', res2.undo.hash).split('\n').includes('big.bin'), 'undo point keeps the large file');
+  fs.rmSync(d, { recursive: true, force: true });
+});

@@ -99,6 +99,15 @@ async function resolveTask(b, task) {
  * Build a context pack. opts: { task (text or board task id), budget }. b: briefCtx(...).
  * Returns { task: { id, text }, budget, tokens, items: [{ kind, path, reason, score, tokens, ... }], skipped, markdown }.
  */
+/** `name` appears in `text` as a whole word (same boundaries as before, without building a RegExp per file). */
+function namedIn(text, name) {
+  for (let i = text.indexOf(name); i !== -1; i = text.indexOf(name, i + 1)) {
+    const before = i ? text[i - 1] : '', after = text[i + name.length] || '';
+    if ((!before || !/[\w.-]/.test(before)) && (!after || !/[\w-]/.test(after))) return true;
+  }
+  return false;
+}
+
 export async function buildPack(b, { task, budget = DEFAULT_BUDGET } = {}) {
   const T = await resolveTask(b, task);
   if (!T) throw Object.assign(new Error('task is required'), { status: 400 });
@@ -128,7 +137,7 @@ export async function buildPack(b, { task, budget = DEFAULT_BUDGET } = {}) {
     const hitD = [...dp].filter((w) => tt.has(w) && w.length > 2 && !bp.has(w));
     let s = hitB.length * 3 + hitD.length * 1.5;
     const bn = path.posix.basename(f.path).toLowerCase();
-    if (bn.length > 3 && new RegExp(`(^|[^\\w.-])${bn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`).test(lowerText)) s += 6;
+    if (bn.length > 3 && namedIn(lowerText, bn)) s += 6;
     if (f.path.length > 3 && lowerText.includes(f.path.toLowerCase())) s += 8;
     if (s > 0) bump(f.path, s, hitB.length || hitD.length ? `name matches ${[...hitB, ...hitD].slice(0, 4).map((w) => `"${w}"`).join(', ')}` : 'named in the task');
   }

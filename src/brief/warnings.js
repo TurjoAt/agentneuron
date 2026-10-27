@@ -28,7 +28,7 @@ const DESTRUCTIVE = [
   [/\bgit\s+reset\s+--hard\b/, 'warn', 'git reset --hard discards uncommitted work', 'Create a checkpoint first (agentneuron checkpoint create) or stash the changes.'],
   [/\bgit\s+clean\s+-\w*f/, 'warn', 'git clean deletes untracked files', 'Preview with git clean -n first.'],
   [/\bgit\s+checkout\s+(--\s+)?\.(\s|$)|\bgit\s+restore\s+\.(\s|$)/, 'warn', 'Discards all working-tree changes', 'Restore only the files you mean to.'],
-  [/\brm\s+-\w*r\w*f?\w*\s+(\/|~|\$HOME|\*)(\s|$)/, 'block', 'Recursive delete of a root, home or wildcard path', 'Delete the specific directory you mean, never / ~ or *.'],
+  [/\brm\s+-(?=[A-Za-z]*r)[A-Za-z]+\s+(\/|~|\$HOME|\*)(\s|$)/, 'block', 'Recursive delete of a root, home or wildcard path', 'Delete the specific directory you mean, never / ~ or *.'],
   [/\bgit\s+commit\b[^|;&]*--no-verify\b/, 'warn', 'Skips the commit hooks', 'Fix what the hooks report instead of bypassing them.'],
   [/\b(migrate:fresh|migrate:reset|db:drop|db:wipe|dropdb)\b|\bDROP\s+(TABLE|DATABASE)\b/i, 'warn', 'Destroys database data', 'Only on a disposable local database; never against shared or production data.'],
 ];
@@ -149,7 +149,7 @@ const commandKey = (seg) => {
 
 async function headerSays(root, p) {
   try {
-    const r = await readRegularAsync(path.join(root, p), { maxBytes: 1024, confine: root });
+    const r = await readRegularAsync(path.join(root, p), { head: 1024, confine: root });
     return r ? /@generated|DO NOT EDIT|auto-?generated|this file (is|was) generated/i.test(r.buf.toString('utf8')) : false;
   } catch { return false; }
 }
