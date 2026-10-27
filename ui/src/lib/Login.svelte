@@ -1,6 +1,7 @@
 <script>
   import { app, login } from './store.svelte.js';
   import Icon from './Icon.svelte';
+  import Logo from './Logo.svelte';
 
   let tok = $state('');
   let busy = $state(false);
@@ -18,17 +19,7 @@
 <div class="login">
   <form class="panel card" onsubmit={submit}>
     <div class="mark">
-      <svg viewBox="0 0 32 32" width="44" height="44" aria-hidden="true">
-        <defs>
-          <linearGradient id="lg-g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ff8a4c" />
-            <stop offset="0.55" stop-color="#c07bff" />
-            <stop offset="1" stop-color="#4f8dff" />
-          </linearGradient>
-        </defs>
-        <rect width="32" height="32" rx="9" fill="url(#lg-g)" />
-        <path d="M8 22V10l4 5 4-5v12M20 10v8m0 0-3-3m3 3 3-3M19 22h6" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
+      <Logo size={44} pulse />
     </div>
     <div class="col" style="gap:4px;text-align:center">
       <h1>Sign in to agentneuron</h1>

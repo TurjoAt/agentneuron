@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/logo.svg" alt="AgentNeuron logo: a neural-network letter A" width="96" height="96"></p>
+
 # AgentNeuron
 
 **AgentNeuron is an open-source, local control center for AI coding-agent context files.** It shows what Claude Code, Codex and other agents are editing in real time, what every session cost (tokens, cache, tools, subagents) with a step-by-step replay, checks that `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, Copilot instructions, Windsurf rules, skills and MCP configs are still true and safe, learns rules from your agent sessions, and keeps every tool's rules in sync, in a web dashboard, a CLI and an MCP server.

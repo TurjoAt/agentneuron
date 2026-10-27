@@ -3,6 +3,7 @@
   import { VIEWS, href } from './nav.js';
   import { jobs } from './actions.svelte.js';
   import Icon from './Icon.svelte';
+  import { REPO_URL } from './links.js';
   import RadarScan from './RadarScan.svelte';
   import Bell from './Bell.svelte';
   import WorkspaceSwitcher from './insight/WorkspaceSwitcher.svelte';
@@ -67,6 +68,10 @@
   <RadarScan />
 
   <Bell />
+
+  <a class="btn icon ghost hide-sm" href={REPO_URL} target="_blank" rel="noopener noreferrer" aria-label="AgentNeuron on GitHub" title="AgentNeuron on GitHub: source, issues and releases">
+    <Icon name="github" size={17} />
+  </a>
 
   <button class="btn icon ghost hide-sm" onclick={() => (app.modal = { kind: 'map', props: {} })} aria-label="Product map" title="Product map: how pages and data connect (m)">
     <Icon name="map" size={17} />

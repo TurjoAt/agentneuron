@@ -18,9 +18,7 @@
   import ActionBtn from './overview/ActionBtn.svelte';
   import NeuronBrain from './overview/NeuronBrain.svelte';
   import LiveAgents from './overview/LiveAgents.svelte';
-  import TruthTeaser from './overview/TruthTeaser.svelte';
-  import UsageTeaser from './overview/UsageTeaser.svelte';
-  import MapTeaser from './overview/MapTeaser.svelte';
+  import StatusStrip from './overview/StatusStrip.svelte';
   import EntityLink from '../lib/EntityLink.svelte';
 
   let { params: _params } = $props();
@@ -117,6 +115,8 @@
   const commits = $derived((gitInfo.data?.recent || []).slice(0, 3));
   const sum = $derived(trends.data?.summary);
   const tokensDelta = $derived(sum?.kpis ? [sum.kpis.tokensNow, sum.kpis.tokensNow - sum.kpis.tokensDelta] : [null, null]);
+  const projectName = $derived(app.state?.project?.name || 'Project');
+  const initials = $derived(projectName.split(/[^A-Za-z0-9]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'P');
   const healthDelta = $derived(sum?.kpis ? [sum.kpis.healthNow, sum.kpis.healthNow - sum.kpis.healthDelta] : [null, null]);
 </script>
 
@@ -140,20 +140,26 @@
     </div>
   {/if}
 
-  <div class="page-h">
-    <div>
-      <h1>Overview</h1>
-      <p>Your AI context at a glance — what every tool can see, what it costs, and what changed.</p>
+  <header class="hero fade-up">
+    <span class="mono-av" aria-hidden="true">{initials}</span>
+    <div class="hero-t">
+      <div class="eyebrow">Overview</div>
+      <h1>{projectName}</h1>
+      <div class="meta">
+        {#if git?.available}<a class="mchip" href="#/git"><Icon name="branch" size={12} /> <span class="mono">{git.branch}</span>{#if git.dirty}<b class="tnum">· {git.dirty}</b>{/if}</a>{/if}
+        <a class="mchip" href="#/agents"><Icon name="agents" size={12} /> {detected.length} AI tool{detected.length === 1 ? '' : 's'}</a>
+        <a class="mchip grade g{(health?.grade || '').toLowerCase()}" href="#/health"><Icon name="health" size={12} /> Health {health?.grade || '–'}</a>
+        {#if app.events.length}<span class="mchip quiet"><span class="live-dot"></span> last change {timeAgo(app.events[0]?.ts, app.now)}</span>{/if}
+      </div>
     </div>
-    <span class="spacer"></span>
-    <div class="qa">
+    <div class="qa" role="group" aria-label="Quick actions">
       <ActionBtn id="agents.create" params={{ template: 'claude-md' }} label="CLAUDE.md" icon="plus" cls="sm" />
       <ActionBtn id="agents.create" params={{ template: 'agents-md' }} label="AGENTS.md" icon="plus" cls="sm" />
       <button class="btn sm" onclick={() => newFile()}><Icon name="file" size={14} /> New file</button>
       <a class="btn sm" href="#/agents?tab=sync"><Icon name="merge" size={14} /> Sync tools</a>
       <ActionBtn id="agentneuron.rescan" label="Rescan" icon="refresh" cls="sm" opts={{ silent: false }} />
     </div>
-  </div>
+  </header>
 
   <section class="kpis stagger" aria-label="Key metrics">
     <Kpi label="Tracked files" value={files.length} href="#/files" sub="{detected.length || '–'} tools · {byKind.length} kinds" />
@@ -165,93 +171,122 @@
   </section>
 
   {#if newLessons}
-    <a class="card tease" href="#/insights?tab=lessons"><Icon name="sparkles" size={15} /> <b class="tnum">{newLessons}</b> {newLessons === 1 ? 'lesson' : 'lessons'} to learn from your agent sessions<span class="spacer"></span><span class="faint">Insights →</span></a>
+    <a class="card tease" href="#/insights?tab=lessons"><span class="tic"><Icon name="sparkles" size={14} /></span> <b class="tnum">{newLessons}</b> {newLessons === 1 ? 'lesson' : 'lessons'} to learn from your agent sessions<span class="spacer"></span><span class="faint small">Insights <Icon name="chevron" size={12} /></span></a>
   {/if}
 
-  <div class="grid">
-    <div class="side stagger">
-      <NeuronBrain />
-      <section class="card activity">
-        <div class="card-h">
-          <span class="live-dot"></span> Live activity
-          <span class="sub">{app.events.length} events</span>
-        </div>
-        <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
-      </section>
-    </div>
+  <div class="sec-h"><h2>Status</h2><span class="faint small">cost, ship readiness, change risk and context truth</span></div>
+  <div class="block"><StatusStrip /></div>
 
-    <div class="side stagger">
-      <LiveAgents />
-      <UsageTeaser />
-      <TruthTeaser />
-      <MapTeaser />
-      <section class="card">
-        <div class="card-h">Context health <span class="sub">lint + secret scan</span></div>
-        <div class="hb">
-          <HealthRing score={health?.score ?? 0} grade={health?.grade ?? '–'} size={112} stroke={9} />
-          <div class="sev">
-            {#each [['error', 'Errors', 'err'], ['warn', 'Warnings', 'warn'], ['info', 'Info', 'info']] as [k, label, cls] (k)}
-              <a class="sev-row" href="#/health?severity={k}">
-                <span class="sd {cls}"></span><span class="grow">{label}</span>
-                <b class="tnum"><Counter value={health?.counts?.[k] ?? 0} /></b>
-              </a>
-            {/each}
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-h">Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks?tab=board">Board</a></div>
-        <div class="card-b col" style="gap:10px">
-          {#if colCounts.length}
-            <div class="stk" aria-label="Tasks per column">
-              {#each colCounts as c, i (c.id)}
-                <span style="flex:{c.n || 0.001};opacity:{0.35 + (0.65 * (i + 1)) / colCounts.length}" title="{c.title}: {c.n}"></span>
-              {/each}
-            </div>
-            <div class="legend">
-              {#each colCounts as c (c.id)}<span class="faint small">{c.title} <b class="tnum">{c.n}</b></span>{/each}
-            </div>
-          {/if}
-          {#each topTasks as t (t.id)}
-            <button class="list-row trow" onclick={() => openTask(t.id)}>
-              <span class="pr {t.priority}"></span>
-              <span class="grow ellipsis small">{t.title}</span>
-              {#if t.due}<span class="faint tiny">{t.due}</span>{/if}
-            </button>
-          {:else}
-            {#if board.error}
-              <div class="faint small">Could not load tasks: {board.error.message}</div>
-            {:else if board.data}
-              <Empty compact icon="check" title="All clear">No open tasks.</Empty>
-            {:else}
-              <div class="skel-rows" aria-label="Loading tasks">{#each [0, 1, 2] as i (i)}<span class="skel"></span>{/each}</div>
-            {/if}
-          {/each}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-h"><Icon name="branch" size={14} /> Git <span class="sub">{git?.available ? git.branch : 'unavailable'}</span><span class="spacer"></span><a class="btn sm ghost" href="#/git">Open</a></div>
-        <div class="card-b col" style="gap:8px">
-          {#if git?.available}
-            <a class="gline" href="#/git"><b class="tnum">{git.dirty || 0}</b> <span class="muted">uncommitted {git.dirty === 1 ? 'change' : 'changes'}</span></a>
-            {#each commits as c (c.hash)}
-              <a class="gline" href="#/git">
-                <code class="mono tiny">{(c.short || c.hash || '').slice(0, 7)}</code>
-                <span class="ellipsis small grow">{c.subject || c.message}</span>
-                <span class="faint tiny">{timeAgo(toMs(c.date || c.ts), app.now)}</span>
-              </a>
-            {/each}
-          {:else}
-            <div class="faint small">This folder is not a git repository.</div>
-          {/if}
-        </div>
-      </section>
-    </div>
+  <div class="sec-h"><h2>Agents &amp; context</h2><span class="faint small">who is working and what they can see</span></div>
+  <div class="g-main block stagger">
+    <NeuronBrain />
+    <LiveAgents />
   </div>
 
-  <section class="sec">
+  <div class="sec-h"><h2>Work</h2><span class="faint small">health, tasks and the repository</span></div>
+  <div class="g3 block stagger">
+    <section class="card">
+      <div class="card-h"><Icon name="health" size={14} /> Context health <span class="sub">lint + secret scan</span><span class="spacer"></span><a class="btn sm ghost" href="#/health">Open</a></div>
+      <div class="hb">
+        <HealthRing score={health?.score ?? 0} grade={health?.grade ?? '–'} size={104} stroke={9} />
+        <div class="sev">
+          {#each [['error', 'Errors', 'err'], ['warn', 'Warnings', 'warn'], ['info', 'Info', 'info']] as [k, label, cls] (k)}
+            <a class="sev-row" href="#/health?severity={k}">
+              <span class="sd {cls}"></span><span class="grow">{label}</span>
+              <b class="tnum"><Counter value={health?.counts?.[k] ?? 0} /></b>
+            </a>
+          {/each}
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><Icon name="tasks" size={14} /> Tasks <span class="sub">{openTasks.length} open</span><span class="spacer"></span><a class="btn sm ghost" href="#/tasks?tab=board">Board</a></div>
+      <div class="card-b col" style="gap:10px">
+        {#if colCounts.length}
+          <div class="stk" aria-label="Tasks per column">
+            {#each colCounts as c, i (c.id)}
+              <span style="flex:{c.n || 0.001};opacity:{0.35 + (0.65 * (i + 1)) / colCounts.length}" title="{c.title}: {c.n}"></span>
+            {/each}
+          </div>
+          <div class="legend">
+            {#each colCounts as c (c.id)}<span class="faint tiny">{c.title} <b class="tnum">{c.n}</b></span>{/each}
+          </div>
+        {/if}
+        {#each topTasks as t (t.id)}
+          <button class="list-row trow" onclick={() => openTask(t.id)}>
+            <span class="pr {t.priority}"></span>
+            <span class="grow ellipsis small">{t.title}</span>
+            {#if t.due}<span class="faint tiny">{t.due}</span>{/if}
+          </button>
+        {:else}
+          {#if board.error}
+            <div class="faint small">Could not load tasks: {board.error.message}</div>
+          {:else if board.data}
+            <Empty compact icon="check" title="All clear">No open tasks.</Empty>
+          {:else}
+            <div class="skel-rows" aria-label="Loading tasks">{#each [0, 1, 2] as i (i)}<span class="skel"></span>{/each}</div>
+          {/if}
+        {/each}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><Icon name="branch" size={14} /> Git <span class="sub">{git?.available ? git.branch : 'unavailable'}</span><span class="spacer"></span><a class="btn sm ghost" href="#/git">Open</a></div>
+      <div class="card-b col" style="gap:8px">
+        {#if git?.available}
+          <a class="gline big" href="#/changes"><b class="tnum">{git.dirty || 0}</b> <span class="muted">uncommitted {git.dirty === 1 ? 'change' : 'changes'}</span><span class="spacer"></span><span class="faint tiny">Review <Icon name="chevron" size={11} /></span></a>
+          {#each commits as c (c.hash)}
+            <a class="gline" href="#/git?tab=history&hash={c.hash}">
+              <code class="mono tiny">{(c.short || c.hash || '').slice(0, 7)}</code>
+              <span class="ellipsis small grow">{c.subject || c.message}</span>
+              <span class="faint tiny">{timeAgo(toMs(c.date || c.ts), app.now)}</span>
+            </a>
+          {/each}
+        {:else}
+          <div class="faint small">This folder is not a git repository.</div>
+        {/if}
+      </div>
+    </section>
+  </div>
+
+  <div class="sec-h"><h2>Activity</h2><span class="faint small">what changed, as it happens</span></div>
+  <div class="g2 block stagger">
+    <section class="card activity">
+      <div class="card-h">
+        <span class="live-dot"></span> Live activity
+        <span class="sub">{app.events.length} events</span>
+      </div>
+      <div class="card-b feed-wrap"><ActivityFeed limit={30} /></div>
+    </section>
+
+    <section class="card activity">
+      <div class="card-h"><Icon name="flame" size={15} /> Hottest files <span class="sub">by recent changes</span></div>
+      <div class="card-b col feed-wrap" style="gap:2px">
+        {#each hot as h (h.path)}
+          {@const f = fileByPath.get(h.path)}
+          <button class="list-row hrow" class:pulse-row={isPulsing(h.path)} onclick={() => openFile(h.path, { drawer: true })}>
+            <ToolBadge tool={f?.tool} compact />
+            <span class="grow col" style="gap:3px">
+              <span class="row" style="gap:6px">
+                <span class="mono ellipsis small"><span class="faint">{dirname(h.path) ? dirname(h.path) + '/' : ''}</span>{basename(h.path)}</span>
+                <GitStatus status={f?.gitStatus} />
+              </span>
+              <span class="heat"><span style="width:{(h.count / maxHot) * 100}%"></span></span>
+            </span>
+            <span class="col" style="gap:0;align-items:flex-end">
+              <b class="tnum small">{h.count}×</b>
+              <span class="faint tiny">{timeAgo(h.last, app.now)}</span>
+            </span>
+          </button>
+        {:else}
+          <Empty compact icon="flame" title="Nothing hot yet">Files that change most often will rise here.</Empty>
+        {/each}
+      </div>
+    </section>
+  </div>
+
+  <section class="block">
     <div class="sec-h">
       <h2>AI tools</h2>
       <span class="faint small">{detected.length} detected · instruction tokens vs {fmtNum(TOOL_TOKEN_BUDGET)} budget</span>
@@ -281,10 +316,11 @@
     {/if}
   </section>
 
-  <div class="grid2 stagger">
-    <section class="card">
-      <div class="card-h"><Icon name="layers" size={14} /> Project stack <span class="spacer"></span><a class="btn sm ghost" href="#/project">Details</a></div>
-      <div class="card-b stacks">
+  <div class="sec-h"><h2>Project</h2><span class="faint small">stack and context-file kinds</span><span class="spacer"></span><a class="btn sm ghost" href="#/project">Details <Icon name="chevron" size={13} /></a></div>
+  <section class="card stackcard">
+    <div class="sc-col">
+      <div class="eyebrow">Stack</div>
+      <div class="stacks">
         {#each stacks as s (s.id)}
           <a class="chip" href="#/project" title={s.source}>{s.name}{#if s.version}<span class="n">{s.version}</span>{/if}</a>
         {:else}
@@ -297,61 +333,61 @@
           {/if}
         {/each}
       </div>
-      <div class="card-b kinds">
+    </div>
+    <div class="sc-col">
+      <div class="eyebrow">Context files</div>
+      <div class="stacks">
         {#each byKind as [k, n] (k)}
           <a class="chip" href="#/files?kind={k}">{KINDS[k] || k} <span class="n">{n}</span></a>
         {/each}
       </div>
-    </section>
-
-    <section class="card">
-      <div class="card-h"><Icon name="flame" size={15} /> Hottest files <span class="sub">by recent changes</span></div>
-      <div class="card-b col" style="gap:2px">
-        {#each hot as h (h.path)}
-          {@const f = fileByPath.get(h.path)}
-          <button class="list-row hrow" class:pulse-row={isPulsing(h.path)} onclick={() => openFile(h.path, { drawer: true })}>
-            <ToolBadge tool={f?.tool} compact />
-            <span class="grow col" style="gap:3px">
-              <span class="row" style="gap:6px">
-                <span class="mono ellipsis small"><span class="faint">{dirname(h.path) ? dirname(h.path) + '/' : ''}</span>{basename(h.path)}</span>
-                <GitStatus status={f?.gitStatus} />
-              </span>
-              <span class="heat"><span style="width:{(h.count / maxHot) * 100}%"></span></span>
-            </span>
-            <span class="col" style="gap:0;align-items:flex-end">
-              <b class="tnum small">{h.count}×</b>
-              <span class="faint tiny">{timeAgo(h.last, app.now)}</span>
-            </span>
-          </button>
-        {:else}
-          <Empty compact icon="flame" title="Nothing hot yet">Files that change most often will rise here.</Empty>
-        {/each}
-      </div>
-    </section>
-  </div>
+    </div>
+  </section>
 </div>
 
 <style>
-  .tease { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-bottom: 16px; color: inherit; text-decoration: none; }
+  /* hero */
+  .hero { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .mono-av { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-weight: 750; font-size: 17px; letter-spacing: 0.02em; color: #fff;
+    background: linear-gradient(135deg, #ff8a4c, #b86bff 55%, #4f7dff); box-shadow: 0 10px 28px -10px rgba(184, 107, 255, 0.65); flex-shrink: 0; }
+  .hero-t { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .hero-t h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eyebrow { font-size: 10.5px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-3); }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .mchip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel); color: var(--text-2); font-size: 12px; text-decoration: none; white-space: nowrap; }
+  a.mchip:hover { border-color: var(--border-strong); color: var(--text); text-decoration: none; }
+  .mchip b { color: var(--warn); font-weight: 600; }
+  .mchip.quiet { background: transparent; }
+  .mchip.ga, .mchip.gb { color: var(--ok); }
+  .mchip.gc { color: var(--warn); }
+  .mchip.gd, .mchip.gf { color: var(--err); }
+  .qa { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-left: auto; }
+
+  .tease { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-bottom: 8px; color: inherit; text-decoration: none; }
   .tease:hover { border-color: var(--border-strong); text-decoration: none; }
-  .qa { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
-  .sec { margin-bottom: 22px; }
-  .sec-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-  .sec-h h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  .tic { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+
+  /* sections */
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .sec-h { display: flex; align-items: baseline; gap: 12px; margin: 22px 0 10px; flex-wrap: wrap; }
+  .sec-h h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -0.005em; }
+  .block { margin-bottom: 6px; }
+  .g-main { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+  .g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  .g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  .g-main > :global(*), .g3 > :global(*), .g2 > :global(*) { min-width: 0; height: 100%; margin: 0; }
+  .g-main > :global(.card) { display: flex; flex-direction: column; }
+
   .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
   .miss { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
   .miss .chip { text-decoration: none; }
   .pad { padding: 16px; }
   .small { font-size: 12px; }
   .tiny { font-size: 11px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 22px; align-items: start; }
-  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-  .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .activity { display: flex; flex-direction: column; }
-  .feed-wrap { overflow: auto; max-height: 460px; }
-  .hb { display: flex; align-items: center; gap: 20px; padding: 4px 18px 18px; flex-wrap: wrap; }
-  .sev { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 2px; }
+  .feed-wrap { overflow: auto; height: 400px; }
+  .hb { display: flex; align-items: center; gap: 18px; padding: 6px 18px 18px; flex-wrap: wrap; }
+  .sev { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 2px; }
   .sev-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px; color: var(--text-2); font-size: 13px; text-decoration: none; }
   .sev-row:hover { background: var(--panel-hover); color: var(--text); text-decoration: none; }
   .sev-row b { color: var(--text); font-size: 15px; }
@@ -361,19 +397,24 @@
   .sd.info { background: var(--info); }
   .stk { display: flex; height: 8px; border-radius: 99px; overflow: hidden; gap: 2px; background: var(--panel-active); }
   .stk span { background: var(--accent); min-width: 2px; transition: flex 0.5s var(--ease); }
-  .legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; }
   .trow { padding: 6px 4px; gap: 9px; }
   .pr { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
   .pr.urgent { background: var(--err); }
   .pr.high { background: var(--warn); }
   .pr.med { background: var(--info); }
-  .gline { display: flex; align-items: center; gap: 9px; color: inherit; text-decoration: none; min-width: 0; font-size: 13px; }
+  .gline { display: flex; align-items: center; gap: 9px; color: inherit; text-decoration: none; min-width: 0; font-size: 13px; padding: 4px 0; }
+  .gline.big { padding: 8px 10px; border-radius: 9px; background: var(--panel-hover); margin-bottom: 4px; }
+  .gline.big b { font-size: 16px; }
   .gline:hover { text-decoration: none; color: var(--accent); }
+  .spacer { flex: 1; }
+  .stackcard { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 0; margin-bottom: 8px; }
+  .sc-col { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .sc-col + .sc-col { border-left: 1px solid var(--border); }
   .stacks { display: flex; flex-wrap: wrap; gap: 6px; }
-  .stacks .chip, .kinds .chip { text-decoration: none; }
+  .stacks .chip { text-decoration: none; }
   .chip-sk { height: 24px; border-radius: 99px; }
-  .kinds { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: live 2s infinite; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: live 2s infinite; flex-shrink: 0; }
   @keyframes live {
     0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); }
     70% { box-shadow: 0 0 0 7px transparent; }
@@ -389,13 +430,22 @@
   .lnk { border: 0; background: none; color: var(--text); font-weight: 600; cursor: pointer; padding: 0; }
   .lnk:hover { color: var(--accent); }
 
-  @media (max-width: 1280px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  @media (max-width: 900px) {
-    .grid, .grid2 { grid-template-columns: 1fr; }
-    .feed-wrap { max-height: 420px; }
+  @media (max-width: 1280px) {
+    .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .g3 > :global(:last-child) { grid-column: 1 / -1; }
+  }
+  @media (max-width: 960px) {
+    .g-main, .g2, .g3 { grid-template-columns: 1fr; }
+    .g3 > :global(:last-child) { grid-column: auto; }
+    .feed-wrap { height: 360px; }
+    .stackcard { grid-template-columns: 1fr; }
+    .sc-col + .sc-col { border-left: 0; border-top: 1px solid var(--border); }
+    .qa { justify-content: flex-start; width: 100%; }
   }
   @media (max-width: 520px) {
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .qa { width: 100%; }
+    .hero-t h1 { font-size: 20px; }
+    .mono-av { width: 40px; height: 40px; font-size: 15px; border-radius: 12px; }
   }
 </style>

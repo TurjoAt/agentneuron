@@ -108,3 +108,6 @@ export function mentionAt(lineText, col) {
   }
   return null;
 }
+
+/** The project on GitHub (source, issues, releases). */
+export const REPO_URL = 'https://github.com/TurjoAt/agentneuron';

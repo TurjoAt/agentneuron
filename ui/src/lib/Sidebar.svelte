@@ -5,11 +5,12 @@
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { dur } from './motion.js';
-  import { fileHref } from './links.js';
+  import { fileHref, REPO_URL } from './links.js';
   import { openMenu } from './menu.svelte.js';
   import { fileMenuItems } from './fileActions.js';
   import { basename, dirname } from './format.js';
   import Icon from './Icon.svelte';
+  import Logo from './Logo.svelte';
   import ConnPulse from './ConnPulse.svelte';
   import ToolBadge from './ToolBadge.svelte';
 
@@ -61,17 +62,7 @@
 <nav class="side" aria-label="Main">
   <a class="brand" href="#/overview" aria-label="AgentNeuron overview">
     <span class="mark">
-      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
-        <defs>
-          <linearGradient id="brand-g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ff8a4c" />
-            <stop offset="0.55" stop-color="#c07bff" />
-            <stop offset="1" stop-color="#4f8dff" />
-          </linearGradient>
-        </defs>
-        <rect width="32" height="32" rx="9" fill="url(#brand-g)" />
-        <path d="M8 22V10l4 5 4-5v12M20 10v8m0 0-3-3m3 3 3-3M19 22h6" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
+      <Logo size={28} />
     </span>
     <span class="name">AgentNeuron<span class="sub">{app.state?.project?.name || 'context control'}</span></span>
   </a>
@@ -172,6 +163,8 @@
             { label: 'Permissions & roles', icon: 'shield', run: () => (location.hash = '#/settings?tab=permissions') },
             { label: 'Keyboard shortcuts', icon: 'command', kbd: '?', run: () => (app.modal = { kind: 'shortcuts', props: {} }) },
             { label: 'Product map', icon: 'map', kbd: 'm', run: () => (app.modal = { kind: 'map', props: {} }) },
+            { label: 'AgentNeuron on GitHub', icon: 'github', run: () => window.open(REPO_URL, '_blank', 'noopener,noreferrer') },
+            { label: 'Report an issue', icon: 'flag', run: () => window.open(`${REPO_URL}/issues/new`, '_blank', 'noopener,noreferrer') },
             ...(app.me?.tokenRequired ? [{ sep: true }, { label: 'Sign out', icon: 'logout', run: logout }] : []),
           ],
         )}
