@@ -29,7 +29,13 @@
     toast((await copyText(report.markdown)) ? 'Bug report copied as Markdown' : 'Could not copy to the clipboard', 'info', 2600);
   }
   async function save() {
-    const job = await runAction('brief.save', { kind: 'debug', ...(lastInput?.error ? { error: lastInput.error } : { run: report?.run?.id || undefined }) }, { title: 'Save debug report' });
+    if (lastInput?.error) {
+      // pasted text is saved by the debug route itself (never as an action param, which every role can list)
+      try { const r = await post('/api/brief/debug', { ...lastInput, save: true }); toast(`Debug report saved to ${r.saved?.path || '.agentneuron/briefs/'}`, 'ok', 3000); }
+      catch (e) { toast(`Could not save: ${e.message}`, 'err', 4000); }
+      return;
+    }
+    const job = await runAction('brief.save', { kind: 'debug', run: report?.run?.id || undefined }, { title: 'Save debug report' });
     if (job?.status === 'ok') toast('Debug report saved to .agentneuron/briefs/', 'ok', 3000);
   }
   const conf = (c) => (c >= 0.65 ? 'high' : c >= 0.4 ? 'medium' : 'low');

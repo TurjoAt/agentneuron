@@ -6,7 +6,7 @@ import { maskDeep } from '../mask.js';
 import { guard } from './files.js';
 import { liveAccess } from '../../live/coord.js';
 import {
-  briefCtx, buildResume, resumeSources, warningRules, checkAction, publicRule, buildPack, buildDebug, listBriefs, getBrief, VIEWER, MAX_ERROR,
+  briefCtx, buildResume, resumeSources, warningRules, checkAction, publicRule, buildPack, buildDebug, listBriefs, getBrief, saveBrief, VIEWER, MAX_ERROR,
 } from '../../brief/index.js';
 
 const id = (v, what) => {
@@ -52,11 +52,18 @@ export default async function register(router, ctx) {
     return buildPack(B(), { task, budget: q.get('budget') });
   }, (v) => v); // files, context sections, repo facts and counts only: no session text
   // pasted error text is accepted only from roles that may see prompts; `run` (a failing run) works for all
-  R('post', '/api/brief/debug', ({ body, role }) => {
+  R('post', '/api/brief/debug', async ({ body, role }) => {
     const b = body && typeof body === 'object' ? body : {};
     const error = text(b.error, MAX_ERROR, 'error');
     if (error.trim() && !prompts(role)) throw new HttpError(403, 'pasting error text is admin-only; send { "run": "last" } for the last failing run');
     const run = b.run == null || b.run === '' ? null : b.run === 'last' ? 'last' : id(b.run, 'run');
-    return buildDebug(B(), { error, run }, { sessionData: prompts(role) });
+    // { save: true } stores the report (level state). Pasted text is saved here, not through the brief.save
+    // action, because job params are listed to every role.
+    if (b.save === true && !ctx.can?.('state', role)) throw new HttpError(403, 'saving a debug report needs the state level');
+    const report = await buildDebug(B(), { error, run }, { sessionData: prompts(role) });
+    if (b.save !== true) return report;
+    const saved = saveBrief(ctx.root, 'debug', report);
+    try { ctx.broadcast?.('brief', { saved: saved.id }); } catch { /* ignore */ }
+    return { ...report, saved: { id: saved.id, path: saved.path } };
   }, VIEWER.debug);
 }

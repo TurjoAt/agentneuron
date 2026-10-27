@@ -27,7 +27,8 @@
   const brief = $derived(res.data);
   const sessions = $derived(sources.data?.sessions || []);
   const tasks = $derived(sources.data?.tasks || []);
-  const savedList = $derived(briefs.data?.briefs || []);
+  // debug reports are saved alongside resume briefs; this picker opens resume briefs only
+  const savedList = $derived((briefs.data?.briefs || []).filter((b) => b.kind !== 'debug'));
   let pick = $state('sessions');
   const select = (p) => navigate('brief', { tab: 'resume', ...p });
   const saveState = $derived(actionEnabled('brief.save'));

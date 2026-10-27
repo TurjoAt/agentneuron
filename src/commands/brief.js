@@ -13,12 +13,24 @@ async function ctxFor(root) {
   return briefCtx({ ...c, usageBudgetMs: Infinity });
 }
 
-/** Read all of stdin (bounded); '' when stdin is a TTY or empty. */
-async function readStdin(max = MAX_ERROR, stream = process.stdin) {
-  if (!stream || stream.isTTY) return '';
-  const chunks = []; let n = 0;
-  for await (const c of stream) { const buf = Buffer.isBuffer(c) ? c : Buffer.from(String(c)); n += buf.length; if (n > max * 2) break; chunks.push(buf); }
-  return Buffer.concat(chunks).toString('utf8').slice(0, max);
+/**
+ * Read all of stdin (bounded); '' when stdin is a TTY, empty, or sends nothing within `wait` ms
+ * (harnesses may leave an open pipe that never closes; hooks write their event and close at once).
+ */
+export function readStdin(max = MAX_ERROR, stream = process.stdin, { wait = 400 } = {}) {
+  if (!stream || stream.isTTY) return Promise.resolve('');
+  return new Promise((resolve) => {
+    const chunks = []; let n = 0; let done = false;
+    const finish = () => {
+      if (done) return; done = true; clearTimeout(timer);
+      stream.off?.('data', onData); stream.off?.('end', finish); stream.off?.('error', finish);
+      stream.pause?.(); if (stream === process.stdin) stream.destroy?.();
+      resolve(Buffer.concat(chunks).toString('utf8').slice(0, max));
+    };
+    const timer = setTimeout(() => { if (!n) finish(); }, wait);
+    const onData = (c) => { const buf = Buffer.isBuffer(c) ? c : Buffer.from(String(c)); n += buf.length; chunks.push(buf); if (n > max * 2) finish(); };
+    stream.on('data', onData); stream.once('end', finish); stream.once('error', finish);
+  });
 }
 
 const tick = (i) => {

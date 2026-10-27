@@ -200,7 +200,9 @@ export function briefRoutes(deps) {
       const error = typeof b.error === 'string' ? b.error : '';
       if (error.trim() && viewer()) throw err(403, 'pasting error text is admin-only; send { "run": "last" } for the last failing run');
       if (!error.trim() && !b.run) throw err(400, 'no error text and no failing run recorded');
-      return debugFor(error || "TypeError: Cannot read properties of undefined (reading 'status')", error.trim() ? 'error' : 'run', viewer());
+      if (b.save === true && viewer()) throw err(403, 'saving a debug report needs the state level');
+      const r = debugFor(error || "TypeError: Cannot read properties of undefined (reading 'status')", error.trim() ? 'error' : 'run', viewer());
+      return b.save === true ? { ...r, saved: { id: 'b3f9c2a71d0', path: '.agentneuron/briefs/b3f9c2a71d0.json' } } : r;
     },
   };
 }

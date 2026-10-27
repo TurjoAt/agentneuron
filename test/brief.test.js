@@ -5,6 +5,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { Readable } from 'node:stream';
 import { makeHome, H } from './usage-fixtures.js';
 import { projectDirName } from '../src/agents/sessions.js';
@@ -334,4 +335,17 @@ test('CLI resume, pack and debug print text, Markdown and JSON', async () => {
   const dbg = await capture(() => cmdDebug(fx.root, { json: true }, { stdin: Readable.from(["Error: Cannot find module 'leftpad'"]) }));
   assert.equal(dbg.code, 0);
   assert.ok(JSON.parse(dbg.out).hypotheses.some((h) => h.id === 'notinstalled:leftpad'));
+});
+
+test('MCP get_debug_report falls back to the last failing run without error text', async () => {
+  const { makeTools } = await import('../src/brief/mcp.js');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'an-brief-mcp-'));
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.writeFileSync(path.join(root, 'src', 'a.js'), 'export const a = 1;\n');
+  const run = { id: 'run1', kind: 'test', exitCode: 1, failed: 1, finishedAt: Date.now(), failures: [{ name: 'a works', file: 'src/a.js', message: 'TypeError: a is not a function\n    at src/a.js:1:1' }] };
+  const t = makeTools({ root, config: {}, home: root, briefDeps: { listRuns: async () => [run], taskScope: async () => null, listCheckpoints: async () => [] } });
+  const r = await t.get_debug_report({});
+  assert.equal(r.source, 'run');
+  assert.equal(r.run.id, 'run1');
+  fs.rmSync(root, { recursive: true, force: true });
 });

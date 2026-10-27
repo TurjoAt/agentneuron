@@ -88,14 +88,14 @@ Paste an error or stack trace (or use the last failing test/build run). AgentNeu
 - a service that is down, a port in use, a pending migration, a syntax error, a null value;
 - recorded failing tests with the same error, and the same error seen in an earlier session.
 
-Each hypothesis has a confidence, its evidence and a concrete way to confirm it. Related files, commits, sessions, config, dependencies and tests are listed. The pasted text is not stored unless you save the report.
+Each hypothesis has a confidence, its evidence and a concrete way to confirm it. Related files, commits, sessions, config, dependencies and tests are listed. The pasted text is not stored unless you save the report. A report of pasted text is saved by the debug route itself (`{ "save": true }`, level `state`), never as an action parameter, because job parameters are visible to every role. A report of a failing run is saved with the `brief.save` action.
 
 ## Privacy
 
 - Session text (prompts, replies, user corrections, quotes, titles) sits only under the keys `prompt`, `title`, `quote`, `lastPrompt`, `thinking` and `body`, and follows the [live prompt policy](live.md#configuration). For roles that may not see prompts (the viewer token by default):
   - resume briefs drop that text, command text and the Markdown export;
   - warnings and rules never use session history, so a query cannot reveal whether a command failed before;
-  - the bug detective refuses pasted error text (`403`; the last failing run still works), and the report has no error text, function names, session evidence or Markdown.
+  - the bug detective refuses pasted error text (`403`; the last failing run still works), and the report has no error text, function names, session evidence or Markdown; saved reports of pasted text are withheld.
 - Every response passes through the secret masker. Files on the deny list (credentials, keys, `.env` values, ...) are never read; `~/.claude/.credentials.json`, session keys and pasted contents are never touched.
 - GET routes and MCP tools never touch the network and spawn nothing except a read-only `git log` with a timeout. The debug route only analyses the text it is given.
 
@@ -110,6 +110,6 @@ Each hypothesis has a confidence, its evidence and a concrete way to confirm it.
 | GET | `/api/brief/warnings` | `command?`, `paths?` (comma list), `task?` | `{ warnings, blocking, rules }` |
 | GET | `/api/brief/rules` | | `{ rules }` |
 | GET | `/api/brief/pack` | `task`, `budget?` | `{ task, budget, tokens, items, skipped, markdown }` |
-| POST | `/api/brief/debug` | `{ error? , run? }` (`run`: id or `last`) | `{ error, frames, hypotheses, related, markdown }` |
+| POST | `/api/brief/debug` | `{ error?, run?, save? }` (`run`: id or `last`; `save: true` needs level `state`) | `{ error, frames, hypotheses, related, markdown, saved? }` |
 
-All are level `read`. Saving uses the `brief.save` action (`{ kind: "resume" | "debug", session?, task?, error?, run? }`, level `state`); the brief is recomputed on the server.
+All are level `read`. Saving uses the `brief.save` action (`{ kind: "resume" | "debug", session?, task?, run? }`, level `state`); the brief is recomputed on the server. For viewers, a saved report of pasted error text is withheld entirely (`withheld: true`).

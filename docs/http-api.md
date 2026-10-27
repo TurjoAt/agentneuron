@@ -184,9 +184,9 @@ See [Agent brief](brief.md). All routes are level `read` and pass through the se
 | GET | `/api/brief/warnings` | `command?`, `paths?`, `task?` | `{ command, paths, task, warnings: [{ id, severity, title, why, fix, source, evidence }], blocking, rules }` |
 | GET | `/api/brief/rules` | | `{ rules }`: the active warning rules with their source |
 | GET | `/api/brief/pack` | `task`, `budget?` (500 to 200000, default 8000) | `{ generatedAt, task, budget, tokens, items: [{ kind, path, reason, score, tokens }], skipped, markdown }`; `400` without `task` |
-| POST | `/api/brief/debug` | `{ error?, run? }` (`run`: id or `last`; error text at most 64 KB, else `413`) | `{ generatedAt, source, run, error, frames, hypotheses, related: { files, commits, sessions, config, deps, tests }, markdown }`; `400` with no error and no failing run |
+| POST | `/api/brief/debug` | `{ error?, run?, save? }` (`run`: id or `last`; error text at most 64 KB, else `413`; `save: true` stores the report and needs level `state`) | `{ generatedAt, source, run, error, frames, hypotheses, related: { files, commits, sessions, config, deps, tests }, markdown, saved?: { id, path } }`; `400` with no error and no failing run |
 
-Saving a resume brief or debug report is the `brief.save` action (level `state`, params `{ kind, session?, task?, error?, run? }`); it also adds a handoff note.
+Saving a resume brief, or the debug report of a failing run, is the `brief.save` action (level `state`, params `{ kind, session?, task?, run? }`); a resume brief also adds a handoff note. Pasted error text is saved only through `POST /api/brief/debug` with `save: true`, never as an action parameter (job parameters are listed to every role). For viewers, a saved report of pasted text is withheld.
 
 ## Rules compiler
 

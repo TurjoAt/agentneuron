@@ -18,6 +18,11 @@ const noCmd = ({ command: _c, quote: _q, ...x }) => x;
  * redactPrompts; on top of that, commands and tool output (`command`, `quote`) are dropped, absolute paths
  * hidden and the Markdown export omitted, like the usage replay viewer rows.
  */
+const WITHHELD = (b = {}) => ({
+  generatedAt: b.generatedAt || 0, source: 'error', run: null, withheld: true, error: { type: '', quote: '' }, frames: [], hypotheses: [],
+  related: { files: [], commits: [], sessions: [], config: [], deps: [], tests: [] },
+});
+
 export const VIEWER = {
   resume: (v) => {
     const items = (list) => (list || []).map((i) => redactPrompts({ ...noCmd(i), path: relOrNull(i.path) }));
@@ -44,5 +49,6 @@ export const VIEWER = {
     };
   },
   briefs: (v) => ({ briefs: (v.briefs || []).map((b) => ({ ...b, title: '' })) }),
-  saved: (v) => ({ ...v, title: '', brief: v.kind === 'debug' ? VIEWER.debug(v.brief || {}) : VIEWER.resume(v.brief || {}) }),
+  /** a saved report of pasted error text is withheld entirely: every label in it may echo the paste */
+  saved: (v) => ({ ...v, title: '', brief: v.kind !== 'debug' ? VIEWER.resume(v.brief || {}) : v.brief?.source === 'error' ? WITHHELD(v.brief) : VIEWER.debug(v.brief || {}) }),
 };

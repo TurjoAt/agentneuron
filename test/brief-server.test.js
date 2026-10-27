@@ -151,3 +151,20 @@ test('brief.save action: admin only (state), stores the recomputed brief and a h
   assert.ok(row, 'handoff note written');
   for (const s of SECRET_TEXT) assert.ok(!JSON.stringify(row).includes(s), `handoff leaks "${s}"`);
 });
+
+test('debug save: pasted text is saved by the route (state level), never exposed through job params', async () => {
+  const paste = `RangeError: PASTED_MARKER_91 overflow\n    at parse (${fx.root}/src/a.js:2:3)`;
+  assert.equal((await req('POST', '/api/brief/debug', VIEWER, { run: 'last', save: true })).status, 403);
+  const a = await req('POST', '/api/brief/debug', ADMIN, { error: paste, save: true });
+  assert.equal(a.status, 200, a.body);
+  const r = JSON.parse(a.body);
+  assert.match(r.saved.id, /^b[0-9a-f]{10}$/);
+  const v = JSON.parse((await req('GET', `/api/brief/brief?id=${r.saved.id}`, VIEWER)).body);
+  assert.ok(!JSON.stringify(v).includes('PASTED_MARKER_91'), 'viewer sees no pasted text in the saved brief');
+  assert.equal(v.brief.withheld, true);
+  // the action no longer takes error text, so nothing pasted can reach /api/jobs
+  const s = await req('POST', '/api/actions/run', ADMIN, { id: 'brief.save', params: { kind: 'debug', error: paste } });
+  const jobs = (await req('GET', '/api/jobs', VIEWER)).body;
+  assert.ok(!jobs.includes('PASTED_MARKER_91'), 'job list leaks pasted text');
+  assert.ok(s.status >= 200);
+});
