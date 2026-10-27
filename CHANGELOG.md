@@ -14,10 +14,17 @@ All notable changes to this project are documented here. The format follows [Kee
 - Details panel for any session, file, commit, task, tool, model or agent, linked from every page; a product map of pages and how their data connects; related-page links on each page; grouped, collapsible sidebar with badges; a bottom bar on phones; entity search in the command palette.
 - Animated first-load screen that shows the real startup steps (connect, sign in, files, analysis, sessions).
 - MCP tools `get_usage`, `get_session_replay` and `get_tool_health`.
+- **Ship check** page and `agentneuron ship`: detects the project's test, build, lint and typecheck commands, runs them on request (`exec` level, or `--run` in the CLI), parses the results and gives a verdict (verified, partial, failing, unverified) with evidence. Acceptance criteria on board tasks are tracked as verified, incomplete, untested or failed with linked tests, commits and files. Static production-readiness scan and a fake-functionality detector (placeholder handlers, mock auth, demo data, stubs).
+- **Change review** page and `agentneuron review`: per-file and per-hunk risk with reasons, missing tests and a read-first order; impact analysis of changed symbols (importers, callers, routes, tests, contracts). Safe checkpoints (`agentneuron checkpoint`) stored as `refs/agentneuron/checkpoints/*` with per-file restore after an automatic undo point. Package guard (`agentneuron packages`) for look-alike, unlocked or risky dependencies, offline by default.
+- **Agent brief** page: resume briefs of a session or task to continue in another agent (`agentneuron resume`), warnings before repeating known mistakes (`agentneuron preflight`, exit 2 for `PreToolUse` hooks), task context packs (`agentneuron pack`) and a bug detective (`agentneuron debug`).
+- MCP tools `get_ship_report`, `get_task_scope`, `review_changes`, `get_change_impact`, `check_package`, `get_resume_brief`, `preflight_check`, `get_context_pack` and `get_debug_report`.
+- New logo and favicon; GitHub link in the top bar and account menu; reorganized Overview with a status row (usage, ship check, change review, truth & safety) and labelled sections.
 
 ### Security
 
 - Usage routes follow the prompt policy (`live.showPrompts`, `live.viewerPrompts`): viewers get no prompt text, titles, thinking or memory bodies, and file versions need `live.viewerDiffs`. Claude's credentials, session keys and pasted prompt content are never read or returned. Other projects' sessions are read only with `"usage": { "scope": "all" }` and the admin role.
+
+- Quality-round routes: test-failure excerpts and run logs are admin-only, session text in briefs follows the prompt policy, pasted error text is admin-only and never stored in job parameters, package registry lookups need `packages.online` and the admin role, and checkpoint file content needs `live.viewerDiffs`.
 
 ## [1.0.0] - 2026-10-26
 

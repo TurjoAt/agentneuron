@@ -37,8 +37,8 @@ const exampleDir = path.join(repo, 'examples', example);
 
 // name, hash route, theme, selector that signals the view rendered, extra settle ms
 const SHOTS = [
-  { name: 'overview', hash: '#/overview', theme: 'dark', settle: 1200 },
-  { name: 'overview-light', hash: '#/overview', theme: 'light', settle: 1200 },
+  { name: 'overview', query: '?mock=1', hash: '#/overview', theme: 'dark', settle: 3000 },
+  { name: 'overview-light', query: '?mock=1', hash: '#/overview', theme: 'light', settle: 3000 },
   { name: 'graph', hash: '#/graph', theme: 'dark', wait: 'svg, canvas', settle: 4000, click: 'button[title^="Zoom out"]' },
   { name: 'tasks', hash: '#/tasks', theme: 'dark', settle: 1200 },
   { name: 'reports', hash: '#/reports', theme: 'dark', settle: 1500 },
@@ -52,6 +52,11 @@ const SHOTS = [
   { name: 'usage-fleet', query: '?mock=1', hash: '#/usage?tab=fleet', theme: 'dark', settle: 2000 },
   { name: 'session-replay', query: '?mock=1', hash: '#/sessions?id=8f2c1a90-3b7e-4d0e-9a41-2f6c5d8e1b07', theme: 'dark', settle: 2500 },
   { name: 'memory', query: '?mock=1', hash: '#/memory', theme: 'dark', settle: 1500 },
+  { name: 'ship', query: '?mock=1', hash: '#/ship', theme: 'dark', settle: 2000 },
+  { name: 'changes', query: '?mock=1', hash: '#/changes', theme: 'dark', settle: 2000 },
+  { name: 'changes-impact', query: '?mock=1', hash: '#/changes?tab=impact', theme: 'dark', settle: 3000 },
+  { name: 'brief', query: '?mock=1', hash: '#/brief', theme: 'dark', settle: 2500 },
+  { name: 'brief-warnings', query: '?mock=1', hash: '#/brief?tab=warnings', theme: 'dark', settle: 2000 },
 ];
 
 async function loadPlaywright() {
@@ -183,6 +188,8 @@ async function main() {
         await page.click(shot.click, { timeout: 5000 }).catch(() => {});
         await page.waitForTimeout(1000);
       }
+      // demo notifications are transient; keep them from covering the view
+      await page.addStyleTag({ content: '.toasts { display: none !important; }' });
       const file = path.join(outDir, `${shot.name}.png`);
       await page.screenshot({ path: file });
       console.log(`saved ${path.relative(repo, file)}`);

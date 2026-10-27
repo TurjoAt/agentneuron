@@ -21,6 +21,9 @@ AgentNeuron is an open-source Node.js CLI, local web dashboard and read-only MCP
 | [Coordination](coordination.md) | Advisory file claims, task claims and handoff notes for several agents |
 | [Supported tools](supported-tools.md) | Which files are detected for which AI tool |
 | [Usage, cost and sessions](usage.md) | Cost (exact or estimated), tokens, cache, tools, session replay, file versions, memory and settings audit from local agent data |
+| [Ship check](ship.md) | Verify agent work: run tests/build/lint, acceptance criteria with evidence, production readiness, fake functionality |
+| [Change review](changes.md) | Risk-rated diff review, impact analysis, safe checkpoints and selective restore, package guard |
+| [Agent brief](brief.md) | Resume briefs, preflight warnings (hooks), task context packs, bug detective |
 | [Insights](insights.md) | Lessons from agent sessions, rule effectiveness, replay, cost by feature |
 | [Project intelligence](project-intelligence.md) | Stacks, dependencies, CI, env, Laravel, doc drift |
 | [Architecture](architecture.md) | Module map, data flow, single-file build |

@@ -2,7 +2,7 @@
 
 # AgentNeuron
 
-**AgentNeuron is an open-source, local control center for AI coding-agent context files.** It shows what Claude Code, Codex and other agents are editing in real time, what every session cost (tokens, cache, tools, subagents) with a step-by-step replay, checks that `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, Copilot instructions, Windsurf rules, skills and MCP configs are still true and safe, learns rules from your agent sessions, and keeps every tool's rules in sync, in a web dashboard, a CLI and an MCP server.
+**AgentNeuron is an open-source, local control center for AI coding-agent context files.** It shows what Claude Code, Codex and other agents are editing in real time, what every session cost (tokens, cache, tools, subagents) with a step-by-step replay, checks that `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Cursor rules, Copilot instructions, Windsurf rules, skills and MCP configs are still true and safe, verifies that an agent's work is really done and safe to ship (tests, acceptance criteria, risky changes, made-up packages, restore points), warns agents before they repeat a known mistake, learns rules from your agent sessions, and keeps every tool's rules in sync, in a web dashboard, a CLI and an MCP server.
 
 [![npm version](https://img.shields.io/npm/v/agentneuron)](https://www.npmjs.com/package/agentneuron)
 [![npm downloads](https://img.shields.io/npm/dm/agentneuron)](https://www.npmjs.com/package/agentneuron)
@@ -41,6 +41,23 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - [Security audit](docs/audit.md) of agent config: unpinned MCP servers, inline tokens, `Bash(*)`, bypass modes, risky hooks, with a 0 to 100 risk score.
 - [Context CI](docs/ci.md): `agentneuron ci` and a GitHub Action that annotate pull requests, with `--base` to report only new problems.
 
+**Verify the work before you ship it**
+- [Ship check](docs/ship.md): runs your tests, build, lint and typecheck (opt-in) and gives a verdict with evidence: verified, partial, failing or unverified. Tracks each task's acceptance criteria as verified, incomplete, untested or failed, linked to the tests, commits and files that prove it.
+- Production readiness: missing env vars, `.env` committed, debug flags, auth bypasses, `CORS *`, default passwords, secrets, new or edited migrations, missing lockfile or start script.
+- Fake functionality detector: placeholder handlers, mock login, hard-coded demo data, `not implemented` stubs, lorem ipsum and `href="#"` buttons, before they go live.
+
+**Review what agents changed**
+- [Change review](docs/changes.md): every changed file and hunk rated high, medium or low risk with the reason (removed permission checks, touched auth, payments, migrations or CI, secrets, disabled tests), files without tests, and a "read these first" order.
+- Impact analysis: the functions and exports a change touches and what depends on them, from importers and callers to routes, tests and API contracts, as a graph and a list.
+- Safe checkpoints: snapshots of the working tree as git refs that never touch your branch, index or HEAD, with per-file restore after an automatic undo point.
+- Package guard: flags dependencies that look like popular packages (`expres`), are missing from the lockfile, come from URLs or run install scripts. Registry and advisory lookups are opt-in.
+
+**Brief your agents**
+- [Agent brief](docs/brief.md): a resume brief of any session or task (goal, done, failed attempts, decisions, files, test results, next steps, each with evidence) to continue in a new session or another agent.
+- Mistake prevention: `agentneuron preflight` warns before an agent repeats a known mistake (`npm install` in a pnpm repo, editing generated files or `.env`, a command that failed before, `rm -rf /`) and exits 2 to block it from a Claude Code hook.
+- Context packs: the files, rules, facts and tests that matter for a task, within a token budget.
+- Bug detective: paste an error or use the last failing test run to get the affected files, recent changes, related config and ranked causes with how to confirm each.
+
 **Track usage and cost**
 - [Usage & cost](docs/usage.md): cost per day, model, branch and agent from your local Claude Code and Codex sessions. Cost is exact where Claude Code recorded it and marked as an estimate where it did not. Also cache hit rate and money saved by caching, tokens, turn times, a daily budget with burn rate, and alerts for cost spikes, repeated tool failures and context jumps.
 - Session replay: every prompt, thinking step (with its duration), tool call, result, error, edit, compaction and subagent of a session on one timeline, with before/after diffs of the files it changed.
@@ -63,7 +80,7 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - Effective context: the merged instruction chain Claude, Codex or Cursor sees for a given directory, with token counts.
 - Agents center: tool and capability matrix for 13 AI tools, rules that apply to a file, MCP servers, concurrent-edit radar, context time travel.
 - Memory & plans: Claude's saved memory and plans for the project, with links between memories and warnings when a memory claims something the repo no longer has.
-- One connected dashboard: pages grouped into Monitor, Analytics, Context, Agents and Project, a product map of how pages and data connect, and a details panel for any session, file, commit, task, tool or model.
+- One connected dashboard: pages grouped into Monitor, Analytics, Quality, Context, Agents and Project, a product map of how pages and data connect, and a details panel for any session, file, commit, task, tool or model.
 - Project intelligence: stacks, dependencies and outdated packages, scripts, CI, Docker, env keys, Laravel routes/models/migrations, doc drift, code stats.
 - Git: changes, history, branches, tags, stash, blame, stats, generated changelog.
 
@@ -80,7 +97,7 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 - Git stage/commit/branch, package and script runner. Commands are spawned without a shell, stream live output and are written to an audit log.
 
 **Integrate**
-- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 19 read-only tools, plus 4 opt-in coordination tools, so your AI agents can query the same data.
+- [MCP server](docs/mcp.md) (`agentneuron mcp`) with 28 read-only tools, plus 4 opt-in coordination tools, so your AI agents can query the same data.
 - HTTP + Server-Sent Events [API](docs/http-api.md).
 - `agentneuron lint --json` for CI ([example workflow](examples/ci/)).
 - Slack/Discord-compatible webhooks for secrets, conflicts, health drops and job results.
@@ -90,8 +107,11 @@ AI tools read a growing pile of instruction files, and nobody checks them. Links
 
 | | |
 |---|---|
-| ![Live view: Claude, Codex and Cursor sessions in swimlanes with streaming file edits, line counts, a heat strip of touched files and a collision warning](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/live.png) | ![Overview dashboard with KPIs, the animated Neuron brain orbit graph, live agents, truth and safety summary and context health](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/overview.png) |
+| ![Live view: Claude, Codex and Cursor sessions in swimlanes with streaming file edits, line counts, a heat strip of touched files and a collision warning](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/live.png) | ![Overview dashboard: project header, KPIs, a status row for usage and cost, ship check, change review and truth and safety, the Neuron brain graph and live agents](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/overview.png) |
 | **Live:** what each agent is editing right now | **Overview:** Neuron brain, live agents, health and tasks |
+| ![Ship check: a failing completion verdict with reasons, changed files with line counts, test, typecheck and lint checks with their last results and Run buttons](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/ship.png) | ![Change review: changed files, lines and risk counts, a read-these-first list of high-risk files with reasons such as a removed permission check or an added secret](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/changes.png) |
+| ![Impact graph: changed files, the functions they change, their importers, callers and tests, and the API routes and contracts that may be affected](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/changes-impact.png) | ![Agent brief: a resume brief of a session with goal, done work, failed attempts, decisions, files and next steps, each with evidence](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/brief.png) |
+| ![Preflight warnings: active rules from repo facts, context rules, accepted lessons and session history that warn or block an agent's command](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/brief-warnings.png) | ![Overview in the light theme](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/overview-light.png) |
 | ![Truth check listing false commands and paths in CLAUDE.md with the evidence and a one-click fix](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/verify.png) | ![Insights: lessons mined from agent sessions as proposed rules with evidence quotes and confidence](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/insights.png) |
 | **Truth & safety:** instructions that are no longer true | **Insights:** rules learned from your sessions |
 | ![Link graph of CLAUDE.md, skills, subagents and docs grouped by role in AgentNeuron's neural layout](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/graph.png) | ![Tasks board built from Markdown checkboxes in TODO.md, with labels, due dates and links to the source line](https://raw.githubusercontent.com/TurjoAt/agentneuron/main/docs/assets/tasks.png) |
@@ -148,6 +168,9 @@ agentneuron lint                 # print issues, exit 1 on any error (CI friendl
 agentneuron status               # files, tokens, health in a few lines
 agentneuron workspace ~/code     # one UI for a folder of projects
 agentneuron mcp                  # MCP server on stdio
+agentneuron ship --run           # run tests/build/lint and report what is verified
+agentneuron review               # risk-rated review of what the agent changed
+agentneuron checkpoint create    # restore point before letting an agent loose
 agentneuron --enable edit        # allow editing files from the UI for this run
 ```
 
@@ -169,7 +192,7 @@ Any other Markdown in the project (README, TODO, ROADMAP, ADRs, `docs/`) is trac
 
 ## Use it from your AI agent (MCP)
 
-`agentneuron mcp` is a read-only MCP server on stdio. Its tools: `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`, `report_export`, `verify_context`, `audit_agent_config`, `suggest_rules`, `compile_preview`, `get_usage`, `get_session_replay`, `get_tool_health`, `list_claims`, `get_handoffs`. With `--level state`, agents can also `claim_task`, `claim_files`, `release_files` and write a `handoff_note`. Full reference: [docs/mcp.md](docs/mcp.md).
+`agentneuron mcp` is a read-only MCP server on stdio. Its tools: `project_info`, `list_files`, `read_file`, `search`, `get_health`, `get_context`, `recent_changes`, `get_tasks`, `get_links`, `report_export`, `verify_context`, `audit_agent_config`, `suggest_rules`, `compile_preview`, `get_usage`, `get_session_replay`, `get_tool_health`, `get_ship_report`, `get_task_scope`, `review_changes`, `get_change_impact`, `check_package`, `get_resume_brief`, `preflight_check`, `get_context_pack`, `get_debug_report`, `list_claims`, `get_handoffs`. With `--level state`, agents can also `claim_task`, `claim_files`, `release_files` and write a `handoff_note`. Full reference: [docs/mcp.md](docs/mcp.md).
 
 **Claude Code** (CLI, or `.mcp.json` at the project root):
 
@@ -204,10 +227,10 @@ Other MCP clients (Codex, Windsurf, Gemini CLI, Zed, Continue) use the same comm
 | Level | Allows | Enabled by |
 |---|---|---|
 | `read` | Monitor, search, graph, health, git read | always |
-| `state` | AgentNeuron's own data in `.agentneuron/`: task board, bookmarks, annotations, rescan | admin role |
-| `edit` | Write project files, git stage/commit/branch, history and trash restore | `--enable edit` |
-| `exec` | Run commands: package managers, scripts, git fetch/pull/push, MCP test; edit files that make agents run commands (Claude hooks and permissions, `.mcp.json`) | `--enable exec` |
-| `danger` | Discard changes, delete branches, run migrations, clear history, purge trash | `--enable danger` |
+| `state` | AgentNeuron's own data in `.agentneuron/`: task board, bookmarks, annotations, rescan, criteria overrides, saved briefs | admin role |
+| `edit` | Write project files, git stage/commit/branch, history and trash restore, create and delete checkpoints | `--enable edit` |
+| `exec` | Run commands: package managers, scripts, ship checks (tests, build, lint), git fetch/pull/push, MCP test; edit files that make agents run commands (Claude hooks and permissions, `.mcp.json`) | `--enable exec` |
+| `danger` | Discard changes, delete branches, run migrations, clear history, purge trash, restore files from a checkpoint | `--enable danger` |
 | `terminal` | Free-form command runner (also requires `danger`) | `--enable terminal` |
 
 - Commands are spawned without a shell, every parameter is validated, and file paths cannot leave the project.
@@ -229,6 +252,14 @@ Read [docs/permissions-and-security.md](docs/permissions-and-security.md) before
 | `agentneuron verify [dir]` | Truth check: false commands, paths and versions in context files |
 | `agentneuron audit [dir]` | Security audit of MCP servers, permissions and hooks |
 | `agentneuron ci [dir]` | Lint + verify + audit for pull requests (GitHub annotations) |
+| `agentneuron ship [dir]` | Is the work verified and ready to deploy? (`--run` runs the checks) |
+| `agentneuron review [dir]` | Risk-rated review of the current diff, with missing tests |
+| `agentneuron checkpoint list\|create\|diff\|restore` | Safe restore points; restore only the files you pick |
+| `agentneuron packages [dir]` | Look-alike, unknown or risky dependencies |
+| `agentneuron resume [dir]` | Resume brief of a session or task, as Markdown for another agent |
+| `agentneuron preflight --command "..."` | Warnings before a command or edit; exit 2 blocks it (hook-friendly) |
+| `agentneuron pack --task "..."` | Task-specific context pack within a token budget |
+| `agentneuron debug [dir]` | Diagnostic report for an error or the last failing run |
 | `agentneuron usage [dir]` | Cost, tokens, cache, tools and alerts from your Claude/Codex sessions |
 | `agentneuron lessons [dir]` | Rules to learn from your Claude/Codex sessions |
 | `agentneuron compile [dir]` | Compile `.agentneuron/rules/` into every tool's files |
@@ -248,7 +279,7 @@ For usage and session pages it also reads the session logs Claude Code and Codex
 
 ### Does it send my code or files anywhere?
 
-No. There is no telemetry. The only outbound requests are webhooks you configure, commands you run yourself through actions (such as `git fetch`), and the MCP server test.
+No. There is no telemetry. The only outbound requests are webhooks you configure, commands you run yourself through actions (such as `git fetch`), the MCP server test, and package registry lookups if you turn on `packages.online`.
 
 ### Does it use an AI model or cost tokens?
 
@@ -256,7 +287,7 @@ No. AgentNeuron does not call any model. Token counts are local estimates. Sessi
 
 ### Will it change my project?
 
-Not by default. It writes only inside `.agentneuron/`. Editing files and running commands require you to enable a permission level.
+Not by default. It writes only inside `.agentneuron/` (and, when you create a checkpoint, a git ref under `refs/agentneuron/checkpoints/`, which never touches your branches, index or HEAD). Editing files and running commands require you to enable a permission level.
 
 ### How do I lint CLAUDE.md or AGENTS.md in CI?
 
@@ -274,6 +305,14 @@ Yes, through the MCP server (`agentneuron mcp`). An agent can ask for the effect
 
 Run `npx agentneuron` and open **Usage & cost**, or run `npx agentneuron usage --range 7d` in a terminal. You get cost per day, model, branch and session, the cache hit rate and what caching saved, and alerts for cost spikes or an agent stuck repeating the same failing command. Open any session to replay it step by step.
 
+### How do I know the agent's work is actually done?
+
+Open **Ship check**, or run `npx agentneuron ship --run`. It runs your tests, build, lint and typecheck, and reports a verdict with the evidence: which acceptance criteria of the task are verified, incomplete, untested or failed, what changed, and anything that blocks a production deploy. Pair it with `agentneuron review` to see which changes are risky and which files have no tests.
+
+### Can I stop an agent from repeating a mistake?
+
+Yes. `agentneuron preflight --command "<cmd>"` checks a command or a file edit against the project's rules, past session failures and repo facts (such as the package manager in use) and exits 2 when it should be blocked. Wire it into a Claude Code `PreToolUse` hook; the snippet is in [docs/brief.md](docs/brief.md). AI agents can also call the `preflight_check` MCP tool.
+
 ### Can I see what Claude Code or Codex is editing right now?
 
 Yes. Open **Live**: AgentNeuron tails the Claude Code and Codex session transcripts for the project and shows each edit as it happens, checked against the file watcher, with diffs and collision warnings. Prompts are shown to admins only. See [docs/live.md](docs/live.md).
@@ -290,6 +329,7 @@ More answers: [docs/faq.md](docs/faq.md).
 | Secret detection in context files | Yes | No | No | Manual |
 | Drift between tools' instruction files | Yes | No | Usually one-way copy | Manual |
 | Live change feed and history | Yes | No | No | git log |
+| Verifies agent work (tests, criteria, risky changes) | Yes | No | No | Manual |
 | MCP server for agents | Yes, read-only | No | No | No |
 | Runs locally, no account | Yes | Yes | Yes | Yes |
 
