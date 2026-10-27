@@ -5,16 +5,19 @@ export const US = '\x1f';
 export const RS = '\x1e';
 export const MAX_PATCH = 400 * 1024;
 
-/** Run git (never a shell). Resolves { ok, code, out, err }; never rejects. */
-export function runGit(cwd, args, { timeout = 15000, maxBuffer = 64 * 1024 * 1024 } = {}) {
+/**
+ * Run git (never a shell). Resolves { ok, code, out, err }; never rejects.
+ * Options: `env` adds variables (e.g. GIT_INDEX_FILE); `encoding: 'buffer'` returns `out` as a Buffer (binary blobs).
+ */
+export function runGit(cwd, args, { timeout = 15000, maxBuffer = 64 * 1024 * 1024, env = null, encoding = 'utf8' } = {}) {
   return new Promise((resolve) => {
     try {
       execFile('git', args, {
-        cwd, timeout, maxBuffer, windowsHide: true, encoding: 'utf8',
-        env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C', GIT_TERMINAL_PROMPT: '0', GIT_PAGER: 'cat' },
+        cwd, timeout, maxBuffer, windowsHide: true, encoding,
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C', GIT_TERMINAL_PROMPT: '0', GIT_PAGER: 'cat', ...(env || {}) },
       }, (err, stdout, stderr) => {
-        const out = typeof stdout === 'string' ? stdout : '';
-        const e = typeof stderr === 'string' ? stderr : '';
+        const out = encoding === 'buffer' ? (Buffer.isBuffer(stdout) ? stdout : Buffer.alloc(0)) : typeof stdout === 'string' ? stdout : '';
+        const e = Buffer.isBuffer(stderr) ? stderr.toString('utf8') : typeof stderr === 'string' ? stderr : '';
         if (err) return resolve({ ok: false, code: typeof err.code === 'number' ? err.code : -1, out, err: e || String(err.message || '') });
         resolve({ ok: true, code: 0, out, err: e });
       });

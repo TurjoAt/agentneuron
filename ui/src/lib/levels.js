@@ -19,6 +19,9 @@ export const CATEGORY_ICON = {
   tasks: 'tasks',
   agentneuron: 'settings',
   workspace: 'folder',
+  ship: 'check',
+  changes: 'merge',
+  brief: 'target',
 };
 
 export const HOW_TO_ENABLE = {

@@ -235,6 +235,18 @@ Lint + truth check + audit + context budget for CI. `--format github|markdown|js
 
 Completion and readiness report: verdict, changed files, each detected check with its last stored run, acceptance criteria with evidence, production-readiness findings and placeholder code. Static by default. `--run` first runs the detected checks (test/build/lint/typecheck, without a shell, `CI=1`) and stores the results in `.agentneuron/ship/runs/`. `--base <ref>` compares against a git revision instead of `HEAD`. `--fail-on high|medium|low` (default `high`): exit `1` when a readiness or placeholder finding is at or above that severity, or the verdict is `failing`. `--json` prints `{ schema: "agentneuron.ship/v1", report, readiness, placeholders, exitCode }`. See [Ship check](ship.md).
 
+### `review [dir]`
+
+Review guardian for the current diff: per-file risk with reasons (removed checks, secrets, widened permissions, missing tests), groups and a read-first order. `--base <ref>` compares with another revision (`a..b` ranges work), `--json` prints `{ base, head, summary, groups, files, readFirst }`, `--fail-on high|medium|low` exits `1` when any file reaches that risk. See [change review](changes.md).
+
+### `checkpoint list|create|diff|restore|delete [dir]`
+
+Working-tree snapshots under `refs/agentneuron/checkpoints/*` that never touch HEAD, the index or branches. `create [--label x]`, `diff --id <id>` (per-file status vs now), `restore --id <id> --paths a,b` (prints the plan and exits `1`; add `--yes` to restore those paths only, after an automatic undo checkpoint), `delete --id <id>`. `--json` on every subcommand. See [checkpoints](changes.md#checkpoints-and-selective-rollback).
+
+### `packages [dir]`
+
+Package hallucination guard: look-alikes of popular packages, dependencies missing from the lockfile, URL/git sources, unpinned versions, install scripts. Offline unless `--online` or `packages.online` is set. Exit `1` if any finding is high; `--json` prints `{ online, deps, findings, lockfiles }`. See [package guard](changes.md#package-hallucination-guard).
+
 ### `--version`, `--help`
 
 Print the version or the usage text.

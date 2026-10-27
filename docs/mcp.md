@@ -43,6 +43,9 @@ agentneuron mcp [dir] [--level state]
 | `preflight_check` | `command?`, `paths?` (comma list) | `{ warnings: [{ id, severity, title, why, fix, source, evidence }], blocking, verdict }` (`verdict`: `block`, `warn` or `ok`) for an action about to be taken |
 | `get_context_pack` | `task` (description or board task id), `budget?` (default 8000) | `{ task, budget, tokens, items: [{ kind, path, reason, score, tokens }], skipped, markdown }` |
 | `get_debug_report` | `error?`, `run?` (failing run id; default the last failing run when `error` is empty) | `{ error, frames, hypotheses: [{ title, confidence, evidence, check }], related, markdown }` |
+| `review_changes` | `base?` | [Change review](changes.md) of the current diff: summary, groups, per-file risk and reasons (hunks as a count, at most 150 files), read-first order |
+| `get_change_impact` | `paths?` (comma list; default the changed files), `base?` | Changed symbols and what may depend on them: importers, callers, routes, tests, contracts with confidence |
+| `check_package` | `manager` (`npm`, `pnpm`, `yarn`, `bun`, `composer`, `pip`, `poetry`), `name`, `version?` | Verdict (`ok`, `warn`, `block`, `unknown`) with reasons before installing. Never goes online; uses cached registry facts when `packages.online` is on |
 
 ### Coordination tools (`--level state`)
 

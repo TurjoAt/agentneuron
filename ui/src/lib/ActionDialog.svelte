@@ -1,6 +1,7 @@
 <script>
   // Renders the pending runAction() request: schema form, live command preview,
   // disabled reason + how-to-enable, typed confirmation for danger.
+  import { untrack } from 'svelte';
   import { post } from './api.js';
   import { app, toast, navigate } from './store.svelte.js';
   import { actionsState, actionEnabled, startJob } from './actions.svelte.js';
@@ -65,11 +66,11 @@
     const { params, errs } = collect();
     clearTimeout(timer);
     if (Object.keys(errs).length) {
-      preview = { ...preview, loading: false, error: '' };
+      untrack(() => (preview = { ...preview, loading: false, error: '' }));
       return;
     }
     const id = req.id;
-    preview = { ...preview, loading: true };
+    untrack(() => (preview = { ...preview, loading: true }));
     timer = setTimeout(() => {
       post('/api/actions/preview', { id, params })
         .then((r) => req?.id === id && (preview = { loading: false, command: r?.command ?? null, summary: r?.summary || '', error: '' }))

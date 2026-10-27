@@ -9,7 +9,7 @@ import { insightsRoutes } from './mock-insights.js';
 import { usageRoutes } from './mock-usage.js';
 import { usageShellRoutes } from './mock-usage-shell.js';
 import { shipRoutes } from './mock-ship.js';
-import { changesRoutes } from './mock-changes.js';
+import { changesRoutes, CHANGES_MOCK_ACTIONS, changesMockPreview, changesMockApply } from './mock-changes.js';
 import { briefRoutes } from './mock-brief.js';
 
 const MIN = 60_000;
@@ -858,13 +858,14 @@ export function createMock() {
   const jobTimers = new Map();
   let jobSeq = 0;
   const actionList = () =>
-    MOCK_ACTIONS.map((a) => {
+    [...MOCK_ACTIONS, ...CHANGES_MOCK_ACTIONS].map((a) => {
       const lvl = a.flag === 'terminal' ? 'terminal' : a.level;
       const enabled = can(lvl) && (a.level !== 'danger' || can('danger'));
       return { id: a.id, title: a.title, category: a.category, level: a.level, description: a.description, params: clone(a.params), enabled, ...(enabled ? {} : { reason: howTo(lvl) }) };
     });
   const shq = (s) => (/^[\w@%+=:,./-]+$/.test(String(s)) ? String(s) : `'${String(s).replace(/'/g, `'\\''`)}'`);
   function preview(id, p = {}) {
+    if (id.startsWith('changes.')) return changesMockPreview(id, p);
     const m = p.manager || 'pnpm';
     const map = {
       'agentneuron.rescan': [null, 'Re-index all tracked files'],
@@ -940,6 +941,7 @@ export function createMock() {
   }
 
   function applyEffects(id, p) {
+    if (id.startsWith('changes.')) return changesMockApply(id, p);
     switch (id) {
       case 'git.stage': for (const x of p.paths || []) if (db.get(x)?.gitStatus) staged.add(x); return { staged: p.paths };
       case 'git.unstage': for (const x of p.paths || []) staged.delete(x); return { unstaged: p.paths };
@@ -978,7 +980,7 @@ export function createMock() {
     return clone(s);
   }
   function runJob(id, params) {
-    const def = MOCK_ACTIONS.find((a) => a.id === id);
+    const def = [...MOCK_ACTIONS, ...CHANGES_MOCK_ACTIONS].find((a) => a.id === id);
     if (!def) throw httpErr(404, `unknown action ${id}`);
     const lvl = def.flag === 'terminal' ? 'terminal' : def.level;
     need(lvl);
