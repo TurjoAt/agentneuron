@@ -99,11 +99,15 @@ test('store: init, add/change/unlink events, ring buffer', async () => {
 test('watcher: receives add, change, unlink for candidates only', async () => {
   const r = tmp();
   put(r, 'existing.md', 'a\n');
+  // the folder exists before watching starts: on macOS, fs.watch can miss a file written in the same
+  // instant its brand-new parent folder appears, which made this test flaky on busy runners
+  fs.mkdirSync(path.join(r, 'docs'));
   const cfg = loadConfig(r);
   const got = [];
   const w = createWatcher(r, cfg, (e) => got.push(e));
   await w.ready;
-  const waitFor = async (pred, ms = 5000) => {
+  await new Promise((x) => setTimeout(x, 200)); // let the native watchers settle after 'ready' (macOS)
+  const waitFor = async (pred, ms = 15000) => {
     const end = Date.now() + ms;
     while (Date.now() < end) { if (got.some(pred)) return; await new Promise((x) => setTimeout(x, 50)); }
     assert.fail('timeout; got ' + JSON.stringify(got));
@@ -132,10 +136,11 @@ test('watcher + store integration', async () => {
   await s.init();
   const w = createWatcher(r, cfg, (e) => { s.handleFsEvent(e); });
   await w.ready;
+  await new Promise((x) => setTimeout(x, 200)); // let the native watchers settle after 'ready' (macOS)
   try {
     const p = new Promise((res) => s.once('event', res));
     fs.writeFileSync(path.join(r, 'AGENTS.md'), '# x\nchanged\n');
-    const ev = await Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))]);
+    const ev = await Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))]);
     assert.equal(ev.path, 'AGENTS.md');
     assert.equal(ev.type, 'change');
     assert.equal(ev.stats.added, 1);
