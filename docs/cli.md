@@ -211,6 +211,10 @@ Security audit of the project's agent config (MCP servers, permissions, bypass m
 
 Lint + truth check + audit + context budget for CI. `--format github|markdown|json` (default `github` inside GitHub Actions, else `markdown`), `--fail-on error|warn|never` (default `error`), `--base <ref>` (only issues introduced since that revision), `--budget <tokens>` (default 20000). See [context CI](ci.md).
 
+### `ship [dir]`
+
+Completion and readiness report: verdict, changed files, each detected check with its last stored run, acceptance criteria with evidence, production-readiness findings and placeholder code. Static by default. `--run` first runs the detected checks (test/build/lint/typecheck, without a shell, `CI=1`) and stores the results in `.agentneuron/ship/runs/`. `--base <ref>` compares against a git revision instead of `HEAD`. `--fail-on high|medium|low` (default `high`): exit `1` when a readiness or placeholder finding is at or above that severity, or the verdict is `failing`. `--json` prints `{ schema: "agentneuron.ship/v1", report, readiness, placeholders, exitCode }`. See [Ship check](ship.md).
+
 ### `--version`, `--help`
 
 Print the version or the usage text.
@@ -220,8 +224,8 @@ Print the version or the usage text.
 | Code | Meaning |
 |---|---|
 | `0` | Success |
-| `1` | `lint` found errors, `verify` found a false claim, `audit` found a high-severity issue, `ci` failed its `--fail-on` threshold, `doctor` found a failure, `update` failed or was declined; or an unexpected runtime error |
-| `2` | Bad usage: not a directory, invalid `--enable` level, bad `export` format or range, bad `ci` flags or unusable `--base` |
+| `1` | `lint` found errors, `verify` found a false claim, `audit` found a high-severity issue, `ci` failed its `--fail-on` threshold, `ship` found a finding at or above `--fail-on` or a failing check, `doctor` found a failure, `update` failed or was declined; or an unexpected runtime error |
+| `2` | Bad usage: not a directory, invalid `--enable` level, bad `export` format or range, bad `ci` flags or unusable `--base`, bad `ship --fail-on` / `--base` |
 
 ## Environment
 

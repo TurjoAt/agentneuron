@@ -37,6 +37,8 @@ agentneuron mcp [dir] [--level state]
 | `get_usage` | `range?` (`24h`, `7d`, `30d` default, `90d`, `all`) | Usage summary of this project's Claude Code / Codex sessions: cost (exact where Claude Code recorded it, otherwise estimated), tokens, cache hit rate and savings, models, tool errors, anomalies and tips. No prompt text or titles. See [Usage](usage.md) |
 | `get_session_replay` | `id`, `limit?` (default 200, max 1000) | One session: summary row, the last `limit` timeline rows, subagents and saved file versions. Prompts are included (masked); thinking text only when `live.showPrompts` allows it |
 | `get_tool_health` | `range?` | Tool calls, errors, denials, durations, MCP servers needing auth, skills, hooks and error loops |
+| `get_ship_report` | `base?` (git ref, default `HEAD`) | [Ship check](ship.md) completion report: verdict (`verified`/`partial`/`failing`/`unverified`) with reasons, changed files with +/-, each check's last stored run, failures with file:line, acceptance criteria with evidence, readiness blockers and placeholder counts. Never runs commands |
+| `get_task_scope` | `task?` (task id; default all open tasks with criteria) | Acceptance criteria of board tasks with status `verified`/`incomplete`/`untested`/`failed` and evidence (`commit`, `file`, `test`, `run`, `manual`). See [Ship check](ship.md#acceptance-criteria) |
 
 ### Coordination tools (`--level state`)
 

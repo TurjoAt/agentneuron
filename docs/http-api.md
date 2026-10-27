@@ -157,6 +157,23 @@ Common query parameters: `range` (`24h`, `7d`, `30d` default, `90d`, `all`), `to
 | `/api/usage/settings` | | Masked `settings`, `permissionModes` seen in sessions (last 30 days), `mcpNeedsAuth`, `findings`. `~/.claude/settings.json` is included for admins only. |
 | `/api/usage/entity` | `kind` (`session`, `file`, `commit`, `task`, `tool`, `model`, `agent`), `id` | `{ kind, id, title, subtitle, stats, related: { sessions, files, commits, tasks, tools }, links }` for the side panel (last 90 days) |
 
+## Ship check
+
+Completion, scope and readiness. See [Ship check](ship.md). All routes are `GET`, level `read`, secret-masked, and never run project commands (only read-only git queries and bounded file reads). No session text is returned.
+
+| Path | Parameters | Result |
+|---|---|---|
+| `/api/ship/summary` | | `{ generatedAt, verdict, reasons, readiness: { ready, blockers, counts }, placeholders: { count, counts }, lastRuns, scope: { tasks, criteria, verified, incomplete, untested, failed }, changed }` |
+| `/api/ship/checks` | | `{ checks: [{ id, kind, label, command, source, script, last, stale, status }], run: { actionId, level, enabled, reason } }`. `run.reason` says how to enable running for this role |
+| `/api/ship/runs` | `limit` (max 200, default 50) | `{ runs: [{ id, check, kind, command, startedAt, endedAt, exitCode, passed, failed, skipped, format, failures }] }`, newest first |
+| `/api/ship/run` | `id` | One run with `tests`, `failures` and `log` (masked, last 128 KB). The log is admin-only (`logHidden: true` for viewers) |
+| `/api/ship/report` | `base` (git rev, default `HEAD`) | `{ base, head, git, verdict, reasons, changedFiles: [{ path, status, added, removed }], totals, checks, criteria, criteriaSummary, failures: [{ check, run, name, file, line, message }], evidence, run, override }` |
+| `/api/ship/scope` | `task` (optional id) | `{ tasks: [{ id, title, status, criteria: [{ id, text, done, source, status, auto, evidence: [{ kind, ref, label }] }], commits, summary }], totals, override }`; 404 for an unknown task |
+| `/api/ship/readiness` | | `{ ready, blockers, counts, findings: [{ id, rule, severity, category, title, why, fix, location: { path, line } }], scanned }` |
+| `/api/ship/placeholders` | | `{ count, counts, findings, scanned }` (same finding shape, `category: "placeholder"`) |
+
+Actions: `ship.verify.run` (level `exec`, params `{ checks: string[] }`, empty = all detected) and `ship.criterion.set` (level `state`, params `{ task, criterion, status: verified|incomplete|untested|failed|auto, note? }`).
+
 ## Insights
 
 See [Insights](insights.md). Every response is passed through the secret masker.
