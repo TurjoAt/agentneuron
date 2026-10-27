@@ -1,8 +1,12 @@
 <script>
-  // Agent brief (agent C). Contract: docs/internal/quality-contract.md.
+  // Agent brief: resume briefs, mistake prevention (warnings / preflight), context packs, bug detective.
+  // Contract: docs/internal/quality-contract.md (Slice C). User doc: docs/brief.md.
   import { navigate } from '../lib/store.svelte.js';
   import Tabs from '../lib/Tabs.svelte';
-  import Empty from '../lib/Empty.svelte';
+  import ResumeTab from './brief/ResumeTab.svelte';
+  import WarningsTab from './brief/WarningsTab.svelte';
+  import PackTab from './brief/PackTab.svelte';
+  import DebugTab from './brief/DebugTab.svelte';
 
   let { params = {} } = $props();
   const IDS = ['resume', 'warnings', 'pack', 'debug'];
@@ -19,9 +23,21 @@
   <div class="page-h">
     <div>
       <h1>Agent brief</h1>
-      <p>Resume work, avoid known mistakes, build task context and diagnose errors.</p>
+      <p>Resume work, avoid known mistakes, build task context and diagnose errors. Every item cites its evidence; nothing here calls a model.</p>
     </div>
   </div>
   <div class="tabs"><Tabs tabs={TABS} active={tab} onchange={(id) => navigate('brief', { tab: id })} /></div>
-  <div class="card"><Empty icon="info" title="Coming soon">This page is being built.</Empty></div>
+  {#if tab === 'warnings'}
+    <WarningsTab {params} />
+  {:else if tab === 'pack'}
+    <PackTab {params} />
+  {:else if tab === 'debug'}
+    <DebugTab />
+  {:else}
+    <ResumeTab {params} />
+  {/if}
 </div>
+
+<style>
+  .tabs { margin-bottom: 16px; max-width: 100%; }
+</style>

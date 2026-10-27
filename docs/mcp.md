@@ -37,6 +37,10 @@ agentneuron mcp [dir] [--level state]
 | `get_usage` | `range?` (`24h`, `7d`, `30d` default, `90d`, `all`) | Usage summary of this project's Claude Code / Codex sessions: cost (exact where Claude Code recorded it, otherwise estimated), tokens, cache hit rate and savings, models, tool errors, anomalies and tips. No prompt text or titles. See [Usage](usage.md) |
 | `get_session_replay` | `id`, `limit?` (default 200, max 1000) | One session: summary row, the last `limit` timeline rows, subagents and saved file versions. Prompts are included (masked); thinking text only when `live.showPrompts` allows it |
 | `get_tool_health` | `range?` | Tool calls, errors, denials, durations, MCP servers needing auth, skills, hooks and error loops |
+| `get_resume_brief` | `session?`, `task?`, `brief?` (saved brief id) | Resume brief of the latest session, a session or a board task: goal, done, failed attempts, decisions, files, runs, todos, next steps, each with evidence, plus `markdown`. `brief` loads a saved brief (the id is in its handoff note). See [Agent brief](brief.md) |
+| `preflight_check` | `command?`, `paths?` (comma list) | `{ warnings: [{ id, severity, title, why, fix, source, evidence }], blocking, verdict }` (`verdict`: `block`, `warn` or `ok`) for an action about to be taken |
+| `get_context_pack` | `task` (description or board task id), `budget?` (default 8000) | `{ task, budget, tokens, items: [{ kind, path, reason, score, tokens }], skipped, markdown }` |
+| `get_debug_report` | `error?`, `run?` (failing run id; default the last failing run when `error` is empty) | `{ error, frames, hypotheses: [{ title, confidence, evidence, check }], related, markdown }` |
 
 ### Coordination tools (`--level state`)
 
