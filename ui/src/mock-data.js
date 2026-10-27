@@ -531,6 +531,8 @@ const MANAGER = { type: 'enum', enum: ['pnpm', 'npm', 'composer'], required: tru
 
 /** Mock action registry (mirrors the server registry shapes). */
 export const MOCK_ACTIONS = [
+  { id: 'ship.verify.run', title: 'Run checks', category: 'ship', level: 'exec', description: 'Run the detected test, build, lint and typecheck commands and record the results.', params: { checks: { type: 'string[]', label: 'Checks' } } },
+  { id: 'ship.criterion.set', title: 'Set criterion status', category: 'ship', level: 'state', description: 'Override the status of one acceptance criterion.', params: { task: { type: 'string' }, criterion: { type: 'string' }, status: { type: 'enum', enum: ['auto', 'verified', 'incomplete', 'untested', 'failed'] }, note: { type: 'text', default: '' } } },
   { id: 'agentneuron.rescan', title: 'Rescan project', category: 'agentneuron', level: 'state', description: 'Re-index every tracked file and recompute the graph and health.', params: {} },
   { id: 'agentneuron.snapshot', title: 'Record metrics snapshot', category: 'agentneuron', level: 'state', description: 'Append a metrics snapshot to .agentneuron/metrics.jsonl.', params: {} },
   { id: 'agentneuron.history.clear', title: 'Clear file history', category: 'agentneuron', level: 'danger', description: 'Delete all local version snapshots in .agentneuron/history.', params: {} },
