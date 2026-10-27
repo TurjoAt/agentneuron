@@ -118,7 +118,7 @@ async function readLockfilesUncached(root) {
   if (pn) {
     const L = npmLock('pnpm-lock.yaml');
     let section = null, cur = null;
-    for (const line of pn.split('\n')) {
+    for (const line of pn.split(/\r?\n/)) {
       if (/^\S/.test(line)) { section = line.replace(/:.*$/, ''); cur = null; continue; }
       if (section === 'packages' || section === 'snapshots') {
         const m = /^ {2}['"]?\/?((?:@[^/@\s'"]+\/)?[^@\s'"/(]+)@[^:]*['"]?:\s*$/.exec(line);
@@ -132,7 +132,7 @@ async function readLockfilesUncached(root) {
   const yl = await readText(root, 'yarn.lock');
   if (yl) {
     const L = npmLock('yarn.lock');
-    for (const line of yl.split('\n')) {
+    for (const line of yl.split(/\r?\n/)) {
       if (!line || /^[\s#]/.test(line) || !line.endsWith(':')) continue;
       for (let spec of line.slice(0, -1).split(',')) {
         spec = spec.trim().replace(/^"|"$/g, '');

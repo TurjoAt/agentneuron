@@ -20,7 +20,14 @@ const ADMIN = 'adm-changes-1234', VIEWER = 'view-changes-1234';
 const SECRET_LINE = 'SECRET-CHECKPOINT-CONTENT-42';
 
 const cleanups = [];
-after(async () => { for (const f of cleanups.reverse()) { try { await f(); } catch { /* ignore */ } } fs.rmSync(home, { recursive: true, force: true }); });
+after(async () => { for (const f of cleanups.reverse()) { try { await f(); } catch { /* ignore */ } } rmTemp(home); });
+
+// Windows can keep directory handles (file watcher, exiting git children) open briefly after
+// an in-process close(); a locked temp dir there is left for the OS instead of failing the run.
+function rmTemp(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  catch (e) { if (process.platform !== 'win32' || !['EBUSY', 'EPERM'].includes(e.code)) throw e; }
+}
 
 function repo() {
   const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agentneuron-chs-')));
@@ -33,7 +40,7 @@ function repo() {
 }
 async function boot(root, overrides = {}) {
   const srv = await startServer(loadConfig(root, { port: 0, adminToken: ADMIN, token: VIEWER, ...overrides }));
-  cleanups.push(async () => { await srv.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await srv.close(); rmTemp(root); });
   return srv.port;
 }
 const req = (port, p, tok, { method = 'GET', body } = {}) => new Promise((resolve, reject) => {
@@ -125,7 +132,8 @@ test('actions: create needs edit, restore is danger and previews per file', asyn
   const run = await req(port, '/api/actions/run', ADMIN, { method: 'POST', body: { id: 'changes.checkpoint.create', params: { label: 'from api' } } });
   assert.equal(run.status, 200, run.body);
   let cps = [];
-  for (let i = 0; i < 50 && !cps.length; i++) { await new Promise((r) => setTimeout(r, 50)); cps = (await req(port, '/api/changes/checkpoints', ADMIN)).json().checkpoints; }
+  // deadline, not an iteration count: a checkpoint job runs ~10 git processes, much slower on Windows/macOS runners
+  for (const end = Date.now() + 15000; Date.now() < end && !cps.length;) { await new Promise((r) => setTimeout(r, 50)); cps = (await req(port, '/api/changes/checkpoints', ADMIN)).json().checkpoints; }
   assert.equal(cps[0].label, 'from api');
   w(d, 'a.txt', 'two\n');
   const pv = (await req(port, '/api/actions/preview', ADMIN, { method: 'POST', body: { id: 'changes.checkpoint.restore', params: { id: cps[0].id, paths: ['a.txt'] } } })).json();

@@ -406,7 +406,10 @@ test('scanners stay fast on a repo-sized tree and skip dependency folders', asyn
   for (let i = 0; i < 10000; i++) put(r, `node_modules/pkg${i % 400}/f${i}.js`, junk);
   for (let i = 0; i < 6000; i++) put(r, `vendor/v${i % 200}/f${i}.php`, junk);
   for (let i = 0; i < 4000; i++) put(r, `dist/assets/c${i}.js`, junk);
-  for (let i = 0; i < 2500; i++) put(r, `src/mod${i % 50}/file${i}.js`, `export function f${i}(a) { return a + ${i}; }\n`.repeat(20));
+  // Windows runners create and open many small files much more slowly than Linux; fewer source files there keep the
+  // test about skipping dependency folders and the per-file cache rather than about the runner's disk (Linux: ~1.3 s for 2500).
+  const SRC = process.platform === 'win32' ? 1000 : 2500;
+  for (let i = 0; i < SRC; i++) put(r, `src/mod${i % 50}/file${i}.js`, `export function f${i}(a) { return a + ${i}; }\n`.repeat(20));
   put(r, 'src/bad.js', junk);
   _clearScanCache();
   const t0 = Date.now();
@@ -416,7 +419,7 @@ test('scanners stay fast on a repo-sized tree and skip dependency folders', asyn
   const paths = new Set([...ready.findings, ...ph.findings].map((f) => f.location.path).filter(Boolean));
   assert.deepEqual([...paths].filter((p) => /node_modules|vendor|dist/.test(p)), []);
   assert.ok(paths.has('src/bad.js'));
-  assert.equal(ready.scanned.files, 2501);
+  assert.equal(ready.scanned.files, SRC + 1);
   const t1 = Date.now();
   await readiness(r, { fresh: true });
   assert.ok(Date.now() - t1 < 3000, 'second scan reuses the per-file cache');

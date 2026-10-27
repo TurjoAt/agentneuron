@@ -26,10 +26,12 @@ function publicRun(r) {
 
 /** Make paths in failures project-relative (node:test reports absolute file:// locations); drop paths outside the project. */
 export function relFailures(root, failures = []) {
-  const abs = path.resolve(root).replace(/\\/g, '/');
+  const base = path.resolve(root);
   return failures.map((f) => {
     let file = f.file ? String(f.file).replace(/^file:\/\//, '').replace(/\\/g, '/') : null;
-    if (file && file.startsWith(abs + '/')) file = file.slice(abs.length + 1);
+    if (file && /^\/[A-Za-z]:\//.test(file)) file = file.slice(1); // Windows file URL: file:///C:/x
+    // path.relative (not a string prefix): on Windows the drive letter / case may differ and POSIX-style roots resolve onto a drive
+    if (file && path.isAbsolute(file)) { const r = path.relative(base, path.resolve(file)); file = r && !path.isAbsolute(r) ? r.replace(/\\/g, '/') : null; }
     if (file && (file.startsWith('/') || /^[A-Za-z]:\//.test(file) || file.split('/').includes('..'))) file = null;
     if (file) file = file.replace(/^\.\//, '');
     return { name: maskSecretsInText(String(f.name || '')).slice(0, 300), file, line: Number.isInteger(f.line) ? f.line : null, message: maskSecretsInText(String(f.message || '')).slice(0, 600) };

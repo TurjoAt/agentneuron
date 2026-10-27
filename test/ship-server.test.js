@@ -31,7 +31,14 @@ const { saveRun, listRuns } = await import('../src/ship/runs.js');
 
 const ADMIN = 'adm-ship-1234', VIEWER = 'view-ship-1234';
 const cleanups = [];
-after(async () => { for (const f of cleanups.reverse()) { try { await f(); } catch { /* ignore */ } } fs.rmSync(base, { recursive: true, force: true }); });
+after(async () => { for (const f of cleanups.reverse()) { try { await f(); } catch { /* ignore */ } } rmTemp(base); });
+
+// Windows can keep directory handles (file watcher, exiting git children) open briefly after
+// an in-process close(); a locked temp dir there is left for the OS instead of failing the run.
+function rmTemp(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  catch (e) { if (process.platform !== 'win32' || !['EBUSY', 'EPERM'].includes(e.code)) throw e; }
+}
 async function boot(actions = {}) {
   const srv = await startServer(loadConfig(root, { port: 0, adminToken: ADMIN, token: VIEWER, actions }));
   cleanups.push(() => srv.close());
@@ -137,7 +144,7 @@ test('ship.criterion.set: state level, admin only, validates ids, changes the st
   const job = await post(url, '/api/actions/run', { id: 'ship.criterion.set', params: { task, criterion: crit, status: 'verified', note: 'manual QA' } }, ADMIN);
   assert.equal(job.status, 200, JSON.stringify(job.body));
   let s;
-  for (let i = 0; i < 50; i++) {
+  for (const end = Date.now() + 15000; Date.now() < end;) { // deadline, not a count: slower Windows/macOS runners
     s = (await get(url, '/api/ship/scope', ADMIN)).body.tasks[0].criteria.find((x) => x.id === crit);
     if (s.status === 'verified') break;
     await new Promise((r) => setTimeout(r, 40));

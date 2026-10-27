@@ -27,7 +27,14 @@ await st0.init();
 const saved = saveBrief(fx.root, 'resume', await buildResume(briefCtx({ root: fx.root, config: cfg0, store: st0, home: fx.home }), { session: 'S1' }));
 
 const cleanups = [];
-after(async () => { for (const f of cleanups.reverse()) { try { await f(); } catch { /* ignore */ } } fs.rmSync(fx.base, { recursive: true, force: true }); });
+after(async () => { for (const f of cleanups.reverse()) { try { await f(); } catch { /* ignore */ } } rmTemp(fx.base); });
+
+// Windows can keep directory handles (file watcher, exiting git children) open briefly after
+// an in-process close(); a locked temp dir there is left for the OS instead of failing the run.
+function rmTemp(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  catch (e) { if (process.platform !== 'win32' || !['EBUSY', 'EPERM'].includes(e.code)) throw e; }
+}
 
 const ADMIN = 'adm-brief-1234', VIEWER = 'view-brief-1234';
 const srv = await startServer(loadConfig(fx.root, { port: 0, adminToken: ADMIN, token: VIEWER }));
@@ -140,7 +147,8 @@ test('brief.save action: admin only (state), stores the recomputed brief and a h
   const a = await req('POST', '/api/actions/run', ADMIN, { id: 'brief.save', params: { session: 'S1' } });
   assert.equal(a.status, 200, a.body);
   let job = JSON.parse(a.body);
-  for (let i = 0; i < 50 && !['ok', 'error'].includes(job.status); i++) {
+  // wait on a deadline, not an iteration count: job + HTTP round trips are much slower on Windows/macOS runners
+  for (const end = Date.now() + 15000; Date.now() < end && !['ok', 'error'].includes(job.status);) {
     await new Promise((r) => setTimeout(r, 50));
     job = JSON.parse((await req('GET', `/api/job?id=${job.id}`, ADMIN)).body);
   }

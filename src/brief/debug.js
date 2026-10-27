@@ -57,8 +57,10 @@ export function parseFrames(text, root, idx) {
       const f = fn(m);
       if (!f.file || /^(node:|internal\/|<anonymous>|native)/.test(f.file) || !Number.isFinite(f.line) || f.line <= 0) break;
       let file = f.file.replace(/^file:\/\//, '');
-      const nm = /(?:^|\/)node_modules\/((?:@[\w.-]+\/)?[\w.-]+)/.exec(file);
-      const vendor = /(?:^|\/)vendor\/([\w.-]+\/[\w.-]+)\//.exec(file);
+      if (process.platform === 'win32') file = file.replace(/^\/([A-Za-z]:)/, '$1'); // file:///C:/x
+      const fwd = file.replace(/\\/g, '/'); // Windows traces use backslashes
+      const nm = /(?:^|\/)node_modules\/((?:@[\w.-]+\/)?[\w.-]+)/.exec(fwd);
+      const vendor = /(?:^|\/)vendor\/([\w.-]+\/[\w.-]+)\//.exec(fwd);
       let rel = path.isAbsolute(file) ? relPath(root, file) : file.replace(/^\.\//, '');
       if (rel && !idx?.paths?.has(rel)) {
         // suffix match ("Foo.java", "src/x.ts" from a different checkout path)
@@ -67,7 +69,7 @@ export function parseFrames(text, root, idx) {
       } else if (!rel && path.isAbsolute(file)) {
         rel = null;
         for (const k of [3, 2]) {
-          const tail = file.split('/').slice(-k).join('/');
+          const tail = fwd.split('/').slice(-k).join('/');
           const cands = files.filter((x) => x.path === tail || x.path.endsWith(`/${tail}`));
           if (cands.length === 1) { rel = cands[0].path; break; }
         }

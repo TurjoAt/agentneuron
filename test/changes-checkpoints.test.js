@@ -155,7 +155,7 @@ test('file diff, validation, symlink refusal, delete and prune', async () => {
 
 test('works in a repo without commits and outside git', async () => {
   const d = tmp();
-  sh(d, 'init', '-q', '-b', 'main');
+  sh(d, 'init', '-q', '-b', 'main'); sh(d, 'config', 'core.autocrlf', 'false');
   w(d, 'first.txt', 'one\n');
   const cp = await createCheckpoint(d, { label: 'empty repo' });
   assert.equal(cp.base, null);
