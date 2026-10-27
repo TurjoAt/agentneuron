@@ -22,7 +22,7 @@
     { id: 'scope', label: 'Scope', count: s ? s.scope.criteria : null },
     { id: 'readiness', label: 'Readiness', count: s ? s.readiness.blockers + s.readiness.counts.medium : null },
     { id: 'placeholders', label: 'Placeholders', count: s ? s.placeholders.count : null },
-    { id: 'runs', label: 'Runs', count: s ? s.lastRuns.length : null },
+    { id: 'runs', label: 'Runs' },
   ]);
   const v = $derived(s ? VERDICT[s.verdict] : null);
 </script>
