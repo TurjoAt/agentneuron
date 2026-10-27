@@ -23,6 +23,14 @@ Analysis:
   verify [dir]       truth check: are the commands/paths/versions in context files real? exit 1 if any false (--json, --fix-preview)
   audit [dir]        security audit of agent config (MCP, permissions, hooks); exit 1 on high risk (--json)
   ci [dir]           lint + verify + audit + budget for CI (--format github|markdown|json, --fail-on, --base <ref>)
+  ship [dir]         is the work verified and ready to deploy? (--base ref, --run, --json)
+  review [dir]       risk-classified review of the current diff (--base ref, --json)
+  checkpoint <list|create|diff|restore> [dir]   safe restore points (--label, --id, --paths)
+  packages [dir]     check dependencies for look-alike, unknown or risky packages
+  resume [dir]       resume brief of a session or task (--session id, --task id, --md)
+  preflight [dir]    warnings before a command or edit (--command "...", --paths a,b); exit 2 on block
+  pack [dir]         task-specific context pack (--task "...", --budget 8000, --md)
+  debug [dir]        diagnostic report for an error (--error "..." or stdin, --md)
   usage [dir]        tokens, cost, cache, tools and anomalies from agent sessions (--range 7d, --json)
   lessons [dir]      rules to learn from agent sessions (corrections, reverts, failing commands) (--json)
 
@@ -120,6 +128,36 @@ Write an activity/health report. Default format "ai" (compact, for pasting into 
   usage: `Usage: agentneuron usage [dir] [--range 24h|7d|30d|90d|all] [--json] [--scope project|all]
 
 Tokens, cost (exact where Claude Code recorded it), cache hit rate, models, tools and anomalies from local agent sessions.`,
+  ship: `Usage: agentneuron ship [dir] [--base ref] [--run] [--json] [--fail-on high|medium|low]
+
+Completion and readiness report: changed files, test/build/lint results, acceptance criteria with evidence,
+production blockers and placeholder code. --run runs the detected checks first.`,
+  review: `Usage: agentneuron review [dir] [--base ref] [--json] [--fail-on high|medium|low]
+
+Risk-classified review of the current diff (or base..HEAD): sensitive areas, removed checks, missing tests.`,
+  checkpoint: `Usage: agentneuron checkpoint list|create|diff|restore [dir] [--label text] [--id id] [--paths a,b] [--yes]
+
+Safe restore points stored as git refs (refs/agentneuron/checkpoints/*). HEAD, the index and branches are
+never changed. restore only rewrites the given paths and asks first unless --yes.`,
+  packages: `Usage: agentneuron packages [dir] [--json] [--online]
+
+Check dependencies for names missing from the lockfile, look-alikes of popular packages and risky sources.
+Offline unless --online (or "packages": { "online": true } in config).`,
+  resume: `Usage: agentneuron resume [dir] [--session id] [--task id] [--md]
+
+Evidence-backed resume brief (goal, done, failed attempts, decisions, files, tests, next steps) to continue
+the work in a new session or another agent.`,
+  preflight: `Usage: agentneuron preflight [dir] --command "npm install x" [--paths a,b] [--json]
+
+Warnings from past mistakes, rules and repo facts for an action an agent is about to take.
+Exit code 2 when a warning blocks, so it can run from a PreToolUse hook.`,
+  pack: `Usage: agentneuron pack [dir] --task "describe the task" [--budget 8000] [--md]
+
+Task-specific context pack: the most relevant files, rules, facts and tests within a token budget.`,
+  debug: `Usage: agentneuron debug [dir] [--error "text"] [--md]
+
+Diagnostic report for an error or stack trace (or stdin): affected files, recent changes, config,
+dependencies, similar past failures and ranked hypotheses.`,
   lessons: `Usage: agentneuron lessons [dir] [--json] [--covered] [--all]
 
 Mine Claude Code and Codex sessions of this project for user corrections, reverted edits, commands
@@ -165,7 +203,7 @@ Asks before replacing anything unless --yes. agentneuron never checks for update
 
 function parseArgs(argv) {
   const o = { _: [], flags: {} };
-  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget', 'tools', 'tool', 'scope']);
+  const valued = new Set(['port', 'p', 'host', 'token', 'admin-token', 'enable', 'format', 'range', 'out', 'level', 'base', 'fail-on', 'budget', 'tools', 'tool', 'scope', 'command', 'session', 'task', 'paths', 'error', 'label', 'id']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
@@ -317,7 +355,7 @@ async function cmdStart(root, flags, workspace = false) {
   process.on('SIGTERM', stop);
 }
 
-const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons', 'usage', 'compile', 'rules', 'generate']);
+const COMMANDS = new Set(['start', 'lint', 'status', 'init', 'help', 'mcp', 'workspace', 'export', 'doctor', 'update', 'verify', 'audit', 'ci', 'lessons', 'usage', 'compile', 'rules', 'generate', 'ship', 'review', 'checkpoint', 'packages', 'resume', 'preflight', 'pack', 'debug']);
 
 export async function main(argv = process.argv.slice(2)) {
   const { _, flags } = parseArgs(argv);
@@ -332,7 +370,7 @@ export async function main(argv = process.argv.slice(2)) {
     const { cmdUpdate } = await import('./commands/update.js');
     return cmdUpdate(flags);
   }
-  const sub = cmd === 'rules' ? _.shift() : null;
+  const sub = cmd === 'rules' || cmd === 'checkpoint' ? _.shift() : null;
   const root = resolveRoot(_[0]);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     console.error(`agentneuron: not a directory: ${root}`); return 2;
@@ -349,6 +387,14 @@ export async function main(argv = process.argv.slice(2)) {
     case 'ci': return (await import('./commands/ci.js')).cmdCi(root, flags);
     case 'usage': return (await import('./commands/usage.js')).cmdUsage(root, flags);
     case 'lessons': return (await import('./commands/lessons.js')).cmdLessons(root, flags);
+    case 'ship': return (await import('./commands/ship.js')).cmdShip(root, flags);
+    case 'review': return (await import('./commands/changes.js')).cmdReview(root, flags);
+    case 'checkpoint': return (await import('./commands/changes.js')).cmdCheckpoint(root, sub, flags);
+    case 'packages': return (await import('./commands/changes.js')).cmdPackages(root, flags);
+    case 'resume': return (await import('./commands/brief.js')).cmdResume(root, flags);
+    case 'preflight': return (await import('./commands/brief.js')).cmdPreflight(root, flags);
+    case 'pack': return (await import('./commands/brief.js')).cmdPack(root, flags);
+    case 'debug': return (await import('./commands/brief.js')).cmdDebug(root, flags);
     case 'compile': return (await import('./commands/compile.js')).cmdCompile(root, flags);
     case 'rules': return (await import('./commands/compile.js')).cmdRules(root, sub, flags);
     case 'generate': return (await import('./commands/compile.js')).cmdGenerate(root, flags);

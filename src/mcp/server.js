@@ -25,6 +25,11 @@ import { createSessions } from '../agents/sessions.js';
 import { projectSessions } from '../insights/transcripts.js';
 import { lessonsFrom, readState, hiddenOf } from '../insights/index.js';
 import { planCompile, summarize } from '../compiler/index.js';
+import * as shipMcp from '../ship/mcp.js';
+import * as changesMcp from '../changes/mcp.js';
+import * as briefMcp from '../brief/mcp.js';
+
+const SLICE_MCP = [shipMcp, changesMcp, briefMcp];
 
 export const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
@@ -63,6 +68,7 @@ const TOOLS = [
     inputSchema: obj({ range: { type: 'string', enum: ['24h', '7d', '30d', '90d', 'all'] } }) },
   { name: 'compile_preview', description: 'Preview compiling the source rules (.agentneuron/rules/*.md) into each tool\'s files: which outputs are stale, which generated regions were edited by hand, what merge-back would pull in. Read-only.',
     inputSchema: obj({ tools: { type: 'string', description: 'Comma list: claude, codex, gemini, cursor, copilot, windsurf (default all)' }, diff: { type: 'boolean', description: 'Include per-file diffs' } }) },
+  ...SLICE_MCP.flatMap((m) => m.TOOL_DEFS),
 ];
 
 // ---- multi-agent coordination (claims are advisory; write tools need `agentneuron mcp --level state`) ----
@@ -290,6 +296,9 @@ export async function runMcpServer(root, config = {}, io = {}) {
     return { ...r, timeline: (r.timeline || []).slice(-Math.max(1, Math.min(1000, Number(limit) || 200))) };
   };
   tools.get_tool_health = async ({ range = '30d' } = {}) => maskDeep(await (await usage()).tools({ range }));
+  for (const m of SLICE_MCP) {
+    for (const [name, fn] of Object.entries(m.makeTools({ root: absRoot, config: cfg, store, home: io.home }))) tools[name] = async (args) => maskDeep(await fn(args || {}));
+  }
   tools.compile_preview = ({ tools: only, diff = false } = {}) => {
     if (only !== undefined && typeof only !== 'string') throw new Error('tools must be a comma separated string');
     return summarize(planCompile({ root: absRoot, config: cfg, store }, { tools: only }), { content: diff === true });

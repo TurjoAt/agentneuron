@@ -46,7 +46,7 @@ test('MCP stdio server: initialize, tools/list, tools/call', async () => {
     assert.ok(init.result.capabilities.tools);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const list = await rpc('tools/list', {});
-    assert.deepEqual(list.result.tools.map((t) => t.name).sort(), ['audit_agent_config', 'compile_preview', 'get_context', 'get_handoffs', 'get_health', 'get_links', 'get_session_replay', 'get_tasks', 'get_tool_health', 'get_usage', 'list_claims', 'list_files', 'project_info', 'read_file', 'recent_changes', 'report_export', 'search', 'suggest_rules', 'verify_context']);
+    assert.deepEqual(list.result.tools.map((t) => t.name).sort(), ['audit_agent_config', 'check_package', 'compile_preview', 'get_change_impact', 'get_context', 'get_context_pack', 'get_debug_report', 'get_handoffs', 'get_health', 'get_links', 'get_resume_brief', 'get_session_replay', 'get_ship_report', 'get_task_scope', 'get_tasks', 'get_tool_health', 'get_usage', 'list_claims', 'list_files', 'preflight_check', 'project_info', 'read_file', 'recent_changes', 'report_export', 'review_changes', 'search', 'suggest_rules', 'verify_context']);
     for (const t of list.result.tools) assert.equal(t.inputSchema.type, 'object');
 
     const files = await call('list_files', {});

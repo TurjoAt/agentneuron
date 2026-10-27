@@ -40,13 +40,16 @@
   import Usage from './views/Usage.svelte';
   import Sessions from './views/Sessions.svelte';
   import Memory from './views/Memory.svelte';
+  import Ship from './views/Ship.svelte';
+  import Changes from './views/Changes.svelte';
+  import Brief from './views/Brief.svelte';
   import EntityDrawer from './lib/EntityDrawer.svelte';
   import BootScreen from './lib/boot/BootScreen.svelte';
   import RelatedStrip from './lib/RelatedStrip.svelte';
   import ProductMap from './lib/map/ProductMap.svelte';
   import { entity, closeEntity } from './lib/entity.svelte.js';
 
-  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights, rules: Rules, usage: Usage, sessions: Sessions, memory: Memory };
+  const COMPONENTS = { overview: Overview, graph: Graph, files: Files, diff: Diff, context: Context, health: Health, tasks: Tasks, git: Git, agents: Agents, reports: Reports, project: Project, settings: Settings, live: Live, verify: Verify, insights: Insights, rules: Rules, usage: Usage, sessions: Sessions, memory: Memory, ship: Ship, changes: Changes, brief: Brief };
   const MODALS = { confirm: ConfirmDialog, 'new-file': NewFileDialog, rename: RenameDialog, replace: ReplaceDialog, task: TaskModal, shortcuts: ShortcutsDialog, map: ProductMap };
   const View = $derived(COMPONENTS[app.route.view] || Overview);
   const ModalC = $derived(app.modal ? MODALS[app.modal.kind] : null);

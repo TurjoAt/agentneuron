@@ -8,6 +8,9 @@ import { insightRoutes } from './mock-insight.js';
 import { insightsRoutes } from './mock-insights.js';
 import { usageRoutes } from './mock-usage.js';
 import { usageShellRoutes } from './mock-usage-shell.js';
+import { shipRoutes } from './mock-ship.js';
+import { changesRoutes } from './mock-changes.js';
+import { briefRoutes } from './mock-brief.js';
 
 const MIN = 60_000;
 const rand = (n) => Math.floor(Math.random() * n);
@@ -1330,6 +1333,10 @@ export function createMock() {
   for (const [k, fn] of Object.entries(usageRoutes({ sessions: () => sessions }))) routes[k] = fn;
   for (const [k, fn] of Object.entries(usageShellRoutes({ sessions: () => sessions, files: filesList, commits: () => commits, role: () => role }))) routes[k] = fn;
   // ---- end usage ----
+
+  // ---- quality round (mock-ship.js: A, mock-changes.js: B, mock-brief.js: C) ----
+  for (const mk of [shipRoutes, changesRoutes, briefRoutes]) for (const [k, fn] of Object.entries(mk({ role: () => role, sessions: () => sessions, files: filesList, commits: () => commits }))) routes[k] = fn;
+  // ---- end quality ----
 
   // UI-B insight routes (reports, project, agents, workspace, git stats…) — called as fn(q, init)
   const insight = insightRoutes({ graph, files: filesList, sessions: () => sessions, health });
