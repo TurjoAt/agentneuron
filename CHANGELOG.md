@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-28
+
 ### Added
 
 - **Usage & cost** page and `agentneuron usage`: cost per day, model, branch, agent and session from local Claude Code and Codex logs. Cost is exact where Claude Code recorded it (`cost-state`) and marked as an estimate otherwise; every figure reports its coverage. Cache hit rate and savings, tokens, turn times, daily budget with burn rate and projection, alerts (cost spikes, repeated tool failures, context jumps, slow turns, denials) and tips.
@@ -155,7 +157,8 @@ Initial release, developed as `mdctl`: a live monitor for AI-context Markdown.
 - Agent session discovery and a concurrent-edit conflict radar.
 - Server-Sent Events live updates, text search, token authentication, `init` and `status` commands.
 
-[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/TurjoAt/agentneuron/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/TurjoAt/agentneuron/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...v1.0.0
 [0.3.0]: https://github.com/TurjoAt/agentneuron/compare/v0.2.1...v1.0.0
 [0.2.1]: https://github.com/TurjoAt/agentneuron/compare/v0.2.0...v0.2.1

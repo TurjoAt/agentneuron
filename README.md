@@ -291,7 +291,7 @@ Not by default. It writes only inside `.agentneuron/` (and, when you create a ch
 
 ### How do I lint CLAUDE.md or AGENTS.md in CI?
 
-Use the GitHub Action (`uses: TurjoAt/agentneuron@v1.0.0`) or run `npx agentneuron ci`. It runs lint, the truth check and the security audit, annotates the pull request, and with `--base` reports only problems the change introduced. See [docs/ci.md](docs/ci.md) and [examples/ci](examples/ci/).
+Use the GitHub Action (`uses: TurjoAt/agentneuron@v1.1.0`) or run `npx agentneuron ci`. It runs lint, the truth check and the security audit, annotates the pull request, and with `--base` reports only problems the change introduced. See [docs/ci.md](docs/ci.md) and [examples/ci](examples/ci/).
 
 ### How do I keep CLAUDE.md, AGENTS.md and Cursor rules in sync?
 

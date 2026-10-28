@@ -22,7 +22,7 @@ jobs:
           node-version: 20
 
       # Pin the action to a release tag; it runs the matching agentneuron version.
-      - uses: TurjoAt/agentneuron@v1.0.0
+      - uses: TurjoAt/agentneuron@v1.1.0
         with:
           path: .
           fail-on: error # or: warn, never

@@ -1,6 +1,6 @@
 {
   "name": "agentneuron",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local dashboard, CLI and MCP server for AI coding agents: watch Claude Code and Codex edit live, track session cost, verify the work is done and safe to ship, review risky changes, and keep CLAUDE.md/AGENTS.md true.",
   "keywords": [
     "claude-code",
